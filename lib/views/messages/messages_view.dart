@@ -228,16 +228,19 @@ class MessagesView extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        name,
-                        style: TextStyle(
-                          color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-                          fontSize: 16,
-                          fontWeight: unread > 0 ? FontWeight.w600 : FontWeight.w500,
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+                            fontSize: 16,
+                            fontWeight: unread > 0 ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         time,
                         style: TextStyle(

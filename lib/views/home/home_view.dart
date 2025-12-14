@@ -4,6 +4,7 @@ import '../../core/controllers/app_controller.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../widgets/bottom_nav.dart';
+import '../../widgets/home_header.dart';
 
 class HomeView extends StatefulWidget {
   const HomeView({super.key});
@@ -65,15 +66,9 @@ class _HomeViewState extends State<HomeView> {
               slivers: [
                 // Space for header
                 SliverToBoxAdapter(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    height: showHeader ? 60 : 12,
+                  child: SizedBox(
+                    height: MediaQuery.of(context).padding.top + 60,
                   ),
-                ),
-                
-                // Header
-                SliverToBoxAdapter(
-                  child: _buildHeader(isDark, language),
                 ),
                 
                 // Posts
@@ -89,6 +84,28 @@ class _HomeViewState extends State<HomeView> {
                   child: SizedBox(height: 120),
                 ),
               ],
+            ),
+            
+            // Fixed Header at top (positioned after scroll view to be on top)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: AnimatedSlide(
+                duration: const Duration(milliseconds: 250),
+                offset: showHeader ? Offset.zero : const Offset(0, -1),
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 250),
+                  opacity: showHeader ? 1.0 : 0.0,
+                  child: Container(
+                    color: isDark ? AppColors.darkBackground : Colors.white,
+                    child: SafeArea(
+                      bottom: false,
+                      child: const HomeHeader(),
+                    ),
+                  ),
+                ),
+              ),
             ),
             
             // Bottom Navigation
@@ -107,62 +124,6 @@ class _HomeViewState extends State<HomeView> {
     });
   }
 
-  Widget _buildHeader(bool isDark, AppLanguage language) {
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 250),
-      opacity: showHeader ? 1.0 : 0.0,
-      child: Container(
-        padding: EdgeInsets.only(
-          top: MediaQuery.of(context).padding.top + 8,
-          left: 16,
-          right: 16,
-          bottom: 8,
-        ),
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkBackground : Colors.white,
-          border: Border(
-            bottom: BorderSide(
-              color: isDark ? AppColors.darkBorder.withOpacity(0.4) : AppColors.lightBorder.withOpacity(0.4),
-            ),
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            // Logo/Title
-            Text(
-              language == AppLanguage.bn ? 'তর্ক' : 'Torko',
-              style: TextStyle(
-                color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            
-            // Actions
-            Row(
-              children: [
-                IconButton(
-                  icon: Icon(
-                    Icons.notifications_outlined,
-                    color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-                  ),
-                  onPressed: () => Get.toNamed(AppRoutes.notifications),
-                ),
-                IconButton(
-                  icon: Icon(
-                    Icons.settings_outlined,
-                    color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-                  ),
-                  onPressed: () => Get.toNamed(AppRoutes.settings),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildPostCard(int index, bool isDark, AppLanguage language) {
     final authors = [

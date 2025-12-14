@@ -22,26 +22,29 @@ class _SplashViewState extends State<SplashView> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final logoSize = screenWidth < 350 ? 150.0 : 200.0;
+    
     return Scaffold(
       backgroundColor: AppColors.lightSecondary, // #B8DED6
       body: Center(
           child: Image.asset(
-            'react/src/assets/54b40a5db169e3bbfb66dd47ad9182426b12a2e8.png',
-            width: 200,
-            height: 200,
+            'assets/images/app_logo.png',
+            width: logoSize,
+            height: logoSize,
             errorBuilder: (context, error, stackTrace) {
               return Container(
-                width: 200,
-                height: 200,
+                width: logoSize,
+                height: logoSize,
                 decoration: BoxDecoration(
                   color: AppColors.lightPrimary,
-                  borderRadius: BorderRadius.circular(40),
+                  borderRadius: BorderRadius.circular(logoSize * 0.2),
                 ),
-                child: const Center(
+                child: Center(
                   child: Text(
                     'তর্ক',
                     style: TextStyle(
-                      fontSize: 48,
+                      fontSize: logoSize * 0.24,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),

@@ -188,38 +188,55 @@ class _CreatePostViewState extends State<CreatePostView> {
                   ),
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildMediaOption(
-                    icon: Icons.image,
-                    label: language == AppLanguage.bn ? 'ছবি' : 'Photo',
-                    color: Colors.green,
-                    isDark: isDark,
-                    onTap: () {},
-                  ),
-                  _buildMediaOption(
-                    icon: Icons.videocam,
-                    label: language == AppLanguage.bn ? 'ভিডিও' : 'Video',
-                    color: Colors.red,
-                    isDark: isDark,
-                    onTap: () {},
-                  ),
-                  _buildMediaOption(
-                    icon: Icons.poll,
-                    label: language == AppLanguage.bn ? 'পোল' : 'Poll',
-                    color: Colors.orange,
-                    isDark: isDark,
-                    onTap: () {},
-                  ),
-                  _buildMediaOption(
-                    icon: Icons.location_on,
-                    label: language == AppLanguage.bn ? 'স্থান' : 'Location',
-                    color: Colors.blue,
-                    isDark: isDark,
-                    onTap: () {},
-                  ),
-                ],
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isSmallScreen = constraints.maxWidth < 300;
+                  return Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      Flexible(
+                        child: _buildMediaOption(
+                          icon: Icons.image,
+                          label: language == AppLanguage.bn ? 'ছবি' : 'Photo',
+                          color: Colors.green,
+                          isDark: isDark,
+                          isSmall: isSmallScreen,
+                          onTap: () {},
+                        ),
+                      ),
+                      Flexible(
+                        child: _buildMediaOption(
+                          icon: Icons.videocam,
+                          label: language == AppLanguage.bn ? 'ভিডিও' : 'Video',
+                          color: Colors.red,
+                          isDark: isDark,
+                          isSmall: isSmallScreen,
+                          onTap: () {},
+                        ),
+                      ),
+                      Flexible(
+                        child: _buildMediaOption(
+                          icon: Icons.poll,
+                          label: language == AppLanguage.bn ? 'পোল' : 'Poll',
+                          color: Colors.orange,
+                          isDark: isDark,
+                          isSmall: isSmallScreen,
+                          onTap: () {},
+                        ),
+                      ),
+                      Flexible(
+                        child: _buildMediaOption(
+                          icon: Icons.location_on,
+                          label: language == AppLanguage.bn ? 'স্থান' : 'Location',
+                          color: Colors.blue,
+                          isDark: isDark,
+                          isSmall: isSmallScreen,
+                          onTap: () {},
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
           ],
@@ -234,20 +251,22 @@ class _CreatePostViewState extends State<CreatePostView> {
     required Color color,
     required bool isDark,
     required VoidCallback onTap,
+    bool isSmall = false,
   }) {
     return GestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: color, size: 24),
+          Icon(icon, color: color, size: isSmall ? 20 : 24),
           const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(
               color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-              fontSize: 11,
+              fontSize: isSmall ? 10 : 11,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

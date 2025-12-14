@@ -115,72 +115,78 @@ class BottomNav extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Stack(
-            clipBehavior: Clip.none,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: AppSizes.bottomNavItemSize,
-                height: AppSizes.bottomNavItemSize,
-                decoration: BoxDecoration(
-                  color: isActive ? AppColors.bottomNavActive : Colors.transparent,
-                  shape: BoxShape.circle,
-                  boxShadow: isActive
-                      ? [
-                          BoxShadow(
-                            color: AppColors.bottomNavActive.withOpacity(0.3),
-                            blurRadius: 8,
-                            spreadRadius: -2,
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Icon(
-                  isActive ? activeIcon : icon,
-                  color: Colors.white,
-                  size: isActive ? AppSizes.bottomNavIconSizeActive : AppSizes.bottomNavIconSize,
-                ),
-              ),
-              if (badge != null && badge > 0)
-                Positioned(
-                  top: -4,
-                  right: -4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: AppSizes.bottomNavItemSize,
+                    height: AppSizes.bottomNavItemSize,
                     decoration: BoxDecoration(
-                      color: AppColors.bottomNavNotificationBadge,
+                      color: isActive ? AppColors.bottomNavActive : Colors.transparent,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: isActive
+                          ? [
+                              BoxShadow(
+                                color: AppColors.bottomNavActive.withOpacity(0.3),
+                                blurRadius: 8,
+                                spreadRadius: -2,
+                              ),
+                            ]
+                          : null,
                     ),
-                    constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
-                    child: Center(
-                      child: Text(
-                        badge > 99 ? '99+' : badge.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
+                    child: Icon(
+                      isActive ? activeIcon : icon,
+                      color: Colors.white,
+                      size: isActive ? AppSizes.bottomNavIconSizeActive : AppSizes.bottomNavIconSize,
+                    ),
+                  ),
+                  if (badge != null && badge > 0)
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.bottomNavNotificationBadge,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Center(
+                          child: Text(
+                            badge > 99 ? '99+' : badge.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                ],
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(isActive ? 1.0 : 0.7),
+                  fontSize: AppSizes.bottomNavTextSize,
+                  fontWeight: FontWeight.w500,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
             ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(isActive ? 1.0 : 0.7),
-              fontSize: AppSizes.bottomNavTextSize,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

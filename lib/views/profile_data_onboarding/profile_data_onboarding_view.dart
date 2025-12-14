@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,9 +28,12 @@ class _ProfileDataOnboardingViewState extends State<ProfileDataOnboardingView> {
   Future<void> handleSubmit() async {
     if (isFormValid) {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('torko_user_profile', '''
-        {"fullName": "${nameController.text}", "dateOfBirth": "${selectedDate?.toIso8601String()}", "gender": "$selectedGender"}
-      ''');
+      await prefs.setString('torko_user_profile', jsonEncode({
+        'name': nameController.text,
+        'fullName': nameController.text,
+        'dateOfBirth': selectedDate?.toIso8601String(),
+        'gender': selectedGender,
+      }));
       Get.offNamed(AppRoutes.locationData);
     }
   }
@@ -62,9 +66,12 @@ class _ProfileDataOnboardingViewState extends State<ProfileDataOnboardingView> {
       return Scaffold(
         backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFFF5F5F5),
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 64),
-            child: Column(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final horizontalPadding = constraints.maxWidth < 350 ? 20.0 : 32.0;
+              return SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 48),
+                child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Title
@@ -97,6 +104,7 @@ class _ProfileDataOnboardingViewState extends State<ProfileDataOnboardingView> {
                   hint: appController.t('enterFullName'),
                   isDark: isDark,
                   hasValue: nameController.text.trim().isNotEmpty,
+
                 ),
                 const SizedBox(height: 24),
                 
@@ -143,7 +151,9 @@ class _ProfileDataOnboardingViewState extends State<ProfileDataOnboardingView> {
                   ),
                 ),
               ],
-            ),
+                ),
+              );
+            },
           ),
         ),
       );
@@ -168,13 +178,13 @@ class _ProfileDataOnboardingViewState extends State<ProfileDataOnboardingView> {
   }) {
     return Container(
       height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0a2f3d) : const Color(0xFFFAFAF8),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark ? const Color(0xFF0d3a4a) : Colors.black.withValues(alpha: 0.1),
-          width: 2,
+          width: 0,
         ),
       ),
       child: Row(
@@ -187,11 +197,16 @@ class _ProfileDataOnboardingViewState extends State<ProfileDataOnboardingView> {
                 fontSize: 16,
               ),
               decoration: InputDecoration(
+                filled: false,
+                contentPadding: EdgeInsets.symmetric(horizontal: 16),
                 hintText: hint,
                 hintStyle: TextStyle(
                   color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.3),
                 ),
+          //      border: InputBorder.none,
                 border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
               ),
               onChanged: (_) => setState(() {}),
             ),
