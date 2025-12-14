@@ -90,25 +90,28 @@ class _ConversationViewState extends State<ConversationView> {
                 ],
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: TextStyle(
-                      color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: TextStyle(
+                        color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                  Text(
-                    online ? 'Online' : 'Offline',
-                    style: TextStyle(
-                      color: online ? Colors.green : AppColors.lightMutedForeground,
-                      fontSize: 12,
+                    Text(
+                      online ? 'Online' : 'Offline',
+                      style: TextStyle(
+                        color: online ? Colors.green : AppColors.lightMutedForeground,
+                        fontSize: 12,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),

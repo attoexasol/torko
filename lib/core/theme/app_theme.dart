@@ -15,12 +15,10 @@ class AppTheme {
         primary: AppColors.lightPrimary,
         secondary: AppColors.lightSecondary,
         surface: AppColors.lightCard,
-        background: AppColors.lightBackground,
         error: AppColors.lightDestructive,
         onPrimary: AppColors.lightPrimaryForeground,
         onSecondary: AppColors.lightSecondaryForeground,
         onSurface: AppColors.lightForeground,
-        onBackground: AppColors.lightForeground,
         onError: AppColors.lightDestructiveForeground,
       ),
       cardTheme: CardThemeData(
@@ -30,22 +28,21 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppSizes.radius),
         ),
       ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: AppColors.lightInputBackground,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radius),
-          borderSide: BorderSide(color: AppColors.lightBorder),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radius),
-          borderSide: BorderSide(color: AppColors.lightBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radius),
-          borderSide: BorderSide(color: AppColors.lightRing, width: 2),
-        ),
+      // inputDecorationTheme: InputDecorationTheme(
+      //   filled: true,
+      //   fillColor: AppColors.lightInputBackground,
+      //   border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSizes.radius), borderSide: BorderSide(color: AppColors.lightBorder),),
+      //   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSizes.radius), borderSide: BorderSide(color: AppColors.lightBorder),),
+      //   focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppSizes.radius), borderSide: BorderSide(color: AppColors.lightRing, width: 0),),
+      // ),
+
+      inputDecorationTheme: const InputDecorationTheme(
+        border: InputBorder.none,
+        enabledBorder: InputBorder.none,
+        focusedBorder: InputBorder.none,
+        disabledBorder: InputBorder.none,
       ),
+
       textTheme: TextTheme(
         displayLarge: TextStyle(
           fontSize: AppSizes.fontSize2xl,
@@ -115,12 +112,10 @@ class AppTheme {
         primary: AppColors.darkPrimary,
         secondary: AppColors.darkSecondary,
         surface: AppColors.darkCard,
-        background: AppColors.darkBackground,
         error: AppColors.darkDestructive,
         onPrimary: AppColors.darkPrimaryForeground,
         onSecondary: AppColors.darkSecondaryForeground,
         onSurface: AppColors.darkForeground,
-        onBackground: AppColors.darkForeground,
         onError: AppColors.darkDestructiveForeground,
       ),
       cardTheme: CardThemeData(

@@ -29,18 +29,18 @@ class AppSizes {
   static const double spacing2xl = 48.0;
 
   // Bottom Nav
-  static const double bottomNavHeight = 90.0;
-  static const double bottomNavItemSize = 52.0;
-  static const double bottomNavCenterButtonSize = 55.0;
-  static const double bottomNavIconSize = 24.0;
-  static const double bottomNavIconSizeActive = 20.0;
-  static const double bottomNavTextSize = 9.0;
+  static const double bottomNavHeight = 85.0;
+  static const double bottomNavItemSize = 46.0;
+  static const double bottomNavCenterButtonSize = 50.0;
+  static const double bottomNavIconSize = 22.0;
+  static const double bottomNavIconSizeActive = 18.0;
+  static const double bottomNavTextSize = 8.0;
 
   // Scrollbar
   static const double scrollbarWidth = 6.0;
 
   // Screen
-  static const double minScreenWidth = 350.0;
+  static const double minScreenWidth = 280.0;
   static const double maxScreenWidth = 768.0;
 }
 

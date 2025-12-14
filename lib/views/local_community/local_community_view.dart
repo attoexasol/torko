@@ -229,34 +229,45 @@ class LocalCommunityView extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Row(
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
                     children: [
-                      Icon(
-                        Icons.people_outline,
-                        size: 14,
-                        color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.people_outline,
+                            size: 14,
+                            color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$members ${language == AppLanguage.bn ? 'সদস্য' : 'members'}',
+                            style: TextStyle(
+                              color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$members ${language == AppLanguage.bn ? 'সদস্য' : 'members'}',
-                        style: TextStyle(
-                          color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-                          fontSize: 13,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.article_outlined,
-                        size: 14,
-                        color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$posts ${language == AppLanguage.bn ? 'পোস্ট' : 'posts'}',
-                        style: TextStyle(
-                          color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-                          fontSize: 13,
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.article_outlined,
+                            size: 14,
+                            color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '$posts ${language == AppLanguage.bn ? 'পোস্ট' : 'posts'}',
+                            style: TextStyle(
+                              color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

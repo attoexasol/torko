@@ -320,14 +320,22 @@ class _LoginViewState extends State<LoginView> {
                                     : const Color(0xFF2C2C2E),
                                 fontSize: 16,
                               ),
+
                               decoration: InputDecoration(
                                 hintText: '01XXX-XXXXXX',
                                 hintStyle: TextStyle(
-                                  color: (isDark ? Colors.white : Colors.black)
-                                      .withOpacity(0.3),
+                                  color: (isDark ? Colors.white : Colors.black).withOpacity(0.3),
                                 ),
+
+                                filled: false,
+
                                 border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                disabledBorder: InputBorder.none,
+                                errorBorder: InputBorder.none,
                               ),
+
                               inputFormatters: [
                                 FilteringTextInputFormatter.allow(
                                   RegExp(r'[0-9-]'),
@@ -578,9 +586,7 @@ class _LoginViewState extends State<LoginView> {
                   ),
                   child: Icon(
                     isDark ? Icons.wb_sunny : Icons.nightlight_round,
-                    color: isDark
-                        ? const Color(0xFFF5F5F5)
-                        : const Color(0xFF2C2C2E),
+                    color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF2C2C2E),
                     size: 20,
                   ),
                 ),
@@ -764,7 +770,7 @@ class _LoginViewState extends State<LoginView> {
       margin: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0a2f3d) : const Color(0xFFFAFAF8),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isDark
               ? const Color(0xFF0d3a4a)
@@ -784,8 +790,13 @@ class _LoginViewState extends State<LoginView> {
           fontWeight: FontWeight.w600,
         ),
         decoration: const InputDecoration(
-          border: InputBorder.none,
+       //   border: InputBorder.none,
           counterText: '',
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
         ),
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
         onChanged: (value) {
