@@ -221,23 +221,100 @@ class _LocationOnboardingViewState extends State<LocationOnboardingView> {
     });
   }
 
-  Future<void> handleComplete() async {
-    if (isFormValid) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('torko_user_location', jsonEncode({
-        'division': selectedDivision!.nameEn,
-        'divisionBn': selectedDivision!.nameBn,
-        'district': selectedDistrict!.nameEn,
-        'districtBn': selectedDistrict!.nameBn,
-        'upazila': selectedUpazila,
-      }));
-      Get.offNamed(AppRoutes.welcomeProfile);
-    }
-  }
 
-  void handleChangeLater() {
-    Get.offNamed(AppRoutes.welcomeProfile);
+
+
+// Updated methods for location_onboarding_view.dart
+// Replace existing methods with these
+// //aman":
+Future<void> handleComplete() async {
+  if (isFormValid) {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('torko_user_location', jsonEncode({
+      'division': selectedDivision!.nameEn,
+      'divisionBn': selectedDivision!.nameBn,
+      'district': selectedDistrict!.nameEn,
+      'districtBn': selectedDistrict!.nameBn,
+      'upazila': selectedUpazila,
+    }));
+    
+    // Mark registration as completed
+    await prefs.setBool('torko_registration_completed', true);
+    await prefs.setBool('torko_onboarding_completed', true);
+    
+    // Show success alert and navigate to Dashboard
+    Get.offAllNamed(AppRoutes.profile);
   }
+}
+
+  // Future<void> handleComplete() async {
+  //   if (isFormValid) {
+  //     final prefs = await SharedPreferences.getInstance();
+  //     await prefs.setString('torko_user_location', jsonEncode({
+  //       'division': selectedDivision!.nameEn,
+  //       'divisionBn': selectedDivision!.nameBn,
+  //       'district': selectedDistrict!.nameEn,
+  //       'districtBn': selectedDistrict!.nameBn,
+  //       'upazila': selectedUpazila,
+  //     }));
+  //     Get.offNamed(AppRoutes.welcomeProfile);
+  //   }
+  // }
+
+
+
+void handleChangeLater() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('torko_registration_completed', true);
+  await prefs.setBool('torko_onboarding_completed', true);
+
+  // ✅ Direct navigation
+  Get.offAllNamed(AppRoutes.profile);
+}
+
+
+  // void handleChangeLater() {
+  //   Get.offNamed(AppRoutes.welcomeProfile);
+  // }
+
+Widget _buildFeatureRow({
+  required IconData icon,
+  required String text,
+  required bool isDark,
+}) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: AppColors.lightPrimary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(
+            icon,
+            size: 14,
+            color: AppColors.lightPrimary,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'NotoSansBengali',
+              fontSize: 14,
+              color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+              height: 1.4,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
 
   void handleBackStep() {
     setState(() {

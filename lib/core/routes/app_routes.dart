@@ -6,6 +6,7 @@ class AppRoutes {
   static const String locationData = '/locationData';
   static const String welcomeProfile = '/welcomeProfile';
   static const String home = '/home';
+  static const String dashboard = '/dashboard';
   static const String createPost = '/createPost';
   static const String notifications = '/notifications';
   static const String profile = '/profile';
@@ -25,4 +26,5 @@ class AppRoutes {
   static const String calling = '/calling';
   static const String postDetail = '/postDetail';
 }
+
 

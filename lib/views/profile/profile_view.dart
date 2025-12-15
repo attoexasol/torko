@@ -226,16 +226,407 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
     }
   }
   
-  List<Map<String, dynamic>> get _profileCompletionItems {
-    final isBn = appController.language == AppLanguage.bn;
-    return [
-      {'id': 'bio', 'completed': _hasBio, 'label': isBn ? 'বায়ো যোগ করুন' : 'Add bio'},
-      {'id': 'photo', 'completed': _hasProfilePhoto, 'label': isBn ? 'প্রোফাইল ছবি যোগ করুন' : 'Add profile photo'},
-      {'id': 'cover', 'completed': _hasCoverPhoto, 'label': isBn ? 'কভার ছবি যোগ করুন' : 'Add cover photo'},
-      {'id': 'location', 'completed': _hasLocation, 'label': isBn ? 'লোকেশন যোগ করুন' : 'Add location'},
-      {'id': 'post', 'completed': _hasFirstPost, 'label': isBn ? 'প্রথম পোস্ট করুন' : 'Make first post'},
-    ];
+
+//aman
+
+// 1. Updated _profileCompletionItems getter matching first image style
+List<Map<String, dynamic>> get _profileCompletionItems {
+  final isBn = appController.language == AppLanguage.bn;
+  return [
+    {
+      'id': 'complete_profile',
+      'completed': _hasProfilePhoto && _hasBio && _savedName.isNotEmpty,
+      'label': isBn ? 'প্রোফাইল সম্পূর্ণ করুন' : 'Complete your profile',
+      'subLabel': isBn ? 'প্রোফাইল ছবি এবং বায়ো যোগ করুন' : 'Add profile photo and bio',
+      'icon': Icons.person_rounded,
+      'action': 'complete_profile',
+    },
+    {
+      'id': 'find_area',
+      'completed': _hasLocation,
+      'label': isBn ? 'আপনার এলাকা খুঁজুন' : 'Find your area',
+      'subLabel': isBn ? 'এলাকা এবং শহরের নাম যুক্ত করুন' : 'Add your area and city name',
+      'icon': Icons.location_on_rounded,
+      'action': 'find_area',
+    },
+    {
+      'id': 'follow_groups',
+      'completed': _hasJoinedGroup,
+      'label': isBn ? 'গ্রুপ সংযুক্ত করুন' : 'Connect to groups',
+      'subLabel': isBn ? 'আপনার আগ্রহের গ্রুপ খোঁজ করুন' : 'Find groups of your interest',
+      'icon': Icons.people_rounded,
+      'action': 'follow_groups',
+    },
+    {
+      'id': 'create_first_post',
+      'completed': _hasFirstPost,
+      'label': isBn ? 'প্রথম পোস্ট করুন' : 'Make first post',
+      'subLabel': isBn ? 'আপনার প্রথম ছবি বা কথার পোস্ট করুন' : 'Post your first photo or text',
+      'icon': Icons.chat_bubble_rounded,
+      'action': 'create_post',
+    },
+  ];
+}
+
+// 2. Add this boolean variable to your existing variables (around line 42)
+bool _hasJoinedGroup = false;
+
+// 3. Updated profile completion section matching first image
+Widget _buildHorizontalProfileCompletion(bool isDark, bool isBn) {
+  return Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: isDark ? const Color(0xFF0F2027) : const Color(0xFFF8F9FA),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: isDark ? const Color(0xFF1A3B43) : const Color(0xFFE0E0E0),
+        width: 1,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header section (optional - you can remove if not needed)
+        Row(
+          children: [
+            Text(
+              isBn ? 'প্রোফাইল সেটআপ' : 'Profile Setup',
+              style: GoogleFonts.roboto(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : const Color(0xFF0f1419),
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '$_completionPercentage%',
+              style: GoogleFonts.roboto(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: AppColors.lightPrimary,
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 12),
+        
+        // Progress Bar
+        Container(
+          height: 4,
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1A3B43) : const Color(0xFFE0E0E0),
+            borderRadius: BorderRadius.circular(2),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: _completionPercentage / 100,
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.lightPrimary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Vertical List Items - Exactly like first image
+        _buildVerticalCompletionList(isDark, isBn),
+      ],
+    ),
+  );
+}
+
+
+// 4. Build vertical completion list matching first image design
+Widget _buildVerticalCompletionList(bool isDark, bool isBn) {
+  final incompleteItems = _profileCompletionItems.where((item) => !item['completed']).toList();
+  
+  // Show completion message when all tasks are done
+  if (incompleteItems.isEmpty) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.lightPrimary.withOpacity(0.1),
+            AppColors.lightSecondary.withOpacity(0.1),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.celebration_rounded,
+            color: AppColors.lightPrimary,
+            size: 32,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            isBn ? '🎉 প্রোফাইল সেটআপ সম্পূর্ণ!' : '🎉 Profile Setup Complete!',
+            style: GoogleFonts.roboto(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: AppColors.lightPrimary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
+  // Vertical list of incomplete items
+  return Column(
+    children: incompleteItems.map((item) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _buildVerticalListItem(item, isDark, isBn),
+      );
+    }).toList(),
+  );
+}
+
+
+
+// 5. Build individual list item exactly like first image
+Widget _buildVerticalListItem(Map<String, dynamic> item, bool isDark, bool isBn) {
+  return GestureDetector(
+    onTap: () => _handleActionCardTap(item['action']),
+    child: Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A3B43) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? const Color(0xFF2A4A53) : const Color(0xFFE0E0E0),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Icon circle - matching first image
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF2A4A53) : const Color(0xFFF5F5F5),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(
+              item['icon'],
+              color: AppColors.lightPrimary,
+              size: 20,
+            ),
+          ),
+          
+          const SizedBox(width: 16),
+          
+          // Text content - matching first image layout
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item['label'],
+                  style: GoogleFonts.roboto(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF0f1419),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item['subLabel'],
+                  style: GoogleFonts.roboto(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFF8e8e8e) : const Color(0xFF666666),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Orange checkmark circle - exactly like first image
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: AppColors.lightPrimary,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.check_rounded,
+              color: Colors.white,
+              size: 16,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+
+// 5. Completion celebration widget
+Widget _buildCompletionCelebration(bool isDark, bool isBn) {
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [
+          AppColors.lightPrimary.withOpacity(0.1),
+          AppColors.lightSecondary.withOpacity(0.1),
+        ],
+      ),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: AppColors.lightPrimary.withOpacity(0.3),
+      ),
+    ),
+    child: Column(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [AppColors.lightPrimary, AppColors.lightSecondary],
+            ),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: const Icon(
+            Icons.celebration_rounded,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          isBn ? '🎉 প্রোফাইল সেটআপ সম্পূর্ণ!' : '🎉 Profile Setup Complete!',
+          style: GoogleFonts.roboto(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: AppColors.lightPrimary,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          isBn 
+            ? 'আপনার প্রোফাইল সম্পূর্ণভাবে প্রস্তুত! এখন কমিউনিটির সাথে যুক্ত হন।'
+            : 'Your profile is fully set up! Start connecting with the community.',
+          style: GoogleFonts.roboto(
+            fontSize: 13,
+            color: isDark ? const Color(0xFF8e8e8e) : const Color(0xFF666666),
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    ),
+  );
+}
+
+
+Widget _buildActionCard(Map<String, dynamic> item, bool isDark, bool isBn) {
+  return GestureDetector(
+    onTap: () => _handleActionCardTap(item['action']),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isDark ? const Color(0xFF3A3A3A) : const Color(0xFFE0E0E0),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            item['icon'],
+            size: 16,
+            color: isDark ? const Color(0xFFB0B0B0) : const Color(0xFF666666),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            item['shortLabel'],
+            style: GoogleFonts.roboto(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF333333),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+// // 6. Updated action handler for new actions
+// void _handleActionCardTap(String action) {
+//   switch (action) {
+//     case 'complete_profile':
+//       _handleEditClick();
+//       break;
+//     case 'find_area':
+//       _handleEditClick(); // Opens edit mode to set location
+//       break;
+//     case 'follow_groups':
+//       Get.toNamed(AppRoutes.localCommunity);
+//       break;
+//     case 'upload_cover':
+//       _pickCoverImage();
+//       break;
+//     case 'create_post':
+//       Get.toNamed(AppRoutes.createPost);
+//       break;
+//     // Keep existing actions for backward compatibility
+//     case 'upload_profile':
+//       _pickProfileImage();
+//       break;
+//     case 'add_bio':
+//       _handleEditClick();
+//       break;
+//     case 'add_location':
+//       _handleEditClick();
+//       break;
+//     case 'follow_group':
+//       Get.toNamed(AppRoutes.localCommunity);
+//       break;
+//   }
+// }
+
+// 5. Keep existing action handler
+void _handleActionCardTap(String action) {
+  switch (action) {
+    case 'complete_profile':
+      _handleEditClick();
+      break;
+    case 'find_area':
+      _handleEditClick(); // Opens edit mode to set location
+      break;
+    case 'follow_groups':
+      Get.toNamed(AppRoutes.localCommunity);
+      break;
+    case 'create_post':
+      Get.toNamed(AppRoutes.createPost);
+      break;
+  }
+}
+
+// 5. Helper method to update group join status (call this when user joins a group)
+void _updateGroupJoinStatus(bool hasJoined) {
+  setState(() {
+    _hasJoinedGroup = hasJoined;
+  });
+}
+
+
+  //aman
+
   
   int get _completedItems => _profileCompletionItems.where((item) => item['completed'] == true).length;
   int get _totalItems => _profileCompletionItems.length;
@@ -671,16 +1062,6 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
                     ),
                   ),
 
-
-
-
-
-
-                  // decoration: InputDecoration(
-                  //   border: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.lightPrimary, width: 2),),
-                  //   focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.lightPrimary, width: 2),),
-                  //   contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                  // ),
                 ),
               )
             : Text(
@@ -948,37 +1329,14 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
               ),
             ),
           ),
+
+          // // aman:
           const SizedBox(height: 14),
-          // Checklist
-          ..._profileCompletionItems.map((item) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Icon(
-                    item['completed'] == true ? Icons.check_circle : Icons.circle_outlined,
-                    size: 18,
-                    color: item['completed'] == true
-                        ? AppColors.lightSecondary
-                        : (isDark ? const Color(0xFF5e5e5e) : const Color(0xFF9d9d9d)),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      item['label'],
-                      style: GoogleFonts.roboto(
-                        fontSize: 13,
-                        color: item['completed'] == true
-                            ? (isDark ? const Color(0xFF8e8e8e) : const Color(0xFF536471))
-                            : (isDark ? Colors.white : const Color(0xFF0f1419)),
-                        decoration: item['completed'] == true ? TextDecoration.lineThrough : null,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
+
+          _buildHorizontalProfileCompletion(isDark, isBn),
+
+
+
           const SizedBox(height: 12),
           Text(
             isBn
@@ -1234,3 +1592,5 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
     };
   }
 }
+
+

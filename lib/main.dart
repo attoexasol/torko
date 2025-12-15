@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:torko/core/controllers/dashboard_controller.dart';
 import 'core/bindings/initial_bindings.dart';
 import 'core/routes/app_routes.dart';
 import 'core/theme/app_theme.dart';
@@ -9,8 +10,6 @@ import 'views/onboarding/onboarding_view.dart';
 import 'views/login/login_view.dart';
 import 'views/profile_data_onboarding/profile_data_onboarding_view.dart';
 import 'views/location_onboarding/location_onboarding_view.dart';
-import 'views/welcome_profile/welcome_profile_view.dart';
-import 'views/home/home_view.dart';
 import 'views/create_post/create_post_view.dart';
 import 'views/notifications/notifications_view.dart';
 import 'views/profile/profile_view.dart';
@@ -51,8 +50,6 @@ class MyApp extends StatelessWidget {
         GetPage(name: AppRoutes.login, page: () => const LoginView()),
         GetPage(name: AppRoutes.profileData, page: () => const ProfileDataOnboardingView()),
         GetPage(name: AppRoutes.locationData, page: () => const LocationOnboardingView()),
-        GetPage(name: AppRoutes.welcomeProfile, page: () => const WelcomeProfileView()),
-        GetPage(name: AppRoutes.home, page: () => const HomeView()),
         GetPage(name: AppRoutes.createPost, page: () => const CreatePostView()),
         GetPage(name: AppRoutes.notifications, page: () => const NotificationsView()),
         GetPage(name: AppRoutes.profile, page: () => const ProfileView()),
@@ -68,6 +65,7 @@ class MyApp extends StatelessWidget {
         GetPage(name: AppRoutes.conversation, page: () => const ConversationView()),
         GetPage(name: AppRoutes.calling, page: () => const CallingView()),
         GetPage(name: AppRoutes.postDetail, page: () => const PostDetailView()),
+        GetPage(name: AppRoutes.dashboard, page: () => const DashboardView()),
       ],
       builder: (context, child) {
         final appController = Get.find<AppController>();

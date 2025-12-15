@@ -12,5 +12,7 @@ class InitialBindings extends Bindings {
     // Get.put(ProfileController(), permanent: true);
     // etc.
   }
+
+  
 }
 

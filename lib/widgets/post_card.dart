@@ -7,14 +7,17 @@ class PostCard extends StatelessWidget {
   final String username;
   final String timestamp;
   final String content;
-  final String? type; // 'text', 'image', 'gradient', 'poll'
+  final String? type;
   final String? gradient;
   final Map<String, dynamic>? poll;
   final int likes;
   final int comments;
   final bool isLiked;
-  final VoidCallback? onLike;
   final String language;
+
+  final VoidCallback? onLike;
+  final VoidCallback? onComment; // ✅ ADD
+  final VoidCallback? onShare;   // ✅ ADD
 
   const PostCard({
     super.key,
@@ -28,8 +31,10 @@ class PostCard extends StatelessWidget {
     required this.likes,
     required this.comments,
     this.isLiked = false,
-    this.onLike,
     this.language = 'bn',
+    this.onLike,
+    this.onComment, // ✅ ADD
+    this.onShare,   // ✅ ADD
   });
 
   @override
@@ -436,8 +441,10 @@ class PostCard extends StatelessWidget {
               
               const SizedBox(width: 8),
               
-              // Comment Button
+             // Comment Button
               Flexible(
+              child: GestureDetector(
+                onTap: onComment, // ✅ CONNECT
                 child: Container(
                   padding: buttonPadding,
                   decoration: BoxDecoration(
@@ -468,43 +475,47 @@ class PostCard extends StatelessWidget {
                   ),
                 ),
               ),
+            ),
+            const Spacer(),
               
-              const Spacer(),
-              
-              // Share Button
+             // Share Button
               Flexible(
-                child: Container(
-                  padding: buttonPadding,
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF0d3a4a) : const Color(0xFFf5f5f5),
-                    border: Border.all(
-                      color: isDark ? const Color(0xFF104050) : const Color(0xFFe6e6e6),
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.share,
-                        size: iconSize,
-                        color: const Color(0xFF9D9D9D),
-                      ),
-                      if (!isSmallScreen) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          language == 'bn' ? 'শেয়ার' : 'Share',
-                          style: GoogleFonts.roboto(
-                            fontSize: fontSize,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF9D9D9D),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+  child: GestureDetector(
+    onTap: onShare, // ✅ CONNECT
+    child: Container(
+      padding: buttonPadding,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0d3a4a) : const Color(0xFFf5f5f5),
+        border: Border.all(
+          color: isDark ? const Color(0xFF104050) : const Color(0xFFe6e6e6),
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.share,
+            size: iconSize,
+            color: const Color(0xFF9D9D9D),
+          ),
+          if (!isSmallScreen) ...[
+            const SizedBox(width: 6),
+            Text(
+              language == 'bn' ? 'শেয়ার' : 'Share',
+              style: GoogleFonts.roboto(
+                fontSize: fontSize,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF9D9D9D),
               ),
+            ),
+          ],
+        ],
+      ),
+    ),
+  ),
+),
+
             ],
           );
         },
