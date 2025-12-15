@@ -630,10 +630,11 @@ class _LoginViewState extends State<LoginView> {
               Center(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     ...List.generate(3, (i) => _buildOtpBox(i, isDark)),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Text(
                         '-',
                         style: TextStyle(
@@ -765,9 +766,9 @@ class _LoginViewState extends State<LoginView> {
 
   Widget _buildOtpBox(int index, bool isDark) {
     return Container(
-      width: 48,
-      height: 48,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      width: 44,
+      height: 44,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0a2f3d) : const Color(0xFFFAFAF8),
         borderRadius: BorderRadius.circular(8),

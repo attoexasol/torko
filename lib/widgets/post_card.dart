@@ -500,13 +500,16 @@ class PostCard extends StatelessWidget {
             color: const Color(0xFF9D9D9D),
           ),
           if (!isSmallScreen) ...[
-            const SizedBox(width: 6),
-            Text(
-              language == 'bn' ? 'শেয়ার' : 'Share',
-              style: GoogleFonts.roboto(
-                fontSize: fontSize,
-                fontWeight: FontWeight.w500,
-                color: const Color(0xFF9D9D9D),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                language == 'bn' ? 'শেয়ার' : 'Share',
+                style: GoogleFonts.roboto(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w500,
+                  color: const Color(0xFF9D9D9D),
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
