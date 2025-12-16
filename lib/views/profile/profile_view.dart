@@ -36,11 +36,17 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   File? _coverImage;
   
   // Profile completion tracking
-  final bool _hasBio = false;
-  final bool _hasProfilePhoto = true;
-  final bool _hasCoverPhoto = true;
-  bool _hasLocation = true;
-  final bool _hasFirstPost = true;
+  // final bool _hasBio = false;
+  // final bool _hasProfilePhoto = true;
+  // final bool _hasCoverPhoto = true;
+  // bool _hasLocation = true;
+  // final bool _hasFirstPost = true;
+
+  bool _hasBio = false;
+  bool _hasProfilePhoto = false;
+  bool _hasCoverPhoto = false;
+  bool _hasLocation = false;
+  bool _hasFirstPost = false;
   
   late AnimationController _tabAnimationController;
   late Animation<double> _tabAnimation;
@@ -227,10 +233,10 @@ class _ProfileViewState extends State<ProfileView> with TickerProviderStateMixin
   }
   
 
-//aman
+  //aman
 
-// 1. Updated _profileCompletionItems getter matching first image style
-List<Map<String, dynamic>> get _profileCompletionItems {
+  // 1. Updated _profileCompletionItems getter matching first image style
+  List<Map<String, dynamic>> get _profileCompletionItems {
   final isBn = appController.language == AppLanguage.bn;
   return [
     {
@@ -565,40 +571,6 @@ Widget _buildActionCard(Map<String, dynamic> item, bool isDark, bool isBn) {
   );
 }
 
-// // 6. Updated action handler for new actions
-// void _handleActionCardTap(String action) {
-//   switch (action) {
-//     case 'complete_profile':
-//       _handleEditClick();
-//       break;
-//     case 'find_area':
-//       _handleEditClick(); // Opens edit mode to set location
-//       break;
-//     case 'follow_groups':
-//       Get.toNamed(AppRoutes.localCommunity);
-//       break;
-//     case 'upload_cover':
-//       _pickCoverImage();
-//       break;
-//     case 'create_post':
-//       Get.toNamed(AppRoutes.createPost);
-//       break;
-//     // Keep existing actions for backward compatibility
-//     case 'upload_profile':
-//       _pickProfileImage();
-//       break;
-//     case 'add_bio':
-//       _handleEditClick();
-//       break;
-//     case 'add_location':
-//       _handleEditClick();
-//       break;
-//     case 'follow_group':
-//       Get.toNamed(AppRoutes.localCommunity);
-//       break;
-//   }
-// }
-
 // 5. Keep existing action handler
 void _handleActionCardTap(String action) {
   switch (action) {
@@ -609,9 +581,11 @@ void _handleActionCardTap(String action) {
       _handleEditClick(); // Opens edit mode to set location
       break;
     case 'follow_groups':
+      FocusManager.instance.primaryFocus?.unfocus();
       Get.toNamed(AppRoutes.localCommunity);
       break;
     case 'create_post':
+      FocusManager.instance.primaryFocus?.unfocus();
       Get.toNamed(AppRoutes.createPost);
       break;
   }
@@ -632,7 +606,7 @@ void _updateGroupJoinStatus(bool hasJoined) {
   int get _totalItems => _profileCompletionItems.length;
   int get _completionPercentage => ((_completedItems / _totalItems) * 100).round();
   bool get _isProfileComplete => _completionPercentage == 100;
-  
+
   // Sample posts data
   List<Map<String, dynamic>> get _userPosts {
     final isBn = appController.language == AppLanguage.bn;
@@ -1255,104 +1229,135 @@ void _updateGroupJoinStatus(bool hasJoined) {
     );
   }
   
-  Widget _buildProfileCompletionCard(bool isDark, bool isBn) {
-    return Transform.translate(
-      offset: const Offset(0, -50),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 24),
+  
+Widget _buildProfileCompletionCard(bool isDark, bool isBn) {
+
+final percent = _completionPercentage;
+  final completed = _completedItems;
+  final total = _totalItems;
+
+  return Transform.translate(
+    offset: const Offset(0, -50),
+    child: Container(
+      margin: const EdgeInsets.only(bottom: 24),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? [
-                  AppColors.lightPrimary.withValues(alpha: 0.2),
-                  AppColors.lightSecondary.withValues(alpha: 0.2),
-                ]
-              : [
-                  AppColors.lightPrimary.withValues(alpha: 0.1),
-                  AppColors.lightSecondary.withValues(alpha: 0.1),
-                ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppColors.lightPrimary.withValues(alpha: isDark ? 0.4 : 0.3),
-        ),
+        color: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF5F6F7),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          /// Header
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Flexible(
-                child: Text(
-                  isBn ? 'প্রোফাইল সম্পূর্ণ করুন' : 'Complete your profile',
-                  style: GoogleFonts.roboto(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? Colors.white : const Color(0xFF0f1419),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 8),
               Text(
-                '$_completionPercentage%',
+                'Profile Progress: $percent%',
                 style: GoogleFonts.roboto(
                   fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.lightPrimary,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : const Color(0xFF0f1419),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                isBn ? 'শুধু আপনি দেখতে পারবেন' : 'Only visible to you',
+                style: GoogleFonts.roboto(
+                  fontSize: 12,
+                  color: const Color(0xFF8e8e8e),
                 ),
               ),
             ],
           ),
+
           const SizedBox(height: 12),
-          // Progress Bar
-          Container(
-            height: 6,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF1a1a1a) : const Color(0xFFe0e0e0),
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: _completionPercentage / 100,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.lightPrimary, AppColors.lightSecondary],
+
+          /// Segmented progress bar
+          Row(
+            children: List.generate(total, (index) {
+              final filled = index < completed;
+              return Expanded(
+                child: Container(
+                  height: 6,
+                  margin: EdgeInsets.only(right: index == total - 1 ? 0 : 6),
+                  decoration: BoxDecoration(
+                    color: filled
+                        ? Colors.white
+                        : (isDark
+                            ? const Color(0xFF3A3A3A)
+                            : const Color(0xFFD0D5DD)),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  borderRadius: BorderRadius.circular(3),
+                ),
+              );
+            }),
+          ),
+
+          const SizedBox(height: 12),
+
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (!_hasProfilePhoto)
+                _pill('Upload a profile photo', () {
+                  _pickProfileImage();
+                  setState(() => _hasProfilePhoto = true);
+                }),
+
+              if (!_hasBio)
+                _pill('Add a bio', () {
+                  _handleEditClick();
+                  setState(() => _hasBio = true);
+                }),
+
+              if (!_hasCoverPhoto)
+                _pill('Add a cover photo', () {
+                  _pickCoverImage();
+                  setState(() => _hasCoverPhoto = true);
+                }),
+
+              if (!_hasLocation)
+                _pill('Add location', () {
+                  _handleEditClick();
+                  setState(() => _hasLocation = true);
+                }),
+
+              if (!_hasFirstPost)
+                _pill('Create first post', () {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  Get.toNamed(AppRoutes.createPost);
+                  setState(() => _hasFirstPost = true);
+                }),
+            ],
+          ),
+                  ],
                 ),
               ),
-            ),
-          ),
+            );
+          }
 
-          // // aman:
-          const SizedBox(height: 14),
-
-          _buildHorizontalProfileCompletion(isDark, isBn),
-
-
-
-          const SizedBox(height: 12),
-          Text(
-            isBn
-                ? 'একটি সম্পূর্ণ প্রোফাইল আপনাকে সম্প্রদায়ের সাথে আরও ভালভাবে সংযুক্ত করবে!'
-                : 'A complete profile helps you connect better with the community!',
-            style: GoogleFonts.roboto(
-              fontSize: 12,
-              color: isDark ? const Color(0xFF8e8e8e) : const Color(0xFF536471),
-            ),
-          ),
-        ],
-        ),
+Widget _pill(String text, VoidCallback onTap) {
+  return GestureDetector(
+    behavior: HitTestBehavior.opaque,
+    onTap: () {
+      FocusManager.instance.primaryFocus?.unfocus(); // ✅ FIX
+      onTap();
+    },
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF9CA3AF)),
       ),
-    );
-  }
-  
+      child: Text(
+        text,
+        style: const TextStyle(fontSize: 12),
+      ),
+    ),
+  );
+}
+
 
   Widget _buildTabs(bool isDark, bool isBn) {
     return LayoutBuilder(

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/controllers/app_controller.dart';
-import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 
 class NotificationSettingsView extends StatefulWidget {
