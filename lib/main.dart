@@ -5,6 +5,7 @@ import 'core/bindings/initial_bindings.dart';
 import 'core/routes/app_routes.dart';
 import 'core/theme/app_theme.dart';
 import 'core/controllers/app_controller.dart';
+import 'services/user_info.dart';
 import 'views/splash/splash_view.dart';
 import 'views/onboarding/onboarding_view.dart';
 import 'views/login/login_view.dart';
@@ -26,8 +27,9 @@ import 'views/conversation/conversation_view.dart';
 import 'views/calling/calling_view.dart';
 import 'views/post_detail/post_detail_view.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await UserInfo.init();
   runApp(const MyApp());
 }
 

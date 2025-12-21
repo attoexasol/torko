@@ -2,103 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../core/controllers/app_controller.dart';
-import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_colors.dart';
+import 'login_controller.dart';
 
-class LoginView extends StatefulWidget {
+class LoginView extends StatelessWidget {
   const LoginView({super.key});
 
   @override
-  State<LoginView> createState() => _LoginViewState();
-}
-
-class _LoginViewState extends State<LoginView> {
-  final appController = Get.find<AppController>();
-
-  String step = 'phone'; // 'phone' or 'otp'
-  String phoneNumber = '';
-  String otp = '';
-  int resendTimer = 0;
-  bool canResend = true;
-  bool cookiesAccepted = false;
-  bool showPhoneError = false;
-  bool termsAccepted = false;
-  bool showOtpResentConfirm = false;
-
-  final phoneController = TextEditingController();
-  final List<TextEditingController> otpControllers = List.generate(
-    6,
-        (_) => TextEditingController(),
-  );
-  final List<FocusNode> otpFocusNodes = List.generate(6, (_) => FocusNode());
-
-  bool isValidPhoneNumber(String phone) {
-    final digits = phone.replaceAll(RegExp(r'\D'), '');
-    if (digits.length != 11) return false;
-    if (!digits.startsWith('0')) return false;
-
-    final validPrefixes = ['017', '018', '013', '012', '016', '014', '015', '019',];
-    final prefix = digits.substring(0, 3);
-
-    return validPrefixes.contains(prefix);
-  }
-
-  void handlePhoneSubmit() {
-    if (isValidPhoneNumber(phoneNumber) && termsAccepted) {
-      setState(() {
-        step = 'otp';
-        resendTimer = 0;
-        canResend = true;
-        showPhoneError = false;
-      });
-    } else {
-      if (!isValidPhoneNumber(phoneNumber)) {
-        setState(() => showPhoneError = true);
-      }
-    }
-  }
-
-  void handleOTPComplete() {
-    final fullOtp = otpControllers.map((c) => c.text).join();
-    if (fullOtp.length == 6) {
-      Get.offAllNamed(AppRoutes.profileData);
-    }
-  }
-
-  void handleResendOTP() {
-    if (canResend) {
-      setState(() {
-        resendTimer = 60;
-        canResend = false;
-        otp = '';
-        for (var controller in otpControllers) {
-          controller.clear();
-        }
-        showOtpResentConfirm = true;
-      });
-
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          setState(() => showOtpResentConfirm = false);
-        }
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    phoneController.dispose();
-    for (var controller in otpControllers) {
-      controller.dispose();
-    }
-    for (var node in otpFocusNodes) {
-      node.dispose();
-    }
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final appController = Get.find<AppController>();
+    final controller = Get.put(LoginController());
+
     return Obx(() {
       final isDark = appController.isDarkMode;
       final language = appController.language;
@@ -111,45 +25,35 @@ class _LoginViewState extends State<LoginView> {
         body: SafeArea(
           child: Stack(
             children: [
-              // SingleChildScrollView(
-              //   padding: EdgeInsets.only(
-              //     bottom: cookiesAccepted ? 0 : 140, // space for cookie card
-              //   ),
-              //   child: step == 'phone'
-              //       ? _buildPhoneStep(isDark, language)
-              //       : _buildOtpStep(isDark, language),
-              // ),
-
               LayoutBuilder(
                 builder: (context, constraints) {
                   return SingleChildScrollView(
                     keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: EdgeInsets.only(
-                      bottom: cookiesAccepted ? 24 : 160,
+                      bottom: controller.cookiesAccepted.value ? 24 : 160,
                     ),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
                         minHeight: constraints.maxHeight,
                       ),
                       child: IntrinsicHeight(
-                        child: step == 'phone'
-                            ? _buildPhoneStep(isDark, language)
-                            : _buildOtpStep(isDark, language),
+                        child: Obx(() => controller.step.value == 'phone'
+                            ? _buildPhoneStep(isDark, language, appController, controller)
+                            : _buildOtpStep(isDark, language, appController, controller)),
                       ),
                     ),
                   );
                 },
               ),
 
-
-              if (!cookiesAccepted)
+              if (!controller.cookiesAccepted.value)
                 Positioned(
                   bottom: 0,
                   left: 0,
                   right: 0,
                   child: Card(
                     margin: EdgeInsets.zero,
-                    child: _buildCookieNotice(isDark, language),
+                    child: _buildCookieNotice(isDark, language, appController, controller),
                   ),
                 ),
             ],
@@ -159,7 +63,7 @@ class _LoginViewState extends State<LoginView> {
     });
   }
 
-  Widget _buildPhoneStep(bool isDark, AppLanguage language) {
+  Widget _buildPhoneStep(bool isDark, AppLanguage language, AppController appController, LoginController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -171,7 +75,7 @@ class _LoginViewState extends State<LoginView> {
             children: [
               // Back Button
               GestureDetector(
-                onTap: () => Get.back(),
+                onTap: controller.goBack,
                 child: Row(
                   children: [
                     Icon(
@@ -344,7 +248,7 @@ class _LoginViewState extends State<LoginView> {
                         children: [
                           Expanded(
                             child: TextField(
-                              controller: phoneController,
+                              controller: controller.phoneController,
                               keyboardType: TextInputType.phone,
                               style: TextStyle(
                                 color: isDark
@@ -374,39 +278,24 @@ class _LoginViewState extends State<LoginView> {
                                 ),
                                 LengthLimitingTextInputFormatter(12),
                               ],
-                              onChanged: (value) {
-                                final digitsOnly = value.replaceAll('-', '');
-                                if (digitsOnly.length > 5) {
-                                  phoneController.text =
-                                  '${digitsOnly.substring(0, 5)}-${digitsOnly.substring(5)}';
-                                  phoneController.selection =
-                                      TextSelection.fromPosition(
-                                        TextPosition(
-                                          offset: phoneController.text.length,
-                                        ),
-                                      );
-                                }
-                                setState(() {
-                                  phoneNumber = phoneController.text;
-                                  if (showPhoneError) showPhoneError = false;
-                                });
-                              },
+                              onChanged: controller.onPhoneChanged,
                             ),
                           ),
-                          if (isValidPhoneNumber(phoneNumber))
-                            Container(
-                              width: 22,
-                              height: 22,
-                              decoration: const BoxDecoration(
-                                color: Colors.green,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                            ),
+                          Obx(() => controller.isPhoneValid
+                              ? Container(
+                                  width: 22,
+                                  height: 22,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.green,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                )
+                              : const SizedBox.shrink()),
                         ],
                       ),
                     ),
@@ -416,39 +305,39 @@ class _LoginViewState extends State<LoginView> {
 
               // Error or Example Text
               const SizedBox(height: 4),
-              Text(
-                showPhoneError
+              Obx(() => Text(
+                controller.showPhoneError.value
                     ? appController.t('invalidPhone')
                     : appController.t('phoneExample'),
                 style: TextStyle(
-                  color: showPhoneError
+                  color: controller.showPhoneError.value
                       ? Colors.red
                       : (isDark
                       ? const Color(0xFF9B9B9B)
                       : const Color(0xFF6B6B6B)),
                   fontSize: 12,
                 ),
-              ),
+              )),
               const SizedBox(height: 24),
 
               // Terms Checkbox
               GestureDetector(
-                onTap: () => setState(() => termsAccepted = !termsAccepted),
+                onTap: controller.toggleTermsAccepted,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
+                    Obx(() => Container(
                       width: 20,
                       height: 20,
                       decoration: BoxDecoration(
-                        color: termsAccepted
+                        color: controller.termsAccepted.value
                             ? AppColors.lightPrimary
                             : (isDark
                             ? const Color(0xFF0a2f3d)
                             : const Color(0xFFFAFAF8)),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
-                          color: termsAccepted
+                          color: controller.termsAccepted.value
                               ? AppColors.lightPrimary
                               : (isDark
                               ? const Color(0xFF0d3a4a)
@@ -456,14 +345,14 @@ class _LoginViewState extends State<LoginView> {
                           width: 2,
                         ),
                       ),
-                      child: termsAccepted
+                      child: controller.termsAccepted.value
                           ? const Icon(
                         Icons.check,
                         color: Colors.white,
                         size: 14,
                       )
                           : null,
-                    ),
+                    )),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text.rich(
@@ -517,18 +406,16 @@ class _LoginViewState extends State<LoginView> {
               const SizedBox(height: 24),
 
               // Continue Button
-              GestureDetector(
-                onTap: (isValidPhoneNumber(phoneNumber) && termsAccepted)
-                    ? handlePhoneSubmit
+              Obx(() => GestureDetector(
+                onTap: controller.canSubmitPhone
+                    ? controller.handlePhoneSubmit
                     : null,
                 child: Container(
                   width: double.infinity,
                   height: 56,
                   decoration: BoxDecoration(
                     color: AppColors.lightPrimary.withOpacity(
-                      (isValidPhoneNumber(phoneNumber) && termsAccepted)
-                          ? 1.0
-                          : 0.4,
+                      controller.canSubmitPhone ? 1.0 : 0.4,
                     ),
                     borderRadius: BorderRadius.circular(28),
                     boxShadow: [
@@ -542,23 +429,34 @@ class _LoginViewState extends State<LoginView> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        appController.t('continue'),
-                        style: const TextStyle(
-                          color: Color(0xFFF5F5F5),
-                          fontSize: 16,
+                      if (controller.isLoading.value)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFF5F5F5),
+                            strokeWidth: 2,
+                          ),
+                        )
+                      else ...[
+                        Text(
+                          appController.t('continue'),
+                          style: const TextStyle(
+                            color: Color(0xFFF5F5F5),
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Icon(
-                        Icons.arrow_forward,
-                        color: Color(0xFFF5F5F5),
-                        size: 20,
-                      ),
+                        const SizedBox(width: 12),
+                        const Icon(
+                          Icons.arrow_forward,
+                          color: Color(0xFFF5F5F5),
+                          size: 20,
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              ),
+              )),
             ],
           ),
         ),
@@ -566,7 +464,7 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
-  Widget _buildOtpStep(bool isDark, AppLanguage language) {
+  Widget _buildOtpStep(bool isDark, AppLanguage language, AppController appController, LoginController controller) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -577,7 +475,7 @@ class _LoginViewState extends State<LoginView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               GestureDetector(
-                onTap: () => setState(() => step = 'phone'),
+                onTap: controller.goBackToPhone,
                 child: Row(
                   children: [
                     Icon(
@@ -647,38 +545,40 @@ class _LoginViewState extends State<LoginView> {
               ),
               const SizedBox(height: 8),
 
-              Text(
-                '+88 $phoneNumber ${appController.t('otpSentTo')}',
+              Obx(() => Text(
+                '+88 ${controller.phoneNumber.value} ${appController.t('otpSentTo')}',
                 style: TextStyle(
                   color: isDark
                       ? const Color(0xFF9B9B9B)
                       : const Color(0xFF6B6B6B),
                   fontSize: 16,
                 ),
-              ),
+              )),
               const SizedBox(height: 32),
 
               // OTP Input
               Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ...List.generate(3, (i) => _buildOtpBox(i, isDark)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        '-',
-                        style: TextStyle(
-                          color: isDark
-                              ? const Color(0xFF9B9B9B)
-                              : const Color(0xFF6B6B6B),
-                          fontSize: 18,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ...List.generate(3, (i) => _buildOtpBox(i, isDark, controller)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text('-',
+                          style: TextStyle(
+                            color: isDark
+                                ? const Color(0xFF9B9B9B)
+                                : const Color(0xFF6B6B6B),
+                            fontSize: 18,
+                          ),
                         ),
                       ),
-                    ),
-                    ...List.generate(3, (i) => _buildOtpBox(i + 3, isDark)),
-                  ],
+                      ...List.generate(3, (i) => _buildOtpBox(i + 3, isDark, controller)),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -697,14 +597,16 @@ class _LoginViewState extends State<LoginView> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: canResend ? handleResendOTP : null,
+                    Obx(() => GestureDetector(
+                      onTap: controller.canResend.value && !controller.isLoading.value
+                          ? controller.handleResendOTP
+                          : null,
                       child: Text(
-                        canResend
+                        controller.canResend.value
                             ? appController.t('resendOTP')
-                            : '${appController.t('resendOTP')} (${resendTimer ~/ 60}:${(resendTimer % 60).toString().padLeft(2, '0')})',
+                            : '${appController.t('resendOTP')} (${controller.resendTimer.value ~/ 60}:${(controller.resendTimer.value % 60).toString().padLeft(2, '0')})',
                         style: TextStyle(
-                          color: canResend
+                          color: controller.canResend.value && !controller.isLoading.value
                               ? AppColors.lightPrimary
                               : (isDark
                               ? const Color(0xFF9B9B9B)
@@ -712,83 +614,93 @@ class _LoginViewState extends State<LoginView> {
                           fontSize: 14,
                         ),
                       ),
-                    ),
+                    )),
                   ],
                 ),
               ),
 
-              if (showOtpResentConfirm)
-                Container(
-                  margin: const EdgeInsets.only(top: 16),
-                  child: Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                            color: AppColors.lightSecondary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check,
-                            color: Color(0xFF1A1A1A),
-                            size: 12,
-                          ),
+              Obx(() => controller.showOtpResentConfirm.value
+                  ? Container(
+                margin: const EdgeInsets.only(top: 16),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 18,
+                        height: 18,
+                        decoration: const BoxDecoration(
+                          color: AppColors.lightSecondary,
+                          shape: BoxShape.circle,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          appController.t('otpResent'),
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.lightSecondary
-                                : const Color(0xFF7BC3B8),
-                            fontSize: 13,
-                          ),
+                        child: const Icon(
+                          Icons.check,
+                          color: Color(0xFF1A1A1A),
+                          size: 12,
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        appController.t('otpResent'),
+                        style: TextStyle(
+                          color: isDark
+                              ? AppColors.lightSecondary
+                              : const Color(0xFF7BC3B8),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              )
+                  : const SizedBox.shrink()),
               const SizedBox(height: 24),
 
               // Continue Button
-              GestureDetector(
-                onTap: otpControllers.every((c) => c.text.isNotEmpty)
-                    ? handleOTPComplete
+              Obx(() => GestureDetector(
+                onTap: controller.canSubmitOtp
+                    ? controller.handleOTPComplete
                     : null,
                 child: Container(
                   width: double.infinity,
                   height: 56,
                   decoration: BoxDecoration(
                     color: AppColors.lightPrimary.withOpacity(
-                      otpControllers.every((c) => c.text.isNotEmpty)
-                          ? 1.0
-                          : 0.4,
+                      controller.canSubmitOtp ? 1.0 : 0.4,
                     ),
                     borderRadius: BorderRadius.circular(28),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        appController.t('continue'),
-                        style: const TextStyle(
-                          color: Color(0xFFF5F5F5),
-                          fontSize: 16,
+                      if (controller.isLoading.value)
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFF5F5F5),
+                            strokeWidth: 2,
+                          ),
+                        )
+                      else ...[
+                        Text(
+                          appController.t('continue'),
+                          style: const TextStyle(
+                            color: Color(0xFFF5F5F5),
+                            fontSize: 16,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Icon(
-                        Icons.arrow_forward,
-                        color: Color(0xFFF5F5F5),
-                        size: 20,
-                      ),
+                        const SizedBox(width: 12),
+                        const Icon(
+                          Icons.arrow_forward,
+                          color: Color(0xFFF5F5F5),
+                          size: 20,
+                        ),
+                      ],
                     ],
                   ),
                 ),
-              ),
+              )),
             ],
           ),
         ),
@@ -796,7 +708,7 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 
-  Widget _buildOtpBox(int index, bool isDark) {
+  Widget _buildOtpBox(int index, bool isDark, LoginController controller) {
     return Container(
       width: 44,
       height: 44,
@@ -811,41 +723,38 @@ class _LoginViewState extends State<LoginView> {
           width: 2,
         ),
       ),
-      child: TextField(
-        controller: otpControllers[index],
-        focusNode: otpFocusNodes[index],
-        textAlign: TextAlign.center,
-        keyboardType: TextInputType.number,
-        maxLength: 1,
-        style: TextStyle(
-          color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF2C2C2E),
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
+      child: Center(
+        child: TextField(
+          controller: controller.otpControllers[index],
+          focusNode: controller.otpFocusNodes[index],
+          textAlign: TextAlign.center,
+          textAlignVertical: TextAlignVertical.center,
+          keyboardType: TextInputType.number,
+          maxLength: 1,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+          cursorColor: Colors.white,
+          decoration: const InputDecoration(
+            counterText: '',
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            contentPadding: EdgeInsets.zero,
+            isDense: true,
+          ),
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (_) => controller.onOtpChanged(index),
         ),
-        decoration: const InputDecoration(
-          //   border: InputBorder.none,
-          counterText: '',
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
-          errorBorder: InputBorder.none,
-        ),
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        onChanged: (value) {
-          if (value.isNotEmpty && index < 5) {
-            otpFocusNodes[index + 1].requestFocus();
-          }
-          if (otpControllers.every((c) => c.text.isNotEmpty)) {
-            handleOTPComplete();
-          }
-          setState(() {});
-        },
       ),
     );
   }
 
-  Widget _buildCookieNotice(bool isDark, AppLanguage language) {
+  Widget _buildCookieNotice(bool isDark, AppLanguage language, AppController appController, LoginController controller) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -889,7 +798,7 @@ class _LoginViewState extends State<LoginView> {
           ),
           const SizedBox(height: 12),
           GestureDetector(
-            onTap: () => setState(() => cookiesAccepted = true),
+            onTap: controller.acceptCookies,
             child: Container(
               width: double.infinity,
               height: 40,
@@ -913,4 +822,3 @@ class _LoginViewState extends State<LoginView> {
     );
   }
 }
-
