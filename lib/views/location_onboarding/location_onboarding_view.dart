@@ -1,10 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/controllers/app_controller.dart';
-import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_colors.dart';
+import 'location_onboarding_controller.dart';
 
 class District {
   final String id;
@@ -44,12 +42,19 @@ class LocationOnboardingView extends StatefulWidget {
 class _LocationOnboardingViewState extends State<LocationOnboardingView> {
   final appController = Get.find<AppController>();
   final searchController = TextEditingController();
+  late final LocationOnboardingController apiController;
 
   String step = 'division'; // 'division', 'district', 'upazila'
   Division? selectedDivision;
   District? selectedDistrict;
   String? selectedUpazila;
   String searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    apiController = Get.put(LocationOnboardingController());
+  }
 
   // Complete Bangladesh data: 8 Divisions, 64 Districts, 495 Upazilas
   final List<Division> divisionsData = [
@@ -203,6 +208,8 @@ class _LocationOnboardingViewState extends State<LocationOnboardingView> {
       searchQuery = '';
       searchController.clear();
     });
+    // Update controller state
+    apiController.setDivision(division.nameEn, division.nameBn);
   }
 
   void handleDistrictSelect(District district) {
@@ -213,69 +220,32 @@ class _LocationOnboardingViewState extends State<LocationOnboardingView> {
       searchQuery = '';
       searchController.clear();
     });
+    // Update controller state
+    apiController.setDistrict(district.nameEn, district.nameBn);
   }
 
   void handleUpazilaSelect(String upazila) {
     setState(() {
       selectedUpazila = upazila;
     });
+    // Update controller state
+    apiController.setUpazila(upazila);
   }
 
 
 
 
-// Updated methods for location_onboarding_view.dart
-// Replace existing methods with these
-// //aman":
-Future<void> handleComplete() async {
-  if (isFormValid) {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('torko_user_location', jsonEncode({
-      'division': selectedDivision!.nameEn,
-      'divisionBn': selectedDivision!.nameBn,
-      'district': selectedDistrict!.nameEn,
-      'districtBn': selectedDistrict!.nameBn,
-      'upazila': selectedUpazila,
-    }));
-    
-    // Mark registration as completed
-    await prefs.setBool('torko_registration_completed', true);
-    await prefs.setBool('torko_onboarding_completed', true);
-    
-    // Show success alert and navigate to Dashboard
-    Get.offAllNamed(AppRoutes.profile);
+  /// Handle complete - calls update_users API via controller
+  Future<void> handleComplete() async {
+    if (isFormValid) {
+      await apiController.handleSubmit();
+    }
   }
-}
 
-  // Future<void> handleComplete() async {
-  //   if (isFormValid) {
-  //     final prefs = await SharedPreferences.getInstance();
-  //     await prefs.setString('torko_user_location', jsonEncode({
-  //       'division': selectedDivision!.nameEn,
-  //       'divisionBn': selectedDivision!.nameBn,
-  //       'district': selectedDistrict!.nameEn,
-  //       'districtBn': selectedDistrict!.nameBn,
-  //       'upazila': selectedUpazila,
-  //     }));
-  //     Get.offNamed(AppRoutes.welcomeProfile);
-  //   }
-  // }
-
-
-
-void handleChangeLater() async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('torko_registration_completed', true);
-  await prefs.setBool('torko_onboarding_completed', true);
-
-  // ✅ Direct navigation
-  Get.offAllNamed(AppRoutes.profile);
-}
-
-
-  // void handleChangeLater() {
-  //   Get.offNamed(AppRoutes.welcomeProfile);
-  // }
+  /// Skip location and navigate to profile
+  void handleChangeLater() {
+    apiController.handleSkip();
+  }
 
 Widget _buildFeatureRow({
   required IconData icon,
@@ -934,102 +904,118 @@ Widget _buildFeatureRow({
   }
 
   Widget _buildBottomActions(bool isDark, bool isBn) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: isDark
-              ? [
-                  AppColors.darkBackground.withValues(alpha: 0),
-                  AppColors.darkBackground.withValues(alpha: 0.95),
-                  AppColors.darkBackground,
-                ]
-              : [
-                  Colors.white.withValues(alpha: 0),
-                  Colors.white.withValues(alpha: 0.95),
-                  Colors.white,
-                ],
+    return Obx(() {
+      final isLoading = apiController.isLoading.value;
+      final canSubmit = isFormValid && !isLoading;
+      
+      return Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark
+                ? [
+                    AppColors.darkBackground.withValues(alpha: 0),
+                    AppColors.darkBackground.withValues(alpha: 0.95),
+                    AppColors.darkBackground,
+                  ]
+                : [
+                    Colors.white.withValues(alpha: 0),
+                    Colors.white.withValues(alpha: 0.95),
+                    Colors.white,
+                  ],
+          ),
         ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          GestureDetector(
-            onTap: isFormValid ? handleComplete : null,
-            child: Container(
-              width: double.infinity,
-              height: 50,
-              decoration: BoxDecoration(
-                color: isFormValid
-                    ? (isDark ? const Color(0xFF0d3a4a) : null)
-                    : (isDark ? const Color(0xFF0a2f3d) : Colors.grey[300]),
-                gradient: isFormValid && !isDark
-                    ? const LinearGradient(colors: [Color(0xFFdc2626), Color(0xFF166534)])
-                    : null,
-                borderRadius: BorderRadius.circular(25),
-                border: isFormValid && isDark
-                    ? Border.all(color: AppColors.darkPrimary, width: 2)
-                    : null,
-                boxShadow: isFormValid
-                    ? [
-                        BoxShadow(
-                          color: isDark
-                              ? AppColors.darkPrimary.withValues(alpha: 0.3)
-                              : const Color(0xFF166534).withValues(alpha: 0.3),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            GestureDetector(
+              onTap: canSubmit ? handleComplete : null,
+              child: Container(
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: canSubmit
+                      ? (isDark ? const Color(0xFF0d3a4a) : null)
+                      : (isDark ? const Color(0xFF0a2f3d) : Colors.grey[300]),
+                  gradient: canSubmit && !isDark
+                      ? const LinearGradient(colors: [Color(0xFFdc2626), Color(0xFF166534)])
+                      : null,
+                  borderRadius: BorderRadius.circular(25),
+                  border: canSubmit && isDark
+                      ? Border.all(color: AppColors.darkPrimary, width: 2)
+                      : null,
+                  boxShadow: canSubmit
+                      ? [
+                          BoxShadow(
+                            color: isDark
+                                ? AppColors.darkPrimary.withValues(alpha: 0.3)
+                                : const Color(0xFF166534).withValues(alpha: 0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 6),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (isLoading)
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
                         ),
-                      ]
-                    : null,
+                      )
+                    else ...[
+                      Text(
+                        isBn ? 'এগিয়ে যান' : 'Continue',
+                        style: const TextStyle(
+                          fontFamily: 'NotoSansBengali',
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward, color: Colors.white, size: 18),
+                    ],
+                  ],
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    isBn ? 'এগিয়ে যান' : 'Continue',
-                    style: const TextStyle(
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: isLoading ? null : handleChangeLater,
+              child: Container(
+                width: double.infinity,
+                height: 44,
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: isDark
+                        ? const Color(0xFF0d3a4a)
+                        : const Color(0xFF166534).withValues(alpha: 0.3),
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Center(
+                  child: Text(
+                    isBn ? 'পরে পরিবর্তন করুন' : 'Change Later',
+                    style: TextStyle(
                       fontFamily: 'NotoSansBengali',
-                      color: Colors.white,
-                      fontSize: 15,
+                      color: isDark ? AppColors.darkSecondary : const Color(0xFF166534),
+                      fontSize: 14,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.arrow_forward, color: Colors.white, size: 18),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: handleChangeLater,
-            child: Container(
-              width: double.infinity,
-              height: 44,
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: isDark
-                      ? const Color(0xFF0d3a4a)
-                      : const Color(0xFF166534).withValues(alpha: 0.3),
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(22),
-              ),
-              child: Center(
-                child: Text(
-                  isBn ? 'পরে পরিবর্তন করুন' : 'Change Later',
-                  style: TextStyle(
-                    fontFamily: 'NotoSansBengali',
-                    color: isDark ? AppColors.darkSecondary : const Color(0xFF166534),
-                    fontSize: 14,
-                  ),
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    });
   }
 }
