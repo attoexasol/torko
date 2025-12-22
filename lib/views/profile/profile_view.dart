@@ -704,20 +704,27 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                 // Header
                 Row(
                   children: [
-                    Text(
-                      '${isBn ? 'প্রোফাইল সম্পূর্ণতা' : 'Profile Progress'}: ${controller.completionPercentage}%',
-                      style: GoogleFonts.roboto(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDark ? Colors.white : const Color(0xFF0f1419),
+                    Flexible(
+                      child: Text(
+                        '${isBn ? 'প্রোফাইল সম্পূর্ণতা' : 'Profile Progress'}: ${controller.completionPercentage}%',
+                        style: GoogleFonts.roboto(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : const Color(0xFF0f1419),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Spacer(),
-                    Text(
-                      isBn ? 'শুধু আপনি দেখতে পারবেন' : 'Only visible to you',
-                      style: GoogleFonts.roboto(
-                        fontSize: 12,
-                        color: const Color(0xFF8e8e8e),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        isBn ? 'শুধু আপনি দেখতে পারবেন' : 'Only visible to you',
+                        style: GoogleFonts.roboto(
+                          fontSize: 12,
+                          color: const Color(0xFF8e8e8e),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.end,
                       ),
                     ),
                   ],
