@@ -31,6 +31,24 @@ class ProfileView extends StatelessWidget {
                   isBn: isBn,
                 ),
         ),
+        floatingActionButton: Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: FloatingActionButton.extended(
+            onPressed: () => Get.offAllNamed(AppRoutes.home),
+            backgroundColor: AppColors.lightPrimary,
+            foregroundColor: Colors.white,
+            elevation: 6,
+            icon: const Icon(Icons.arrow_forward),
+            label: Text(
+              isBn ? 'শুরু করুন' : 'Get Started',
+              style: GoogleFonts.roboto(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       );
     });
   }
@@ -173,20 +191,22 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     GestureDetector(
-                      onTap: controller.handleBack,
+                      onTap: () => Get.offAllNamed(AppRoutes.home),
                       child: Container(
-                        width: 40,
-                        height: 40,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
                           color: isDark
-                              ? Colors.white.withValues(alpha: 0.1)
-                              : Colors.black.withValues(alpha: 0.05),
-                          shape: BoxShape.circle,
+                              ? Colors.white.withValues(alpha: 0.15)
+                              : Colors.black.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Icon(
-                          Icons.chevron_left,
-                          color: isDark ? Colors.white : const Color(0xFF0f1419),
-                          size: 24,
+                        child: Text(
+                          isBn ? 'এড়িয়ে যান' : 'Skip',
+                          style: GoogleFonts.roboto(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : const Color(0xFF0f1419),
+                          ),
                         ),
                       ),
                     ),

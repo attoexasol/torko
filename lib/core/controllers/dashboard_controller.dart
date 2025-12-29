@@ -220,7 +220,6 @@ class DashboardView extends StatelessWidget {
                           likes: post['likes'],
                           comments: post['comments'],
                           isLiked: post['isLiked'],
-                          language: appController.languageCode,
                           onLike: () => dashboardController.onLikePost(post['id']),
                           onComment: () => dashboardController.onCommentPost(post['id']),
                           onShare: () => dashboardController.onSharePost(post['id']),

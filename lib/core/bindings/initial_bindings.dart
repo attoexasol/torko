@@ -1,5 +1,8 @@
 import 'package:get/get.dart';
 import '../controllers/app_controller.dart';
+import '../../controllers/bottom_nav_controller.dart';
+import '../../controllers/home_header_controller.dart';
+import '../../controllers/navigation_controller.dart';
 
 class InitialBindings extends Bindings {
   @override
@@ -7,12 +10,12 @@ class InitialBindings extends Bindings {
     // Initialize all controllers here
     Get.put(AppController(), permanent: true);
     
-    // Add other controllers as needed
-    // Get.put(HomeController(), permanent: true);
-    // Get.put(ProfileController(), permanent: true);
-    // etc.
+    // Centralized navigation controller - single source of truth
+    Get.put(NavigationController(), permanent: true);
+    
+    // Navigation controllers (legacy - kept for compatibility)
+    Get.lazyPut(() => BottomNavController());
+    Get.lazyPut(() => HomeHeaderController());
   }
-
-  
 }
 

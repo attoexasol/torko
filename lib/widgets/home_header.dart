@@ -5,11 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/controllers/app_controller.dart';
 import '../core/routes/app_routes.dart';
 import '../core/theme/app_colors.dart';
+import '../controllers/navigation_controller.dart';
+import '../services/user_info.dart';
 
 class HomeHeader extends StatefulWidget {
-  final VoidCallback? onMenuOpen;
+  final Function(String)? onNavigate;
 
-  const HomeHeader({super.key, this.onMenuOpen});
+  const HomeHeader({super.key, this.onNavigate});
 
   @override
   State<HomeHeader> createState() => _HomeHeaderState();
@@ -33,6 +35,7 @@ class _HomeHeaderState extends State<HomeHeader> {
         return _AppDrawer(
           animation: animation,
           onClose: () => Navigator.of(context).pop(),
+          onNavigate: _handleNavigate,
         );
       },
     );
@@ -75,9 +78,54 @@ class _HomeHeaderState extends State<HomeHeader> {
           onUnreadCountChanged: (count) {
             setState(() => unreadCount = count);
           },
+          onNavigate: _handleNavigate,
         );
       },
     );
+  }
+
+  NavigationController get _navController {
+    if (Get.isRegistered<NavigationController>()) {
+      return Get.find<NavigationController>();
+    } else {
+      return Get.put(NavigationController(), permanent: true);
+    }
+  }
+
+  void _handleNavigate(String screen) {
+    if (widget.onNavigate != null) {
+      widget.onNavigate!(screen);
+    } else {
+      // Use centralized navigation controller
+      _navController.navigateFromDrawer(screen);
+    }
+  }
+
+  void _handleNavigateLegacy(String screen) {
+    if (widget.onNavigate != null) {
+      widget.onNavigate!(screen);
+    } else {
+      switch (screen) {
+        case 'home':
+          Get.offAllNamed(AppRoutes.home);
+          break;
+        case 'localCommunity':
+          Get.toNamed(AppRoutes.localCommunity);
+          break;
+        case 'messages':
+          Get.toNamed(AppRoutes.messages);
+          break;
+        case 'notifications':
+          Get.toNamed(AppRoutes.notifications);
+          break;
+        case 'profile':
+          Get.toNamed(AppRoutes.profile);
+          break;
+        case 'settings':
+          Get.toNamed(AppRoutes.settings);
+          break;
+      }
+    }
   }
 
   @override
@@ -85,6 +133,7 @@ class _HomeHeaderState extends State<HomeHeader> {
     return Obx(() {
       final isDark = appController.isDarkMode;
 
+      // React: h-[55px] px-[16px] pt-[39px] pb-[40px]
       return Container(
         height: 55,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -98,7 +147,7 @@ class _HomeHeaderState extends State<HomeHeader> {
             GestureDetector(
               onTap: _openDrawer,
               child: SizedBox(
-                height: 45,
+                height: 50,
                 child: Image.asset(
                   'assets/images/app_logo.png',
                   height: 45,
@@ -116,7 +165,7 @@ class _HomeHeaderState extends State<HomeHeader> {
                   onTap: _openSearch,
                   isDark: isDark,
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 8), // React: gap-2
                 // Notification Icon with Badge
                 _HeaderIconButton(
                   icon: Icons.notifications_outlined,
@@ -151,8 +200,8 @@ class _HeaderIconButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 40,
-        height: 40,
+        width: 40, // React: w-[40px]
+        height: 40, // React: h-[40px]
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
         ),
@@ -161,20 +210,20 @@ class _HeaderIconButton extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 22,
+              size: 20, // React: w-5 h-5 = 20px
               color: isDark
                   ? AppColors.darkMutedForeground
                   : AppColors.lightMutedForeground,
             ),
             if (badgeCount > 0)
               Positioned(
-                top: 4,
-                right: 4,
+                top: 0, // React: -top-0.5 ≈ -2px
+                right: 0, // React: -right-0.5 ≈ -2px
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
                   constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
                   decoration: BoxDecoration(
-                    color: Colors.red,
+                    color: Colors.red, // React: bg-red-500
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Center(
@@ -182,7 +231,7 @@ class _HeaderIconButton extends StatelessWidget {
                       badgeCount > 9 ? '9+' : badgeCount.toString(),
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 10,
+                        fontSize: 10, // React: fontSize: '10px'
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -196,14 +245,16 @@ class _HeaderIconButton extends StatelessWidget {
   }
 }
 
-// App Drawer Widget
+// App Drawer Widget - Matches React Left Sidebar Menu exactly
 class _AppDrawer extends StatefulWidget {
   final Animation<double> animation;
   final VoidCallback onClose;
+  final Function(String) onNavigate;
 
   const _AppDrawer({
     required this.animation,
     required this.onClose,
+    required this.onNavigate,
   });
 
   @override
@@ -234,6 +285,15 @@ class _AppDrawerState extends State<_AppDrawer> {
     }
   }
 
+  void _handleMenuItemClick(String route) {
+    // Close drawer first, then navigate
+    widget.onClose();
+    // Small delay to let the drawer close animation start
+    Future.microtask(() {
+      widget.onNavigate(route);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -241,24 +301,20 @@ class _AppDrawerState extends State<_AppDrawer> {
       final language = appController.language;
       final isBn = language == AppLanguage.bn;
 
-      final userName = userProfile['name'] ?? (isBn ? 'আপনার নাম' : 'Your Name');
+      final userName = userProfile['name'] ?? UserInfo.fullname ?? (isBn ? 'আপনার নাম' : 'Your Name');
+      final username = UserInfo.username ?? '@username';
 
+      // Menu items - matches React exactly
       final menuItems = [
         _MenuItem(
           icon: Icons.home_outlined,
           label: isBn ? 'হোম' : 'Home',
-          onTap: () {
-            widget.onClose();
-            Get.offAllNamed(AppRoutes.home);
-          },
+          onTap: () => _handleMenuItemClick('home'),
         ),
         _MenuItem(
           icon: Icons.people_outline,
           label: isBn ? 'লোকাল কমিউনিটি' : 'Local Community',
-          onTap: () {
-            widget.onClose();
-            Get.toNamed(AppRoutes.localCommunity);
-          },
+          onTap: () => _handleMenuItemClick('localCommunity'),
         ),
         _MenuItem(
           icon: Icons.bookmark_outline,
@@ -271,42 +327,28 @@ class _AppDrawerState extends State<_AppDrawer> {
         _MenuItem(
           icon: Icons.chat_bubble_outline,
           label: isBn ? 'মেসেজ' : 'Messages',
-          onTap: () {
-            widget.onClose();
-            Get.toNamed(AppRoutes.messages);
-          },
+          onTap: () => _handleMenuItemClick('messages'),
         ),
         _MenuItem(
           icon: Icons.notifications_outlined,
           label: isBn ? 'বিজ্ঞপ্তি' : 'Notifications',
-          onTap: () {
-            widget.onClose();
-            Get.toNamed(AppRoutes.notifications);
-          },
+          onTap: () => _handleMenuItemClick('notifications'),
         ),
         _MenuItem(
           icon: Icons.person_outline,
           label: isBn ? 'প্রোফাইল' : 'Profile',
-          onTap: () {
-            widget.onClose();
-            Get.toNamed(AppRoutes.profile);
-          },
+          onTap: () => _handleMenuItemClick('profile'),
         ),
         _MenuItem(
           icon: Icons.settings_outlined,
           label: isBn ? 'সেটিংস' : 'Settings',
-          onTap: () {
-            widget.onClose();
-            Get.toNamed(AppRoutes.settings);
-          },
+          onTap: () => _handleMenuItemClick('settings'),
         ),
       ];
 
       return Stack(
         children: [
-          // Backdrop (handled by barrier)
-          
-          // Drawer
+          // Sidebar - React: w-[280px]
           Positioned(
             left: 0,
             top: 0,
@@ -334,7 +376,7 @@ class _AppDrawerState extends State<_AppDrawer> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header
+                        // Header - React: p-5
                         Padding(
                           padding: const EdgeInsets.all(20),
                           child: Row(
@@ -343,7 +385,7 @@ class _AppDrawerState extends State<_AppDrawer> {
                               Text(
                                 isBn ? 'মেনু' : 'Menu',
                                 style: TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 20, // React: text-xl
                                   fontWeight: FontWeight.w700,
                                   color: isDark
                                       ? AppColors.darkForeground
@@ -359,7 +401,7 @@ class _AppDrawerState extends State<_AppDrawer> {
                                   ),
                                   child: Icon(
                                     Icons.close,
-                                    size: 20,
+                                    size: 20, // React: w-5 h-5
                                     color: isDark
                                         ? AppColors.darkForeground
                                         : AppColors.lightForeground,
@@ -376,13 +418,13 @@ class _AppDrawerState extends State<_AppDrawer> {
                           color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                         ),
 
-                        // User Info Section
+                        // User Info Section - React: p-5
                         Padding(
                           padding: const EdgeInsets.all(20),
                           child: Row(
                             children: [
                               Container(
-                                width: 48,
+                                width: 48, // React: w-12 h-12
                                 height: 48,
                                 decoration: BoxDecoration(
                                   color: AppColors.lightPrimary,
@@ -393,13 +435,13 @@ class _AppDrawerState extends State<_AppDrawer> {
                                     userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 18,
+                                      fontSize: 18, // React: fontSize: '18px'
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 12), // React: gap-3
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -407,7 +449,7 @@ class _AppDrawerState extends State<_AppDrawer> {
                                     Text(
                                       userName,
                                       style: TextStyle(
-                                        fontSize: 16,
+                                        fontSize: 16, // React: fontSize: '16px'
                                         fontWeight: FontWeight.w600,
                                         color: isDark
                                             ? AppColors.darkForeground
@@ -416,9 +458,9 @@ class _AppDrawerState extends State<_AppDrawer> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '@username',
+                                      username.startsWith('@') ? username : '@$username',
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: 13, // React: fontSize: '13px'
                                         color: isDark
                                             ? AppColors.darkMutedForeground
                                             : AppColors.lightMutedForeground,
@@ -437,7 +479,7 @@ class _AppDrawerState extends State<_AppDrawer> {
                           color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                         ),
 
-                        // Menu Items
+                        // Menu Items - React: py-2
                         Expanded(
                           child: ListView(
                             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -458,13 +500,14 @@ class _AppDrawerState extends State<_AppDrawer> {
                           color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                         ),
 
-                        // Logout
+                        // Logout - React: mt-2 pb-6
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          padding: const EdgeInsets.only(top: 8, bottom: 24),
                           child: _MenuItemWidget(
                             icon: Icons.logout,
                             label: isBn ? 'লগ আউট' : 'Logout',
                             onTap: () {
+                              print('Logout');
                               widget.onClose();
                               // Handle logout
                             },
@@ -472,7 +515,6 @@ class _AppDrawerState extends State<_AppDrawer> {
                             isDestructive: true,
                           ),
                         ),
-                        const SizedBox(height: 16),
                       ],
                     ),
                   ),
@@ -515,12 +557,13 @@ class _MenuItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // React: px-5 py-3.5
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         splashColor: isDestructive
-            ? Colors.red.withValues(alpha: 0.1)
+            ? Colors.red.withOpacity(0.1)
             : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -528,18 +571,18 @@ class _MenuItemWidget extends StatelessWidget {
             children: [
               Icon(
                 icon,
-                size: 20,
+                size: 20, // React: w-5 h-5
                 color: isDestructive
                     ? Colors.red
                     : (isDark
                         ? AppColors.darkMutedForeground
                         : AppColors.lightMutedForeground),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 12), // React: gap-3
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 15, // React: fontSize: '15px'
                   fontWeight: FontWeight.w500,
                   color: isDestructive
                       ? Colors.red
@@ -556,7 +599,7 @@ class _MenuItemWidget extends StatelessWidget {
   }
 }
 
-// Search Dialog Widget
+// Search Dialog Widget - Matches React exactly
 class _SearchDialog extends StatefulWidget {
   final Animation<double> animation;
   final VoidCallback onClose;
@@ -588,6 +631,7 @@ class _SearchDialogState extends State<_SearchDialog> {
       final language = appController.language;
       final isBn = language == AppLanguage.bn;
 
+      // Trending searches - matches React exactly
       final trendingSearches = [
         isBn ? 'ঢাকা ট্রাফিক' : 'Dhaka Traffic',
         isBn ? 'বাংলাদেশ ক্রিকেট' : 'Bangladesh Cricket',
@@ -596,6 +640,7 @@ class _SearchDialogState extends State<_SearchDialog> {
         isBn ? 'চট্টগ্রাম ইভেন্ট' : 'Chittagong Events',
       ];
 
+      // React: top-20 w-[90%] max-w-[600px]
       return Center(
         child: ScaleTransition(
           scale: CurvedAnimation(
@@ -608,14 +653,14 @@ class _SearchDialogState extends State<_SearchDialog> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Material(
                 color: isDark ? AppColors.darkBackground : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                elevation: 20,
+                borderRadius: BorderRadius.circular(20), // React: rounded-2xl
+                elevation: 20, // React: shadow-2xl
                 child: Container(
                   constraints: const BoxConstraints(maxWidth: 600, maxHeight: 500),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Search Header
+                      // Search Header - React: p-4
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Row(
@@ -627,7 +672,7 @@ class _SearchDialogState extends State<_SearchDialog> {
                                   ? AppColors.darkMutedForeground
                                   : AppColors.lightMutedForeground,
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 12), // React: gap-3
                             Expanded(
                               child: TextField(
                                 controller: searchController,
@@ -635,8 +680,14 @@ class _SearchDialogState extends State<_SearchDialog> {
                                 onChanged: (value) {
                                   setState(() => searchQuery = value);
                                 },
+                                onSubmitted: (_) {
+                                  if (searchQuery.trim().isNotEmpty) {
+                                    print('Searching for: $searchQuery');
+                                    widget.onClose();
+                                  }
+                                },
                                 style: TextStyle(
-                                  fontSize: 16,
+                                  fontSize: 16, // React: fontSize: '16px'
                                   color: isDark
                                       ? AppColors.darkForeground
                                       : AppColors.lightForeground,
@@ -676,7 +727,7 @@ class _SearchDialogState extends State<_SearchDialog> {
                         color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                       ),
 
-                      // Content
+                      // Content - React: max-h-[400px]
                       Flexible(
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.all(16),
@@ -687,7 +738,7 @@ class _SearchDialogState extends State<_SearchDialog> {
                               Text(
                                 isBn ? 'ট্রেন্ডিং সার্চ' : 'TRENDING SEARCHES',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   letterSpacing: 0.5,
                                   color: isDark
@@ -695,7 +746,7 @@ class _SearchDialogState extends State<_SearchDialog> {
                                       : AppColors.lightMutedForeground,
                                 ),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 12), // React: mb-3
                               ...trendingSearches.map((term) {
                                 return GestureDetector(
                                   onTap: () {
@@ -704,25 +755,25 @@ class _SearchDialogState extends State<_SearchDialog> {
                                   },
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
+                                      horizontal: 12, // React: p-3
                                       vertical: 12,
                                     ),
                                     margin: const EdgeInsets.only(bottom: 4),
                                     decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
+                                      borderRadius: BorderRadius.circular(12), // React: rounded-xl
                                     ),
                                     child: Row(
                                       children: [
                                         Icon(
                                           Icons.trending_up,
-                                          size: 16,
+                                          size: 16, // React: w-4 h-4
                                           color: AppColors.lightPrimary,
                                         ),
                                         const SizedBox(width: 12),
                                         Text(
                                           term,
                                           style: TextStyle(
-                                            fontSize: 15,
+                                            fontSize: 15, // React: fontSize: '15px'
                                             color: isDark
                                                 ? AppColors.darkForeground
                                                 : AppColors.lightForeground,
@@ -734,7 +785,7 @@ class _SearchDialogState extends State<_SearchDialog> {
                                 );
                               }),
 
-                              // Search Results
+                              // Search Results (when query exists)
                               if (searchQuery.trim().isNotEmpty) ...[
                                 const SizedBox(height: 16),
                                 Divider(
@@ -746,7 +797,7 @@ class _SearchDialogState extends State<_SearchDialog> {
                                 Text(
                                   isBn ? 'ফলাফল' : 'RESULTS',
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.w600,
                                     letterSpacing: 0.5,
                                     color: isDark
@@ -786,18 +837,20 @@ class _SearchDialogState extends State<_SearchDialog> {
   }
 }
 
-// Notification Dialog Widget
+// Notification Dialog Widget - Matches React exactly
 class _NotificationDialog extends StatefulWidget {
   final Animation<double> animation;
   final VoidCallback onClose;
   final int unreadCount;
   final ValueChanged<int> onUnreadCountChanged;
+  final Function(String) onNavigate;
 
   const _NotificationDialog({
     required this.animation,
     required this.onClose,
     required this.unreadCount,
     required this.onUnreadCountChanged,
+    required this.onNavigate,
   });
 
   @override
@@ -834,6 +887,7 @@ class _NotificationDialogState extends State<_NotificationDialog> {
       final language = appController.language;
       final isBn = language == AppLanguage.bn;
 
+      // Mock notifications - matches React exactly
       final notifications = [
         _NotificationItem(
           id: 1,
@@ -896,7 +950,7 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Header
+                      // Header - React: p-4
                       Padding(
                         padding: const EdgeInsets.all(16),
                         child: Row(
@@ -912,7 +966,7 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                             Text(
                               isBn ? 'বিজ্ঞপ্তি' : 'Notifications',
                               style: TextStyle(
-                                fontSize: 17,
+                                fontSize: 17, // React: fontSize: '17px'
                                 fontWeight: FontWeight.w600,
                                 color: isDark
                                     ? AppColors.darkForeground
@@ -964,7 +1018,7 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                         color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                       ),
 
-                      // Notifications List
+                      // Notifications List - React: max-h-[500px]
                       Flexible(
                         child: notifications.isEmpty
                             ? Padding(
@@ -976,8 +1030,8 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                                       Icons.notifications_outlined,
                                       size: 48,
                                       color: isDark
-                                          ? AppColors.darkMutedForeground.withValues(alpha: 0.3)
-                                          : AppColors.lightMutedForeground.withValues(alpha: 0.3),
+                                          ? AppColors.darkMutedForeground.withOpacity(0.3)
+                                          : AppColors.lightMutedForeground.withOpacity(0.3),
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
@@ -1008,7 +1062,7 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                               ),
                       ),
 
-                      // Footer
+                      // Footer - React: p-3
                       if (notifications.isNotEmpty) ...[
                         Divider(
                           height: 1,
@@ -1019,7 +1073,7 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                           child: GestureDetector(
                             onTap: () {
                               widget.onClose();
-                              Get.toNamed(AppRoutes.notifications);
+                              widget.onNavigate('notifications');
                             },
                             child: Container(
                               width: double.infinity,
@@ -1112,13 +1166,13 @@ class _NotificationTile extends StatelessWidget {
         child: Material(
           color: notification.unread
               ? (isDark
-                  ? AppColors.darkMuted.withValues(alpha: 0.3)
-                  : AppColors.lightMuted.withValues(alpha: 0.3))
+                  ? AppColors.darkMuted.withOpacity(0.3)
+                  : AppColors.lightMuted.withOpacity(0.3))
               : Colors.transparent,
           child: InkWell(
             onTap: onTap,
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16), // React: p-4
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
@@ -1130,7 +1184,7 @@ class _NotificationTile extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Avatar
+                  // Avatar - React: w-11 h-11
                   Container(
                     width: 44,
                     height: 44,
@@ -1147,7 +1201,7 @@ class _NotificationTile extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 12), // React: gap-3
 
                   // Content
                   Expanded(
@@ -1157,7 +1211,7 @@ class _NotificationTile extends StatelessWidget {
                         RichText(
                           text: TextSpan(
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 14, // React: fontSize: '14px'
                               height: 1.5,
                               color: isDark
                                   ? AppColors.darkForeground
@@ -1172,11 +1226,11 @@ class _NotificationTile extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 4), // React: mt-1
                         Text(
                           notification.time,
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 12, // React: fontSize: '12px'
                             color: isDark
                                 ? AppColors.darkMutedForeground
                                 : AppColors.lightMutedForeground,
@@ -1186,7 +1240,7 @@ class _NotificationTile extends StatelessWidget {
                     ),
                   ),
 
-                  // Unread Indicator
+                  // Unread Indicator - React: w-2 h-2
                   if (notification.unread)
                     Container(
                       width: 8,
@@ -1206,4 +1260,3 @@ class _NotificationTile extends StatelessWidget {
     );
   }
 }
-

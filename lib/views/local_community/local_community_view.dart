@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../core/controllers/app_controller.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_colors.dart';
+import '../../controllers/navigation_controller.dart';
 import '../../widgets/bottom_nav.dart';
 
 class LocalCommunityView extends StatelessWidget {
@@ -11,6 +12,11 @@ class LocalCommunityView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appController = Get.find<AppController>();
+    
+    // Sync navigation state
+    if (Get.isRegistered<NavigationController>()) {
+      Get.find<NavigationController>().setCurrentScreen('localCommunity');
+    }
     
     return Obx(() {
       final isDark = appController.isDarkMode;

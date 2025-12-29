@@ -26,6 +26,7 @@ import 'views/notification_settings/notification_settings_view.dart';
 import 'views/conversation/conversation_view.dart';
 import 'views/calling/calling_view.dart';
 import 'views/post_detail/post_detail_view.dart';
+import 'views/home/home_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,6 +53,7 @@ class MyApp extends StatelessWidget {
         GetPage(name: AppRoutes.login, page: () => const LoginView()),
         GetPage(name: AppRoutes.profileData, page: () => const ProfileDataOnboardingView()),
         GetPage(name: AppRoutes.locationData, page: () => const LocationOnboardingView()),
+        GetPage(name: AppRoutes.home, page: () => const HomeView()),
         GetPage(name: AppRoutes.createPost, page: () => const CreatePostView()),
         GetPage(name: AppRoutes.notifications, page: () => const NotificationsView()),
         GetPage(name: AppRoutes.profile, page: () => const ProfileView()),
