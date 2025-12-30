@@ -10,7 +10,7 @@ class LoginView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final appController = Get.find<AppController>();
+  final appController = Get.find<AppController>();
     final controller = Get.put(LoginController());
 
     return Obx(() {
@@ -279,21 +279,21 @@ class LoginView extends StatelessWidget {
                                 LengthLimitingTextInputFormatter(12),
                               ],
                               onChanged: controller.onPhoneChanged,
-                            ),
+                                        ),
                           ),
                           Obx(() => controller.isPhoneValid
                               ? Container(
-                                  width: 22,
-                                  height: 22,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.green,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.check,
-                                    color: Colors.white,
-                                    size: 14,
-                                  ),
+                              width: 22,
+                              height: 22,
+                              decoration: const BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 14,
+                              ),
                                 )
                               : const SizedBox.shrink()),
                         ],
@@ -439,19 +439,19 @@ class LoginView extends StatelessWidget {
                           ),
                         )
                       else ...[
-                        Text(
-                          appController.t('continue'),
-                          style: const TextStyle(
-                            color: Color(0xFFF5F5F5),
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Icon(
-                          Icons.arrow_forward,
+                      Text(
+                        appController.t('continue'),
+                        style: const TextStyle(
                           color: Color(0xFFF5F5F5),
-                          size: 20,
+                          fontSize: 16,
                         ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.arrow_forward,
+                        color: Color(0xFFF5F5F5),
+                        size: 20,
+                      ),
                       ],
                     ],
                   ),
@@ -560,24 +560,24 @@ class LoginView extends StatelessWidget {
               Center(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                       ...List.generate(3, (i) => _buildOtpBox(i, isDark, controller)),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: Text('-',
-                          style: TextStyle(
-                            color: isDark
-                                ? const Color(0xFF9B9B9B)
-                                : const Color(0xFF6B6B6B),
-                            fontSize: 18,
-                          ),
+                        style: TextStyle(
+                          color: isDark
+                              ? const Color(0xFF9B9B9B)
+                              : const Color(0xFF6B6B6B),
+                          fontSize: 18,
                         ),
                       ),
+                    ),
                       ...List.generate(3, (i) => _buildOtpBox(i + 3, isDark, controller)),
-                    ],
+                  ],
                   ),
                 ),
               ),
@@ -621,37 +621,37 @@ class LoginView extends StatelessWidget {
 
               Obx(() => controller.showOtpResentConfirm.value
                   ? Container(
-                margin: const EdgeInsets.only(top: 16),
-                child: Center(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 18,
-                        height: 18,
-                        decoration: const BoxDecoration(
-                          color: AppColors.lightSecondary,
-                          shape: BoxShape.circle,
+                  margin: const EdgeInsets.only(top: 16),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 18,
+                          height: 18,
+                          decoration: const BoxDecoration(
+                            color: AppColors.lightSecondary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check,
+                            color: Color(0xFF1A1A1A),
+                            size: 12,
+                          ),
                         ),
-                        child: const Icon(
-                          Icons.check,
-                          color: Color(0xFF1A1A1A),
-                          size: 12,
+                        const SizedBox(width: 8),
+                        Text(
+                          appController.t('otpResent'),
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.lightSecondary
+                                : const Color(0xFF7BC3B8),
+                            fontSize: 13,
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        appController.t('otpResent'),
-                        style: TextStyle(
-                          color: isDark
-                              ? AppColors.lightSecondary
-                              : const Color(0xFF7BC3B8),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
               )
                   : const SizedBox.shrink()),
               const SizedBox(height: 24),
@@ -683,19 +683,19 @@ class LoginView extends StatelessWidget {
                           ),
                         )
                       else ...[
-                        Text(
-                          appController.t('continue'),
-                          style: const TextStyle(
-                            color: Color(0xFFF5F5F5),
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Icon(
-                          Icons.arrow_forward,
+                      Text(
+                        appController.t('continue'),
+                        style: const TextStyle(
                           color: Color(0xFFF5F5F5),
-                          size: 20,
+                          fontSize: 16,
                         ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.arrow_forward,
+                        color: Color(0xFFF5F5F5),
+                        size: 20,
+                      ),
                       ],
                     ],
                   ),
@@ -724,30 +724,30 @@ class LoginView extends StatelessWidget {
         ),
       ),
       child: Center(
-        child: TextField(
+      child: TextField(
           controller: controller.otpControllers[index],
           focusNode: controller.otpFocusNodes[index],
-          textAlign: TextAlign.center,
+        textAlign: TextAlign.center,
           textAlignVertical: TextAlignVertical.center,
-          keyboardType: TextInputType.number,
-          maxLength: 1,
+        keyboardType: TextInputType.number,
+        maxLength: 1,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 22,
             fontWeight: FontWeight.bold,
-          ),
+        ),
           cursorColor: Colors.white,
-          decoration: const InputDecoration(
-            counterText: '',
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            disabledBorder: InputBorder.none,
-            errorBorder: InputBorder.none,
+        decoration: const InputDecoration(
+          counterText: '',
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          disabledBorder: InputBorder.none,
+          errorBorder: InputBorder.none,
             contentPadding: EdgeInsets.zero,
             isDense: true,
-          ),
-          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        ),
+        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           onChanged: (_) => controller.onOtpChanged(index),
         ),
       ),

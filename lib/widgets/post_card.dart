@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/controllers/app_controller.dart';
 import '../core/theme/app_colors.dart';
+import '../services/user_info.dart';
 import 'post_with_comments.dart';
 
 // ==================== Poll Models ====================
@@ -38,6 +39,7 @@ class Poll {
 
 class PostCard extends StatefulWidget {
   final String? id;
+  final int? userId; // Post owner's user ID
   final String author;
   final String username;
   final String? groupName;
@@ -60,10 +62,13 @@ class PostCard extends StatefulWidget {
   final VoidCallback? onComment;
   final VoidCallback? onShare;
   final VoidCallback? onMenuClick;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const PostCard({
     super.key,
     this.id,
+    this.userId,
     required this.author,
     required this.username,
     this.groupName,
@@ -86,6 +91,8 @@ class PostCard extends StatefulWidget {
     this.onComment,
     this.onShare,
     this.onMenuClick,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -180,14 +187,14 @@ class _PostCardState extends State<PostCard> {
   }
 
   void _handlePostMenu(String action) {
+    setState(() => showPostMenu = false);
+    
     switch (action) {
       case 'edit':
-        Get.snackbar(isBn ? 'পোস্ট সম্পাদনা করুন' : 'Edit post', '',
-            snackPosition: SnackPosition.BOTTOM);
+        widget.onEdit?.call();
         break;
       case 'delete':
-        Get.snackbar(isBn ? 'পোস্ট মুছে ফেলা হয়েছে' : 'Post deleted', '',
-            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red.withOpacity(0.8));
+        _showDeleteConfirmation();
         break;
       case 'bookmark':
         Get.snackbar(isBn ? 'বুকমার্ক করা হয়েছে' : 'Bookmarked', '',
@@ -202,8 +209,32 @@ class _PostCardState extends State<PostCard> {
             snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.orange.withOpacity(0.8));
         break;
     }
-    setState(() => showPostMenu = false);
     widget.onMenuClick?.call();
+  }
+
+  void _showDeleteConfirmation() {
+    Get.dialog(
+      AlertDialog(
+        title: Text(isBn ? 'পোস্ট মুছে ফেলুন' : 'Delete Post'),
+        content: Text(isBn 
+            ? 'আপনি কি নিশ্চিত যে আপনি এই পোস্টটি মুছে ফেলতে চান?' 
+            : 'Are you sure you want to delete this post?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(isBn ? 'বাতিল' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              widget.onDelete?.call();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(isBn ? 'মুছে ফেলুন' : 'Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _handleVote(int optionId) {
@@ -259,6 +290,8 @@ class _PostCardState extends State<PostCard> {
             snackPosition: SnackPosition.BOTTOM,
           );
         },
+        onEdit: widget.onEdit,
+        onDelete: widget.onDelete,
       ),
       transition: Transition.rightToLeft,
       duration: const Duration(milliseconds: 300),
@@ -755,7 +788,9 @@ class _PostCardState extends State<PostCard> {
             activeColor: const Color(0xFFB8DED6),
             hoverColor: const Color(0xFFB8DED6),
             onTap: () {
+              // Call the onComment callback first
               widget.onComment?.call();
+              // Then navigate to post detail with comments
               _navigateToPostDetail();
             },
             isDark: isDark,
@@ -763,14 +798,21 @@ class _PostCardState extends State<PostCard> {
 
           const Spacer(),
 
-          // Share Button
+          // Share Button - toggles share menu
           _ActionPillButton(
             icon: Icons.share_outlined,
             label: isBn ? 'শেয়ার' : 'Share',
             isActive: false,
             activeColor: const Color(0xFFB8DED6),
             hoverColor: const Color(0xFFB8DED6),
-            onTap: () => setState(() => showShareMenu = !showShareMenu),
+            onTap: () {
+              final wasOpen = showShareMenu;
+              setState(() => showShareMenu = !showShareMenu);
+              // Call onShare callback when menu is opened (not when closing)
+              if (!wasOpen) {
+                widget.onShare?.call();
+              }
+            },
             isDark: isDark,
           ),
         ],
@@ -837,6 +879,9 @@ class _PostCardState extends State<PostCard> {
   }
 
   Widget _buildPostMenu(bool isDark) {
+    final currentUserId = UserInfo.userId;
+    final isOwnPost = widget.userId != null && currentUserId != null && widget.userId == currentUserId;
+    
     return Positioned(
       right: 0,
       top: 50,
@@ -862,31 +907,45 @@ class _PostCardState extends State<PostCard> {
                 isDark: isDark,
                 isFirst: true,
               ),
-              _buildMenuItem(
-                icon: Icons.edit_outlined,
-                label: isBn ? 'সম্পাদনা করুন' : 'Edit',
-                onTap: () => _handlePostMenu('edit'),
-                isDark: isDark,
-              ),
-              _buildMenuItem(
-                icon: Icons.delete_outline,
-                label: isBn ? 'মুছে ফেলুন' : 'Delete',
-                onTap: () => _handlePostMenu('delete'),
-                isDark: isDark,
-              ),
-              _buildMenuItem(
-                icon: Icons.flag_outlined,
-                label: isBn ? 'রিপোর্ট করুন' : 'Report',
-                onTap: () => _handlePostMenu('report'),
-                isDark: isDark,
-              ),
-              _buildMenuItem(
-                icon: Icons.block,
-                label: isBn ? 'ব্লক করুন' : 'Block',
-                onTap: () => _handlePostMenu('block'),
-                isDark: isDark,
-                isLast: true,
-              ),
+              // Show Edit/Delete only for own posts
+              if (isOwnPost) ...[
+                _buildMenuItem(
+                  icon: Icons.edit_outlined,
+                  label: isBn ? 'সম্পাদনা করুন' : 'Edit',
+                  onTap: () => _handlePostMenu('edit'),
+                  isDark: isDark,
+                ),
+                _buildMenuItem(
+                  icon: Icons.delete_outline,
+                  label: isBn ? 'মুছে ফেলুন' : 'Delete',
+                  onTap: () => _handlePostMenu('delete'),
+                  isDark: isDark,
+                ),
+              ],
+              // Show Report/Block only for other users' posts
+              if (!isOwnPost) ...[
+                _buildMenuItem(
+                  icon: Icons.flag_outlined,
+                  label: isBn ? 'রিপোর্ট করুন' : 'Report',
+                  onTap: () => _handlePostMenu('report'),
+                  isDark: isDark,
+                ),
+                _buildMenuItem(
+                  icon: Icons.block,
+                  label: isBn ? 'ব্লক করুন' : 'Block',
+                  onTap: () => _handlePostMenu('block'),
+                  isDark: isDark,
+                  isLast: true,
+                ),
+              ] else ...[
+                _buildMenuItem(
+                  icon: Icons.flag_outlined,
+                  label: isBn ? 'রিপোর্ট করুন' : 'Report',
+                  onTap: () => _handlePostMenu('report'),
+                  isDark: isDark,
+                  isLast: true,
+                ),
+              ],
             ],
           ),
         ),
@@ -954,7 +1013,7 @@ class _PostCardState extends State<PostCard> {
 
 // ==================== Action Pill Button Widget ====================
 
-class _ActionPillButton extends StatelessWidget {
+class _ActionPillButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final bool isActive;
@@ -974,40 +1033,64 @@ class _ActionPillButton extends StatelessWidget {
   });
 
   @override
+  State<_ActionPillButton> createState() => _ActionPillButtonState();
+}
+
+class _ActionPillButtonState extends State<_ActionPillButton> {
+  bool _isHovered = false;
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isActive
-              ? activeColor.withOpacity(0.1)
-              : (isDark ? const Color(0xFF0d3a4a) : const Color(0xFFf5f5f5)),
-          border: Border.all(
-            color: isActive
-                ? activeColor
-                : (isDark ? const Color(0xFF104050) : const Color(0xFFe6e6e6)),
+    final hoverColor = widget.hoverColor ?? const Color(0xFFB8DED6);
+    final borderColor = _isHovered && !widget.isActive
+        ? hoverColor
+        : (widget.isActive
+            ? widget.activeColor
+            : (widget.isDark ? const Color(0xFF104050) : const Color(0xFFe6e6e6)));
+    final textColor = _isHovered && !widget.isActive
+        ? hoverColor
+        : (widget.isActive ? widget.activeColor : const Color(0xFF9D9D9D));
+    final iconColor = _isHovered && !widget.isActive
+        ? hoverColor
+        : (widget.isActive ? widget.activeColor : const Color(0xFF9D9D9D));
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: widget.isActive
+                ? widget.activeColor.withOpacity(0.1)
+                : (widget.isDark ? const Color(0xFF0d3a4a) : const Color(0xFFf5f5f5)),
+            border: Border.all(
+              color: borderColor,
+              width: 1,
+            ),
+            borderRadius: BorderRadius.circular(25),
           ),
-          borderRadius: BorderRadius.circular(25),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isActive ? activeColor : const Color(0xFF9D9D9D),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.roboto(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: isActive ? activeColor : const Color(0xFF9D9D9D),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                widget.icon,
+                size: 20,
+                color: iconColor,
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Text(
+                widget.label,
+                style: GoogleFonts.roboto(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

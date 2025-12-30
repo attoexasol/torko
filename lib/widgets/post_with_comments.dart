@@ -11,6 +11,7 @@ class PostData {
   final String author;
   final String? authorAvatar;
   final String timestamp;
+  final String? title;
   final String content;
   final String type; // text, image, video, gradient, multiImage, multiVideo
   final String? image;
@@ -28,6 +29,7 @@ class PostData {
     required this.author,
     this.authorAvatar,
     required this.timestamp,
+    this.title,
     required this.content,
     required this.type,
     this.image,
@@ -76,12 +78,16 @@ class PostWithComments extends StatefulWidget {
   final PostData post;
   final VoidCallback onBack;
   final Function(String text, String? replyTo)? onAddComment;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const PostWithComments({
     super.key,
     required this.post,
     required this.onBack,
     this.onAddComment,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -118,6 +124,32 @@ class _PostWithCommentsState extends State<PostWithComments> {
       return words[0][0] + words[1][0];
     }
     return name[0];
+  }
+
+  void _showDeleteConfirmation() {
+    final isBn = appController.language == AppLanguage.bn;
+    Get.dialog(
+      AlertDialog(
+        title: Text(isBn ? 'পোস্ট মুছে ফেলুন' : 'Delete Post'),
+        content: Text(isBn 
+            ? 'আপনি কি নিশ্চিত যে আপনি এই পোস্টটি মুছে ফেলতে চান?' 
+            : 'Are you sure you want to delete this post?'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(isBn ? 'বাতিল' : 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              widget.onDelete?.call();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(isBn ? 'মুছে ফেলুন' : 'Delete'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -247,9 +279,39 @@ class _PostWithCommentsState extends State<PostWithComments> {
                                               ],
                                             ),
                                           ),
-                                          GestureDetector(
-                                            onTap: () {},
-                                            child: Container(
+                                          PopupMenuButton<String>(
+                                            itemBuilder: (context) {
+                                              final isBn = appController.language == AppLanguage.bn;
+                                              return [
+                                                if (widget.onEdit != null)
+                                                  PopupMenuItem(
+                                                    value: 'edit',
+                                                    child: Text(isBn ? 'সম্পাদনা করুন' : 'Edit'),
+                                                  ),
+                                                if (widget.onDelete != null) ...[
+                                                  PopupMenuItem(
+                                                    value: 'delete',
+                                                    child: Text(
+                                                      isBn ? 'মুছে ফেলুন' : 'Delete',
+                                                      style: const TextStyle(color: Colors.red),
+                                                    ),
+                                                  ),
+                                                ],
+                                                if (widget.onEdit == null && widget.onDelete == null)
+                                                  PopupMenuItem(
+                                                    value: 'report',
+                                                    child: Text(isBn ? 'রিপোর্ট করুন' : 'Report'),
+                                                  ),
+                                              ];
+                                            },
+                                            onSelected: (value) {
+                                              if (value == 'edit' && widget.onEdit != null) {
+                                                widget.onEdit!();
+                                              } else if (value == 'delete' && widget.onDelete != null) {
+                                                _showDeleteConfirmation();
+                                              }
+                                            },
+                                            icon: Container(
                                               width: 36,
                                               height: 36,
                                               decoration: BoxDecoration(
@@ -263,13 +325,29 @@ class _PostWithCommentsState extends State<PostWithComments> {
                                                     ? AppColors
                                                         .darkMutedForeground
                                                     : AppColors
-                                                        .lightMutedForeground,
+                                                        .darkMutedForeground,
                                               ),
                                             ),
                                           ),
                                         ],
                                       ),
                                       const SizedBox(height: 8),
+
+                                      // Post Title (if exists)
+                                      if (widget.post.title != null && widget.post.title!.isNotEmpty) ...[
+                                        Text(
+                                          widget.post.title!,
+                                          style: GoogleFonts.roboto(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            height: 1.4,
+                                            color: isDark
+                                                ? Colors.white
+                                                : Colors.black,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 12),
+                                      ],
 
                                       // Post Text
                                       Text(
@@ -629,29 +707,34 @@ class _PostWithCommentsState extends State<PostWithComments> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               isActive ? icon : icon,
-              size: 20,
+              size: 18,
               color: isActive
                   ? activeColor
                   : (isDark
                       ? AppColors.darkMutedForeground
                       : AppColors.lightMutedForeground),
             ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: GoogleFonts.roboto(
-                fontSize: 14,
-                color: isActive
-                    ? activeColor
-                    : (isDark
-                        ? AppColors.darkMutedForeground
-                        : AppColors.lightMutedForeground),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                style: GoogleFonts.roboto(
+                  fontSize: 12,
+                  color: isActive
+                      ? activeColor
+                      : (isDark
+                          ? AppColors.darkMutedForeground
+                          : AppColors.lightMutedForeground),
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
           ],
@@ -1323,24 +1406,32 @@ class _CommentItemState extends State<_CommentItem> {
                               // Author
                               Row(
                                 children: [
-                                  Text(
-                                    widget.comment.author,
-                                    style: GoogleFonts.roboto(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                      color:
-                                          isDark ? Colors.white : Colors.black,
+                                  Flexible(
+                                    child: Text(
+                                      widget.comment.author,
+                                      style: GoogleFonts.roboto(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                        color:
+                                            isDark ? Colors.white : Colors.black,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 1,
                                     ),
                                   ),
                                   if (widget.comment.authorHandle != null) ...[
                                     const SizedBox(width: 6),
-                                    Text(
-                                      widget.comment.authorHandle!,
-                                      style: GoogleFonts.roboto(
-                                        fontSize: 12,
-                                        color: isDark
-                                            ? AppColors.darkMutedForeground
-                                            : AppColors.lightMutedForeground,
+                                    Flexible(
+                                      child: Text(
+                                        widget.comment.authorHandle!,
+                                        style: GoogleFonts.roboto(
+                                          fontSize: 12,
+                                          color: isDark
+                                              ? AppColors.darkMutedForeground
+                                              : AppColors.lightMutedForeground,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
                                       ),
                                     ),
                                   ],
@@ -1363,43 +1454,56 @@ class _CommentItemState extends State<_CommentItem> {
                         Padding(
                           padding: const EdgeInsets.only(left: 12, top: 4),
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                widget.comment.timestamp,
-                                style: GoogleFonts.roboto(
-                                  fontSize: 12,
-                                  color: isDark
-                                      ? AppColors.darkMutedForeground
-                                      : AppColors.lightMutedForeground,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              GestureDetector(
-                                onTap: () => widget.onLike(widget.comment.id),
+                              Flexible(
                                 child: Text(
-                                  '${isBn ? 'পছন্দ' : 'Like'}${widget.comment.likes > 0 ? ' · ${widget.comment.likes}' : ''}',
+                                  widget.comment.timestamp,
                                   style: GoogleFonts.roboto(
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: widget.comment.isLiked
-                                        ? AppColors.lightPrimary
-                                        : (isDark
-                                            ? AppColors.darkMutedForeground
-                                            : AppColors.lightMutedForeground),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              GestureDetector(
-                                onTap: () => widget.onReply(widget.comment),
-                                child: Text(
-                                  isBn ? 'উত্তর দিন' : 'Reply',
-                                  style: GoogleFonts.roboto(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
                                     color: isDark
                                         ? AppColors.darkMutedForeground
                                         : AppColors.lightMutedForeground,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: GestureDetector(
+                                  onTap: () => widget.onLike(widget.comment.id),
+                                  child: Text(
+                                    '${isBn ? 'পছন্দ' : 'Like'}${widget.comment.likes > 0 ? ' · ${widget.comment.likes}' : ''}',
+                                    style: GoogleFonts.roboto(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: widget.comment.isLiked
+                                          ? AppColors.lightPrimary
+                                          : (isDark
+                                              ? AppColors.darkMutedForeground
+                                              : AppColors.lightMutedForeground),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: GestureDetector(
+                                  onTap: () => widget.onReply(widget.comment),
+                                  child: Text(
+                                    isBn ? 'উত্তর দিন' : 'Reply',
+                                    style: GoogleFonts.roboto(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark
+                                          ? AppColors.darkMutedForeground
+                                          : AppColors.lightMutedForeground,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    maxLines: 1,
                                   ),
                                 ),
                               ),

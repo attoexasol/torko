@@ -28,16 +28,10 @@ class HomeView extends StatelessWidget {
               controller: controller.scrollController,
               slivers: [
                 // Space for header
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: MediaQuery.of(context).padding.top + 60,
-                  ),
-                ),
+                SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).padding.top + 60,),),
                 
                 // Tabs Section
-                SliverToBoxAdapter(
-                  child: _buildTabs(controller, appController, isDark),
-                ),
+                SliverToBoxAdapter(child: _buildTabs(controller, appController, isDark),),
                 
                 // Posts Feed
                 Obx(() => SliverList(

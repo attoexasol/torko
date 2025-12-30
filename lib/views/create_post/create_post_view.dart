@@ -1,7 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/controllers/app_controller.dart';
 import '../../core/theme/app_colors.dart';
+import '../../controllers/post_controller.dart';
+import '../../services/user_info.dart';
 
 class CreatePostView extends StatefulWidget {
   const CreatePostView({super.key});
@@ -12,12 +17,100 @@ class CreatePostView extends StatefulWidget {
 
 class _CreatePostViewState extends State<CreatePostView> {
   final appController = Get.find<AppController>();
-  final contentController = TextEditingController();
+  final postController = Get.put(PostController());
+  final titleController = TextEditingController();
+  final descriptionController = TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void dispose() {
-    contentController.dispose();
+    titleController.dispose();
+    descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImages() async {
+    try {
+      final List<XFile> pickedFiles = await _imagePicker.pickMultiImage();
+      if (pickedFiles.isNotEmpty) {
+        postController.selectedImages.value = pickedFiles.map((file) => File(file.path)).toList();
+      }
+    } catch (e) {
+      Get.snackbar(
+        appController.language == AppLanguage.bn ? 'ত্রুটি' : 'Error',
+        e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickVideo(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        Get.snackbar(
+          appController.language == AppLanguage.bn ? 'সতর্কতা' : 'Notice',
+          appController.language == AppLanguage.bn 
+              ? 'ভিডিও আপলোড শীঘ্রই আসছে' 
+              : 'Video upload coming soon',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        appController.language == AppLanguage.bn ? 'ত্রুটি' : 'Error',
+        e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  Future<void> _handlePost() async {
+    final title = titleController.text.trim();
+    final description = descriptionController.text.trim();
+
+    if (title.isEmpty && description.isEmpty && postController.selectedImages.isEmpty) {
+      Get.snackbar(
+        appController.language == AppLanguage.bn ? 'সতর্কতা' : 'Warning',
+        appController.language == AppLanguage.bn 
+            ? 'কিছু লিখুন বা ছবি যোগ করুন' 
+            : 'Please write something or add images',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    // Use title if provided, otherwise use description
+    final postTitle = title.isNotEmpty ? title : (description.isNotEmpty ? description.substring(0, description.length > 50 ? 50 : description.length) : 'Untitled Post');
+    final postDescription = description.isNotEmpty ? description : '';
+
+    final success = await postController.createPost(
+      title: postTitle,
+      description: postDescription,
+      images: postController.selectedImages.toList(),
+    );
+
+    if (success) {
+      Get.back();
+      Get.snackbar(
+        appController.language == AppLanguage.bn ? 'সফল' : 'Success',
+        appController.language == AppLanguage.bn ? 'পোস্ট প্রকাশিত হয়েছে' : 'Post published',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+    } else {
+      Get.snackbar(
+        appController.language == AppLanguage.bn ? 'ত্রুটি' : 'Error',
+        postController.errorMessage.value.isNotEmpty 
+            ? postController.errorMessage.value 
+            : (appController.language == AppLanguage.bn ? 'পোস্ট প্রকাশ করতে ব্যর্থ' : 'Failed to publish post'),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
   }
 
   @override
@@ -25,6 +118,11 @@ class _CreatePostViewState extends State<CreatePostView> {
     return Obx(() {
       final isDark = appController.isDarkMode;
       final language = appController.language;
+      final isBn = language == AppLanguage.bn;
+      final canPost = (titleController.text.trim().isNotEmpty || 
+                      descriptionController.text.trim().isNotEmpty || 
+                      postController.selectedImages.isNotEmpty) &&
+                      !postController.isCreating.value;
       
       return Scaffold(
         backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
@@ -36,10 +134,13 @@ class _CreatePostViewState extends State<CreatePostView> {
               Icons.close,
               color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
             ),
-            onPressed: () => Get.back(),
+            onPressed: () {
+              postController.clearForm();
+              Get.back();
+            },
           ),
           title: Text(
-            language == AppLanguage.bn ? 'নতুন পোস্ট' : 'New Post',
+            isBn ? 'নতুন পোস্ট' : 'New Post',
             style: TextStyle(
               color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
               fontSize: 18,
@@ -50,33 +151,31 @@ class _CreatePostViewState extends State<CreatePostView> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: GestureDetector(
-                onTap: contentController.text.isNotEmpty ? () {
-                  Get.back();
-                  Get.snackbar(
-                    language == AppLanguage.bn ? 'সফল' : 'Success',
-                    language == AppLanguage.bn ? 'পোস্ট প্রকাশিত হয়েছে' : 'Post published',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: AppColors.lightPrimary,
-                    colorText: Colors.white,
-                  );
-                } : null,
+                onTap: canPost ? _handlePost : null,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: contentController.text.isNotEmpty 
+                    color: canPost 
                         ? AppColors.lightPrimary 
                         : AppColors.lightPrimary.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Center(
-                    child: Text(
-                      language == AppLanguage.bn ? 'পোস্ট করুন' : 'Post',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
+                  child: postController.isCreating.value
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Text(
+                          isBn ? 'পোস্ট করুন' : 'Post',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -88,6 +187,7 @@ class _CreatePostViewState extends State<CreatePostView> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // User info row
                     Row(
@@ -96,7 +196,9 @@ class _CreatePostViewState extends State<CreatePostView> {
                           radius: 24,
                           backgroundColor: AppColors.lightPrimary.withValues(alpha: 0.2),
                           child: Text(
-                            'U',
+                            (UserInfo.fullname?.isNotEmpty ?? false) 
+                                ? UserInfo.fullname![0].toUpperCase() 
+                                : 'U',
                             style: TextStyle(
                               color: AppColors.lightPrimary,
                               fontWeight: FontWeight.w600,
@@ -104,61 +206,60 @@ class _CreatePostViewState extends State<CreatePostView> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              language == AppLanguage.bn ? 'ব্যবহারকারী' : 'User Name',
-                              style: TextStyle(
-                                color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                (UserInfo.fullname?.isNotEmpty ?? false) ? UserInfo.fullname! : 'User',
+                                style: TextStyle(
+                                  color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: isDark ? AppColors.darkCard : AppColors.lightCard,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.public,
-                                    size: 12,
-                                    color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    language == AppLanguage.bn ? 'সবাই' : 'Everyone',
-                                    style: TextStyle(
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppColors.darkCard : AppColors.lightCard,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.public,
+                                      size: 12,
                                       color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-                                      fontSize: 12,
                                     ),
-                                  ),
-                                  const Icon(Icons.keyboard_arrow_down, size: 16),
-                                ],
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isBn ? 'সবাই' : 'Everyone',
+                                      style: TextStyle(
+                                        color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 24),
                     
-                    // Content Input
+                    // Title Input
                     TextField(
-                      controller: contentController,
-                      maxLines: null,
-                      minLines: 5,
+                      controller: titleController,
                       style: TextStyle(
                         color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
                         fontSize: 18,
+                        fontWeight: FontWeight.w600,
                       ),
                       decoration: InputDecoration(
-                        hintText: language == AppLanguage.bn 
-                            ? 'আপনি কি ভাবছেন?' 
-                            : "What's on your mind?",
+                        hintText: isBn ? 'পোস্টের শিরোনাম (ঐচ্ছিক)' : 'Post Title (Optional)',
                         hintStyle: TextStyle(
                           color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
                           fontSize: 18,
@@ -167,6 +268,105 @@ class _CreatePostViewState extends State<CreatePostView> {
                       ),
                       onChanged: (_) => setState(() {}),
                     ),
+                    const SizedBox(height: 16),
+                    
+                    // Description Input
+                    TextField(
+                      controller: descriptionController,
+                      maxLines: null,
+                      minLines: 5,
+                      style: TextStyle(
+                        color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+                        fontSize: 16,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: isBn 
+                            ? 'আপনি কি ভাবছেন?' 
+                            : "What's on your mind?",
+                        hintStyle: TextStyle(
+                          color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                          fontSize: 16,
+                        ),
+                        border: InputBorder.none,
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Selected Images Preview
+                    Obx(() {
+                      if (postController.selectedImages.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isBn ? 'নির্বাচিত ছবি' : 'Selected Images',
+                            style: TextStyle(
+                              color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 200,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: postController.selectedImages.length,
+                              itemBuilder: (context, index) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Stack(
+                                    children: [
+                                      Container(
+                                        width: 200,
+                                        height: 200,
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                                          ),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: Image.file(
+                                            postController.selectedImages[index],
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      ),
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: GestureDetector(
+                                          onTap: () => postController.removeImage(index),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: BoxDecoration(
+                                              color: Colors.black54,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                              size: 16,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    }),
                   ],
                 ),
               ),
@@ -197,41 +397,53 @@ class _CreatePostViewState extends State<CreatePostView> {
                       Flexible(
                         child: _buildMediaOption(
                           icon: Icons.image,
-                          label: language == AppLanguage.bn ? 'ছবি' : 'Photo',
+                          label: isBn ? 'ছবি' : 'Photo',
                           color: Colors.green,
                           isDark: isDark,
                           isSmall: isSmallScreen,
-                          onTap: () {},
+                          onTap: _pickImages,
                         ),
                       ),
                       Flexible(
                         child: _buildMediaOption(
                           icon: Icons.videocam,
-                          label: language == AppLanguage.bn ? 'ভিডিও' : 'Video',
+                          label: isBn ? 'ভিডিও' : 'Video',
                           color: Colors.red,
                           isDark: isDark,
                           isSmall: isSmallScreen,
-                          onTap: () {},
+                          onTap: _pickVideo,
                         ),
                       ),
                       Flexible(
                         child: _buildMediaOption(
                           icon: Icons.poll,
-                          label: language == AppLanguage.bn ? 'পোল' : 'Poll',
+                          label: isBn ? 'পোল' : 'Poll',
                           color: Colors.orange,
                           isDark: isDark,
                           isSmall: isSmallScreen,
-                          onTap: () {},
+                          onTap: () {
+                            Get.snackbar(
+                              isBn ? 'সতর্কতা' : 'Notice',
+                              isBn ? 'পোল শীঘ্রই আসছে' : 'Poll coming soon',
+                              snackPosition: SnackPosition.BOTTOM,
+                            );
+                          },
                         ),
                       ),
                       Flexible(
                         child: _buildMediaOption(
                           icon: Icons.location_on,
-                          label: language == AppLanguage.bn ? 'স্থান' : 'Location',
+                          label: isBn ? 'স্থান' : 'Location',
                           color: Colors.blue,
                           isDark: isDark,
                           isSmall: isSmallScreen,
-                          onTap: () {},
+                          onTap: () {
+                            Get.snackbar(
+                              isBn ? 'সতর্কতা' : 'Notice',
+                              isBn ? 'স্থান শীঘ্রই আসছে' : 'Location coming soon',
+                              snackPosition: SnackPosition.BOTTOM,
+                            );
+                          },
                         ),
                       ),
                     ],

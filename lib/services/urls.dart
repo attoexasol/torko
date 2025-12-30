@@ -11,6 +11,14 @@ class Urls{
     static const privacy_settings = "$_baseUrL/update_privacy_settings" ;
 
 
+    // Post API endPoints
+    static const get_all_post = "$_baseUrL/get_all_post" ;
+    static const create_post = "$_baseUrL/create_post" ;
+    static const update_post = "$_baseUrL/update_post" ;
+    static const single_post = "$_baseUrL/single_post" ;
+    static const delete_post = "$_baseUrL/delete_post" ;
+
+
 
 
 }
