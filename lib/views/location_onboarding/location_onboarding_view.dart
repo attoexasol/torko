@@ -578,12 +578,12 @@ Widget _buildFeatureRow({
 
   Widget _buildSearchBar(bool isDark, bool isBn) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+    //  margin: const EdgeInsets.only(bottom: 12),
+      //padding: const EdgeInsets.symmetric(horizontal: 16),
       height: 48,
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0a2f3d) : Colors.white.withValues(alpha: 0.7),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isDark ? const Color(0xFF0d3a4a) : Colors.white.withValues(alpha: 0.6),
         ),

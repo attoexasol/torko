@@ -1,7 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../core/controllers/app_controller.dart';
 import '../core/routes/app_routes.dart';
 import '../core/theme/app_colors.dart';
@@ -27,7 +26,8 @@ class _HomeHeaderState extends State<HomeHeader> {
       barrierDismissible: true,
       barrierLabel: 'Drawer',
       barrierColor: Colors.black54,
-      transitionDuration: const Duration(milliseconds: 300),
+    //  transitionDuration: const Duration(milliseconds: 300),
+      transitionDuration: const Duration(milliseconds: 0),
       pageBuilder: (context, animation, secondaryAnimation) {
         return const SizedBox.shrink();
       },
@@ -263,27 +263,6 @@ class _AppDrawer extends StatefulWidget {
 
 class _AppDrawerState extends State<_AppDrawer> {
   final appController = Get.find<AppController>();
-  Map<String, dynamic> userProfile = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUserProfile();
-  }
-
-  Future<void> _loadUserProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    final profileStr = prefs.getString('torko_user_profile');
-    if (profileStr != null) {
-      try {
-        setState(() {
-          userProfile = jsonDecode(profileStr);
-        });
-      } catch (e) {
-        // Ignore parse errors
-      }
-    }
-  }
 
   void _handleMenuItemClick(String route) {
     // Close drawer first, then navigate
@@ -301,7 +280,8 @@ class _AppDrawerState extends State<_AppDrawer> {
       final language = appController.language;
       final isBn = language == AppLanguage.bn;
 
-      final userName = userProfile['name'] ?? UserInfo.fullname ?? (isBn ? 'আপনার নাম' : 'Your Name');
+      // Get user name dynamically from UserInfo
+      final userName = UserInfo.fullname ?? (isBn ? 'আপনার নাম' : 'Your Name');
       final username = UserInfo.username ?? '@username';
 
       // Menu items - matches React exactly
@@ -448,22 +428,20 @@ class _AppDrawerState extends State<_AppDrawer> {
                                   children: [
                                     Text(
                                       userName,
-                                      style: TextStyle(
-                                        fontSize: 16, // React: fontSize: '16px'
-                                        fontWeight: FontWeight.w600,
-                                        color: isDark
-                                            ? AppColors.darkForeground
-                                            : AppColors.lightForeground,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                        color: isDark ? Colors.white : const Color(0xFF1A1A1A),
+                                        height: 1.4,
                                       ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       username.startsWith('@') ? username : '@$username',
-                                      style: TextStyle(
-                                        fontSize: 13, // React: fontSize: '13px'
-                                        color: isDark
-                                            ? AppColors.darkMutedForeground
-                                            : AppColors.lightMutedForeground,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 14,
+                                        color: (isDark ? Colors.white : Colors.black).withValues(alpha: 0.7),
+                                        height: 1.4,
                                       ),
                                     ),
                                   ],

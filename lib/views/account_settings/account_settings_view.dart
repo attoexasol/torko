@@ -318,11 +318,6 @@ class AccountSettingsView extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkCard : Colors.white,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isEditing
-                  ? AppColors.lightPrimary.withOpacity(0.5)
-                  : (isDark ? Colors.white : Colors.black).withValues(alpha: 0.1),
-            ),
           ),
           child: TextField(
             controller: controller,
@@ -337,7 +332,8 @@ class AccountSettingsView extends StatelessWidget {
                 horizontal: prefixIcon != null ? 0 : 16,
                 vertical: maxLines > 1 ? 12 : 0,
               ),
-              border: InputBorder.none,
+              // border: InputBorder.none,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               prefixIcon: prefixIcon != null
                   ? Padding(
                       padding: const EdgeInsets.only(left: 12, right: 8),

@@ -20,14 +20,19 @@ class PostController extends GetxController {
   final RxString postTitle = ''.obs;
   final RxString postDescription = ''.obs;
   final RxList<File> selectedImages = <File>[].obs;
+  final Rx<File?> selectedVideo = Rx<File?>(null);
   final RxBool isCreating = false.obs;
   final RxBool isUpdating = false.obs;
   final RxBool isDeleting = false.obs;
 
+  // Track current user ID to detect user changes
+  int? _lastUserId;
+
   @override
   void onInit() {
     super.onInit();
-    loadAllPosts();
+    _lastUserId = UserInfo.userId;
+    // Don't auto-load posts on init - let views decide when to load
   }
 
   // ==================== Get All Posts ====================
@@ -83,6 +88,84 @@ class PostController extends GetxController {
     }
   }
 
+  // ==================== Get User Posts (Profile-specific) ====================
+  /// Loads only posts created by the currently logged-in user
+  /// This is used for the Profile page to show user-specific posts
+  Future<void> loadUserPosts() async {
+    isLoading.value = true;
+    errorMessage.value = '';
+
+    try {
+      final token = UserInfo.apiToken;
+      final currentUserId = UserInfo.userId;
+      
+      if (token == null || token.isEmpty) {
+        errorMessage.value = 'Please login first';
+        isLoading.value = false;
+        posts.value = []; // Clear posts if not logged in
+        return;
+      }
+
+      if (currentUserId == null) {
+        errorMessage.value = 'User ID not found';
+        isLoading.value = false;
+        posts.value = []; // Clear posts if user ID is missing
+        _lastUserId = null;
+        return;
+      }
+
+      // Clear posts if user has changed (new login)
+      if (_lastUserId != null && _lastUserId != currentUserId) {
+        posts.value = [];
+      }
+      _lastUserId = currentUserId;
+
+      // Try GET first, if it fails, try POST with api_token
+      var response = await NetworkCaller.getRequest(
+        url: Urls.get_all_post,
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      // If GET fails, try POST with api_token in body
+      if (!response.isSuccess) {
+        response = await NetworkCaller.postRequest(
+          url: Urls.get_all_post,
+          body: {
+            'api_token': token,
+          },
+        );
+      }
+
+      if (response.isSuccess && response.body != null) {
+        if (response.body!['status'] == true) {
+          final data = response.body!['data'];
+          if (data is List) {
+            // Filter posts by current user's ID
+            final allPosts = data.map((json) => PostModel.fromJson(json)).toList();
+            posts.value = allPosts.where((post) => post.userId == currentUserId).toList();
+            errorMessage.value = '';
+          } else {
+            errorMessage.value = 'Invalid response format';
+            posts.value = [];
+          }
+        } else {
+          errorMessage.value = response.body!['message'] ?? 'Failed to load posts';
+          posts.value = [];
+        }
+      } else {
+        errorMessage.value = response.errorMessage ?? 'Failed to load posts';
+        posts.value = [];
+      }
+    } catch (e) {
+      errorMessage.value = 'Error: ${e.toString()}';
+      posts.value = [];
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   // ==================== Get Single Post ====================
   Future<PostModel?> getSinglePost(int postId) async {
     isLoading.value = true;
@@ -130,6 +213,7 @@ class PostController extends GetxController {
     required String title,
     required String description,
     required List<File> images,
+    File? video,
   }) async {
     isCreating.value = true;
     errorMessage.value = '';
@@ -150,6 +234,20 @@ class PostController extends GetxController {
         base64Images.add('data:image/jpeg;base64,$base64String');
       }
 
+      // Convert video to base64 if provided
+      if (video != null) {
+        final bytes = await video.readAsBytes();
+        final base64String = base64Encode(bytes);
+        // Determine video MIME type (default to mp4, but could be detected from file extension)
+        final videoExtension = video.path.split('.').last.toLowerCase();
+        final mimeType = videoExtension == 'mp4' 
+            ? 'video/mp4' 
+            : videoExtension == 'mov' 
+                ? 'video/quicktime'
+                : 'video/mp4'; // default
+        base64Images.add('data:$mimeType;base64,$base64String');
+      }
+
       final response = await NetworkCaller.postRequest(
         url: Urls.create_post,
         body: {
@@ -168,6 +266,7 @@ class PostController extends GetxController {
           postTitle.value = '';
           postDescription.value = '';
           selectedImages.clear();
+          selectedVideo.value = null;
           isCreating.value = false;
           return true;
         } else {
@@ -357,6 +456,18 @@ class PostController extends GetxController {
     postTitle.value = '';
     postDescription.value = '';
     selectedImages.clear();
+    selectedVideo.value = null;
+  }
+
+  void removeVideo() {
+    selectedVideo.value = null;
+  }
+
+  /// Clear all posts (useful when user logs out or changes)
+  void clearPosts() {
+    posts.value = [];
+    _lastUserId = null;
+    errorMessage.value = '';
   }
 }
 

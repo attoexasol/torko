@@ -94,10 +94,16 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
       vsync: this,
     );
     
+    // Load posts if post tab is initially active
+    if (widget.controller.activeTab.value == 'post') {
+      postController.loadUserPosts();
+      _lastActiveTab = 'post';
+    }
+    
     // Listen to tab changes and reload posts when post tab is activated
     ever(widget.controller.activeTab, (String tab) {
       if (tab == 'post' && _lastActiveTab != 'post') {
-        postController.loadAllPosts();
+        postController.loadUserPosts(); // Load only current user's posts
       }
       _lastActiveTab = tab;
     });
@@ -148,8 +154,8 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
           }),
                 const SizedBox(height: 10),
               ],
-            ),
-    );
+        ),
+      );
   }
   
   Widget _buildCoverSection() {
@@ -695,16 +701,20 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
       offset: const Offset(0, -50),
       child: Padding(
         padding: const EdgeInsets.only(bottom: 24),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildStatItem('54', 'Posts', isDark),
-            const SizedBox(width: 32),
-            _buildStatItem('834', isBn ? 'প্রতিবেশী' : 'Neighbours', isDark),
-            const SizedBox(width: 32),
-            _buildStatItem('162', 'Following', isDark),
-          ],
-        ),
+        child: Obx(() {
+          // Get dynamic post count from postController
+          final postCount = postController.posts.length.toString();
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildStatItem(postCount, 'Posts', isDark),
+              const SizedBox(width: 32),
+              _buildStatItem('834', isBn ? 'প্রতিবেশী' : 'Neighbours', isDark),
+              const SizedBox(width: 32),
+              _buildStatItem('162', 'Following', isDark),
+            ],
+          );
+        }),
       ),
     );
   }
@@ -975,7 +985,7 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: () => postController.loadAllPosts(),
+                  onPressed: () => postController.loadUserPosts(),
                   child: Text(isBn ? 'পুনরায় চেষ্টা করুন' : 'Retry'),
                 ),
               ],
@@ -985,21 +995,21 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
       }
 
       if (postController.posts.isEmpty) {
-        return Transform.translate(
-          offset: const Offset(0, -90),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            child: Text(
+    return Transform.translate(
+      offset: const Offset(0, -90),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        child: Text(
               isBn ? 'কোন পোস্ট নেই' : 'No posts yet',
-              style: GoogleFonts.roboto(
-                fontSize: 16,
-                color: isDark ? Colors.white70 : Colors.black54,
-              ),
-              textAlign: TextAlign.center,
-            ),
+          style: GoogleFonts.roboto(
+            fontSize: 16,
+            color: isDark ? Colors.white70 : Colors.black54,
           ),
-        );
-      }
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
 
       return Transform.translate(
         offset: const Offset(0, -90),
@@ -1065,8 +1075,8 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                               backgroundColor: Colors.green,
                               colorText: Colors.white,
                             );
-                            // Reload posts
-                            postController.loadAllPosts();
+                            // Reload user's posts
+                            postController.loadUserPosts();
                           } else {
                             Get.snackbar(
                               isBn ? 'ত্রুটি' : 'Error',

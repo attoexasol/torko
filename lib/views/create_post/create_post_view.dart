@@ -33,6 +33,10 @@ class _CreatePostViewState extends State<CreatePostView> {
     try {
       final List<XFile> pickedFiles = await _imagePicker.pickMultiImage();
       if (pickedFiles.isNotEmpty) {
+        // Clear video if images are selected (typically you post either images or video, not both)
+        if (postController.selectedVideo.value != null) {
+          postController.selectedVideo.value = null;
+        }
         postController.selectedImages.value = pickedFiles.map((file) => File(file.path)).toList();
       }
     } catch (e) {
@@ -46,21 +50,43 @@ class _CreatePostViewState extends State<CreatePostView> {
 
   Future<void> _pickVideo() async {
     try {
-      final XFile? pickedFile = await _imagePicker.pickVideo(source: ImageSource.gallery);
+      final XFile? pickedFile = await _imagePicker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(minutes: 10), // Limit to 10 minutes
+      );
       if (pickedFile != null) {
-        Get.snackbar(
-          appController.language == AppLanguage.bn ? 'সতর্কতা' : 'Notice',
-          appController.language == AppLanguage.bn 
-              ? 'ভিডিও আপলোড শীঘ্রই আসছে' 
-              : 'Video upload coming soon',
-          snackPosition: SnackPosition.BOTTOM,
-        );
+        // Check file size (limit to 100MB for videos)
+        final file = File(pickedFile.path);
+        final fileSize = await file.length();
+        const maxSize = 100 * 1024 * 1024; // 100MB
+        
+        if (fileSize > maxSize) {
+          Get.snackbar(
+            appController.language == AppLanguage.bn ? 'সতর্কতা' : 'Warning',
+            appController.language == AppLanguage.bn 
+                ? 'ভিডিও খুব বড়। সর্বোচ্চ 100MB' 
+                : 'Video is too large. Maximum 100MB',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+          );
+          return;
+        }
+        
+        // Clear images if video is selected (typically you post either images or video, not both)
+        if (postController.selectedImages.isNotEmpty) {
+          postController.selectedImages.clear();
+        }
+        
+        postController.selectedVideo.value = file;
       }
     } catch (e) {
       Get.snackbar(
         appController.language == AppLanguage.bn ? 'ত্রুটি' : 'Error',
         e.toString(),
         snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
       );
     }
   }
@@ -69,12 +95,15 @@ class _CreatePostViewState extends State<CreatePostView> {
     final title = titleController.text.trim();
     final description = descriptionController.text.trim();
 
-    if (title.isEmpty && description.isEmpty && postController.selectedImages.isEmpty) {
+    if (title.isEmpty && 
+        description.isEmpty && 
+        postController.selectedImages.isEmpty && 
+        postController.selectedVideo.value == null) {
       Get.snackbar(
         appController.language == AppLanguage.bn ? 'সতর্কতা' : 'Warning',
         appController.language == AppLanguage.bn 
-            ? 'কিছু লিখুন বা ছবি যোগ করুন' 
-            : 'Please write something or add images',
+            ? 'কিছু লিখুন বা ছবি/ভিডিও যোগ করুন' 
+            : 'Please write something or add images/video',
         snackPosition: SnackPosition.BOTTOM,
       );
       return;
@@ -88,6 +117,7 @@ class _CreatePostViewState extends State<CreatePostView> {
       title: postTitle,
       description: postDescription,
       images: postController.selectedImages.toList(),
+      video: postController.selectedVideo.value,
     );
 
     if (success) {
@@ -121,7 +151,8 @@ class _CreatePostViewState extends State<CreatePostView> {
       final isBn = language == AppLanguage.bn;
       final canPost = (titleController.text.trim().isNotEmpty || 
                       descriptionController.text.trim().isNotEmpty || 
-                      postController.selectedImages.isNotEmpty) &&
+                      postController.selectedImages.isNotEmpty ||
+                      postController.selectedVideo.value != null) &&
                       !postController.isCreating.value;
       
       return Scaffold(
@@ -292,6 +323,90 @@ class _CreatePostViewState extends State<CreatePostView> {
                       onChanged: (_) => setState(() {}),
                     ),
                     const SizedBox(height: 16),
+
+                    // Selected Video Preview
+                    Obx(() {
+                      if (postController.selectedVideo.value == null) {
+                        return const SizedBox.shrink();
+                      }
+                      
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isBn ? 'নির্বাচিত ভিডিও' : 'Selected Video',
+                            style: TextStyle(
+                              color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Stack(
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                height: 250,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                                  ),
+                                  color: Colors.black,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      const Icon(
+                                        Icons.videocam,
+                                        color: Colors.white54,
+                                        size: 64,
+                                      ),
+                                      Center(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.black54,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.play_arrow,
+                                            color: Colors.white,
+                                            size: 32,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 8,
+                                right: 8,
+                                child: GestureDetector(
+                                  onTap: () => postController.removeVideo(),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black54,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      );
+                    }),
 
                     // Selected Images Preview
                     Obx(() {
