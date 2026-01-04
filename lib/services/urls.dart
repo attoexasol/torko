@@ -30,8 +30,4 @@ class Urls{
 
     // Feed page
     static const get_all_post = "$_baseUrL/get_all_post" ;
-
-
-
-
 }

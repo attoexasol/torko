@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/controllers/app_controller.dart';
 import '../../core/theme/app_colors.dart';
+import '../../models/post_model.dart';
 import '../../widgets/bottom_nav.dart';
 import '../../widgets/home_header.dart';
 import 'home_controller.dart';
@@ -24,39 +25,118 @@ class HomeView extends StatelessWidget {
         body: Stack(
           children: [
             // Main content
-            CustomScrollView(
-              controller: controller.scrollController,
-              slivers: [
-                // Space for header
-                SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).padding.top + 60,),),
-                
-                // Tabs Section
-                SliverToBoxAdapter(child: _buildTabs(controller, appController, isDark),),
-                
-                // Posts Feed
-                Obx(() => SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final posts = controller.filteredPosts;
-                      if (index >= posts.length) return null;
-                      
-                      final post = posts[index];
-                      return _HomePostCard(
-                        post: post,
-                        controller: controller,
-                        appController: appController,
-                        isDark: isDark,
-                      );
-                    },
-                    childCount: controller.filteredPosts.length,
+            RefreshIndicator(
+              onRefresh: controller.refreshPosts,
+              color: AppColors.lightPrimary,
+              child: CustomScrollView(
+                controller: controller.scrollController,
+                slivers: [
+                  // Space for header
+                  SliverToBoxAdapter(child: SizedBox(height: MediaQuery.of(context).padding.top + 60,),),
+                  
+                  // Tabs Section
+                  SliverToBoxAdapter(child: _buildTabs(controller, appController, isDark),),
+                  
+                  // Loading indicator
+                  if (controller.isLoading.value && controller.posts.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Container(
+                        padding: const EdgeInsets.all(40),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.lightPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  
+                  // Error message
+                  if (controller.errorMessage.value.isNotEmpty && controller.posts.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Container(
+                        padding: const EdgeInsets.all(40),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: 48,
+                              color: isDark ? Colors.white54 : Colors.black54,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              controller.errorMessage.value,
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 14,
+                                color: isDark ? Colors.white54 : Colors.black54,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton(
+                              onPressed: controller.refreshPosts,
+                              child: Text(
+                                appController.language == AppLanguage.bn ? 'পুনরায় চেষ্টা করুন' : 'Retry',
+                                style: TextStyle(color: AppColors.lightPrimary),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  
+                  // Posts Feed
+                  if (!controller.isLoading.value || controller.posts.isNotEmpty)
+                    Obx(() => SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final posts = controller.filteredPosts;
+                          if (index >= posts.length) return null;
+                          
+                          final post = posts[index];
+                          return _HomePostCard(
+                            post: post,
+                            controller: controller,
+                            appController: appController,
+                            isDark: isDark,
+                          );
+                        },
+                        childCount: controller.filteredPosts.length,
+                      ),
+                    )),
+                  
+                  // Empty state
+                  if (!controller.isLoading.value && controller.filteredPosts.isEmpty && controller.errorMessage.value.isEmpty)
+                    SliverToBoxAdapter(
+                      child: Container(
+                        padding: const EdgeInsets.all(40),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.post_add,
+                              size: 48,
+                              color: isDark ? Colors.white54 : Colors.black54,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              appController.language == AppLanguage.bn 
+                                ? 'কোন পোস্ট নেই' 
+                                : 'No posts yet',
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 16,
+                                color: isDark ? Colors.white54 : Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  
+                  // Bottom padding
+                  const SliverToBoxAdapter(
+                    child: SizedBox(height: 100),
                   ),
-                )),
-                
-                // Bottom padding
-                const SliverToBoxAdapter(
-                  child: SizedBox(height: 100),
-                ),
-              ],
+                ],
+              ),
             ),
             
             // Fixed Header
@@ -196,7 +276,7 @@ class _TabButton extends StatelessWidget {
 }
 
 class _HomePostCard extends StatelessWidget {
-  final Post post;
+  final PostModel post;
   final HomeController controller;
   final AppController appController;
   final bool isDark;
@@ -239,6 +319,9 @@ class _HomePostCard extends StatelessWidget {
   }
 
   Widget _buildHeader(bool isBn) {
+    final authorName = post.createdBy?.name ?? 'Unknown';
+    final timestamp = controller.formatTimestamp(post.createdAt);
+    
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       child: Row(
@@ -248,19 +331,14 @@ class _HomePostCard extends StatelessWidget {
           CircleAvatar(
             radius: 22,
             backgroundColor: AppColors.lightPrimary.withOpacity(0.2),
-            backgroundImage: post.authorAvatar != null
-                ? CachedNetworkImageProvider(post.authorAvatar!)
-                : null,
-            child: post.authorAvatar == null
-                ? Text(
-                    post.author.isNotEmpty ? post.author[0].toUpperCase() : 'U',
-                    style: TextStyle(
-                      color: AppColors.lightPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  )
-                : null,
+            child: Text(
+              authorName.isNotEmpty ? authorName[0].toUpperCase() : 'U',
+              style: TextStyle(
+                color: AppColors.lightPrimary,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           
@@ -274,7 +352,7 @@ class _HomePostCard extends StatelessWidget {
                   children: [
                     Flexible(
                       child: Text(
-                        post.author,
+                        authorName,
                         style: GoogleFonts.notoSansBengali(
                           fontSize: 15,
                           fontWeight: FontWeight.w600,
@@ -292,34 +370,9 @@ class _HomePostCard extends StatelessWidget {
                   ],
                 ),
                 
-                // Group name if exists
-                if (post.groupName != null) ...[
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.group,
-                        size: 12,
-                        color: isDark ? const Color(0xFF8E8E8E) : const Color(0xFF536471),
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          post.groupName!,
-                          style: GoogleFonts.notoSansBengali(
-                            fontSize: 12,
-                            color: isDark ? const Color(0xFF8E8E8E) : const Color(0xFF536471),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                
                 // Timestamp
                 Text(
-                  post.timestamp,
+                  timestamp,
                   style: GoogleFonts.roboto(
                     fontSize: 12,
                     color: isDark ? const Color(0xFF8E8E8E) : const Color(0xFF536471),
@@ -330,13 +383,13 @@ class _HomePostCard extends StatelessWidget {
           ),
           
           // Menu button
-          _buildMenuButton(isBn),
+          _buildMenuButton(isBn, authorName),
         ],
       ),
     );
   }
 
-  Widget _buildMenuButton(bool isBn) {
+  Widget _buildMenuButton(bool isBn, String authorName) {
     return PopupMenuButton<String>(
       icon: Icon(
         Icons.more_horiz,
@@ -356,7 +409,7 @@ class _HomePostCard extends StatelessWidget {
             controller.handleSavePost(post.id);
             break;
           case 'follow':
-            controller.handleFollowUser(post.author);
+            controller.handleFollowUser(authorName);
             break;
           case 'hide':
             controller.handleHidePost(post.id);
@@ -401,7 +454,7 @@ class _HomePostCard extends StatelessWidget {
           child: Obx(() => Row(
             children: [
               Icon(
-                controller.isFollowing(post.author)
+                controller.isFollowing(authorName)
                     ? Icons.person_remove
                     : Icons.person_add,
                 size: 18,
@@ -409,7 +462,7 @@ class _HomePostCard extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Text(
-                controller.isFollowing(post.author)
+                controller.isFollowing(authorName)
                     ? (isBn ? 'আনফলো করুন' : 'Unfollow')
                     : (isBn ? 'ফলো করুন' : 'Follow'),
                 style: TextStyle(
@@ -487,172 +540,62 @@ class _HomePostCard extends StatelessWidget {
   }
 
   Widget _buildContent() {
-    switch (post.type) {
-      case 'gradient':
-        return _buildGradientContent();
-      case 'image':
-        return _buildImageContent();
-      case 'multiImage':
-        return _buildMultiImageContent();
-      case 'poll':
-        return _buildPollContent();
-      default:
-        return _buildTextContent();
-    }
-  }
-
-  Widget _buildTextContent() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Text(
-        post.content,
-        style: GoogleFonts.notoSansBengali(
-          fontSize: 15,
-          height: 1.4,
-          color: isDark ? Colors.white : const Color(0xFF0f1419),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGradientContent() {
-    // Parse gradient colors
-    List<Color> gradientColors = [
-      const Color(0xFF667eea),
-      const Color(0xFF764ba2),
-    ];
-    
-    if (post.gradient != null) {
-      final hexPattern = RegExp(r'#([0-9A-Fa-f]{6})');
-      final matches = hexPattern.allMatches(post.gradient!);
-      if (matches.length >= 2) {
-        final colorList = matches.map((match) {
-          final hex = match.group(1)!;
-          return Color(int.parse('FF$hex', radix: 16));
-        }).toList();
-        gradientColors = colorList.take(2).toList();
-      }
-    }
-    
-    return Container(
-      width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 220),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: gradientColors,
-        ),
-      ),
-      padding: const EdgeInsets.all(32),
-      child: Center(
-        child: Text(
-          post.content,
-          style: GoogleFonts.notoSansBengali(
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-            height: 1.4,
-            color: Colors.white,
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImageContent() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Text content
-        if (post.content.isNotEmpty)
+        // Title
+        if (post.postTitle.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Text(
-              post.content,
+              post.postTitle,
               style: GoogleFonts.notoSansBengali(
-                fontSize: 15,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
                 height: 1.4,
                 color: isDark ? Colors.white : const Color(0xFF0f1419),
               ),
             ),
           ),
         
-        // Image
-        if (post.image != null)
-          ClipRRect(
-            child: CachedNetworkImage(
-              imageUrl: post.image!,
-              width: double.infinity,
-              height: 280,
-              fit: BoxFit.cover,
-              placeholder: (context, url) => Container(
-                height: 280,
-                color: isDark ? const Color(0xFF0d3a4a) : const Color(0xFFF5F5F5),
-                child: const Center(
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-              errorWidget: (context, url, error) => Container(
-                height: 280,
-                color: isDark ? const Color(0xFF0d3a4a) : const Color(0xFFF5F5F5),
-                child: Icon(
-                  Icons.image,
-                  size: 48,
-                  color: isDark ? const Color(0xFF8E8E8E) : const Color(0xFF9D9D9D),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget _buildMultiImageContent() {
-    final images = post.images ?? [];
-    if (images.isEmpty) return _buildTextContent();
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Text content
-        if (post.content.isNotEmpty)
+        // Description
+        if (post.postDescription.isNotEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: Text(
-              post.content,
+              post.postDescription,
               style: GoogleFonts.notoSansBengali(
                 fontSize: 15,
                 height: 1.4,
-                color: isDark ? Colors.white : const Color(0xFF0f1419),
+                color: isDark ? Colors.white.withOpacity(0.9) : const Color(0xFF0f1419),
               ),
             ),
           ),
         
-        // Image grid
-        _buildImageGrid(images),
+        // Images
+        if (post.postImages.isNotEmpty) _buildImages(),
       ],
     );
   }
 
-  Widget _buildImageGrid(List<String> images) {
-    final count = images.length;
+  Widget _buildImages() {
+    final images = post.postImages;
     
-    if (count == 1) {
+    if (images.length == 1) {
       return _buildSingleImage(images[0]);
-    } else if (count == 2) {
+    } else if (images.length == 2) {
       return _buildTwoImages(images);
-    } else if (count == 3) {
+    } else if (images.length == 3) {
       return _buildThreeImages(images);
     } else {
       return _buildFourPlusImages(images);
     }
   }
 
-  Widget _buildSingleImage(String url) {
+  Widget _buildSingleImage(String imagePath) {
     return ClipRRect(
       child: CachedNetworkImage(
-        imageUrl: url,
+        imageUrl: controller.getFullImageUrl(imagePath),
         width: double.infinity,
         height: 280,
         fit: BoxFit.cover,
@@ -669,7 +612,7 @@ class _HomePostCard extends StatelessWidget {
         children: [
           Expanded(
             child: CachedNetworkImage(
-              imageUrl: images[0],
+              imageUrl: controller.getFullImageUrl(images[0]),
               height: 200,
               fit: BoxFit.cover,
               placeholder: (context, url) => _buildImagePlaceholder(200),
@@ -679,7 +622,7 @@ class _HomePostCard extends StatelessWidget {
           const SizedBox(width: 2),
           Expanded(
             child: CachedNetworkImage(
-              imageUrl: images[1],
+              imageUrl: controller.getFullImageUrl(images[1]),
               height: 200,
               fit: BoxFit.cover,
               placeholder: (context, url) => _buildImagePlaceholder(200),
@@ -698,7 +641,7 @@ class _HomePostCard extends StatelessWidget {
         children: [
           Expanded(
             child: CachedNetworkImage(
-              imageUrl: images[0],
+              imageUrl: controller.getFullImageUrl(images[0]),
               height: 260,
               fit: BoxFit.cover,
               placeholder: (context, url) => _buildImagePlaceholder(260),
@@ -711,7 +654,7 @@ class _HomePostCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: CachedNetworkImage(
-                    imageUrl: images[1],
+                    imageUrl: controller.getFullImageUrl(images[1]),
                     width: double.infinity,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => _buildImagePlaceholder(129),
@@ -721,7 +664,7 @@ class _HomePostCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Expanded(
                   child: CachedNetworkImage(
-                    imageUrl: images[2],
+                    imageUrl: controller.getFullImageUrl(images[2]),
                     width: double.infinity,
                     fit: BoxFit.cover,
                     placeholder: (context, url) => _buildImagePlaceholder(129),
@@ -748,7 +691,7 @@ class _HomePostCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: CachedNetworkImage(
-                    imageUrl: images[0],
+                    imageUrl: controller.getFullImageUrl(images[0]),
                     fit: BoxFit.cover,
                     placeholder: (context, url) => _buildImagePlaceholder(139),
                     errorWidget: (context, url, error) => _buildImageError(139),
@@ -757,7 +700,7 @@ class _HomePostCard extends StatelessWidget {
                 const SizedBox(width: 2),
                 Expanded(
                   child: CachedNetworkImage(
-                    imageUrl: images[1],
+                    imageUrl: controller.getFullImageUrl(images[1]),
                     fit: BoxFit.cover,
                     placeholder: (context, url) => _buildImagePlaceholder(139),
                     errorWidget: (context, url, error) => _buildImageError(139),
@@ -772,7 +715,7 @@ class _HomePostCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: CachedNetworkImage(
-                    imageUrl: images[2],
+                    imageUrl: controller.getFullImageUrl(images[2]),
                     fit: BoxFit.cover,
                     placeholder: (context, url) => _buildImagePlaceholder(139),
                     errorWidget: (context, url, error) => _buildImageError(139),
@@ -784,7 +727,7 @@ class _HomePostCard extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       CachedNetworkImage(
-                        imageUrl: images[3],
+                        imageUrl: controller.getFullImageUrl(images[3]),
                         fit: BoxFit.cover,
                         placeholder: (context, url) => _buildImagePlaceholder(139),
                         errorWidget: (context, url, error) => _buildImageError(139),
@@ -835,165 +778,26 @@ class _HomePostCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPollContent() {
-    final isBn = appController.language == AppLanguage.bn;
-    final pollData = post.poll;
-    if (pollData == null) return _buildTextContent();
-    
-    final options = pollData['options'] as List<dynamic>? ?? [];
-    final totalVotes = pollData['totalVotes'] as int? ?? 0;
-    final hasVoted = pollData['hasVoted'] as bool? ?? false;
-    final votedOptionId = pollData['votedOptionId'] as int?;
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0d3a4a) : const Color(0xFFf7f8fa),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? const Color(0xFF104050) : const Color(0xFFe6e6e6),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Question
-            Text(
-              pollData['question'] ?? post.content,
-              style: GoogleFonts.notoSansBengali(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : const Color(0xFF0f1419),
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            // Options
-            ...options.map((option) {
-              final optionId = option['id'] as int;
-              final optionText = option['text'] as String;
-              final optionVotes = option['votes'] as int;
-              final percentage = totalVotes > 0
-                  ? ((optionVotes / totalVotes) * 100).round()
-                  : 0;
-              final isVoted = hasVoted && votedOptionId == optionId;
-              
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: isVoted
-                        ? AppColors.lightPrimary.withOpacity(isDark ? 0.15 : 0.1)
-                        : (isDark ? const Color(0xFF104050) : Colors.white),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isVoted
-                          ? AppColors.lightPrimary
-                          : (isDark ? const Color(0xFF104050) : const Color(0xFFe1e4e8)),
-                    ),
-                  ),
-                  child: Stack(
-                    children: [
-                      // Progress bar
-                      if (hasVoted)
-                        Positioned.fill(
-                          child: FractionallySizedBox(
-                            alignment: Alignment.centerLeft,
-                            widthFactor: percentage / 100,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.lightPrimary.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
-                        ),
-                      
-                      // Option content
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                        child: Row(
-                          children: [
-                            if (isVoted) ...[
-                              Icon(
-                                Icons.check_circle,
-                                size: 16,
-                                color: AppColors.lightPrimary,
-                              ),
-                              const SizedBox(width: 8),
-                            ],
-                            Expanded(
-                              child: Text(
-                                optionText,
-                                style: GoogleFonts.notoSansBengali(
-                                  fontSize: 14,
-                                  color: isVoted
-                                      ? AppColors.lightPrimary
-                                      : (isDark ? Colors.white : const Color(0xFF0f1419)),
-                                  fontWeight: isVoted ? FontWeight.w600 : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                            if (hasVoted) ...[
-                              const SizedBox(width: 8),
-                              Text(
-                                '$percentage%',
-                                style: GoogleFonts.roboto(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark ? const Color(0xFF8E8E8E) : const Color(0xFF536471),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
-            
-            // Total votes
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                '$totalVotes ${isBn ? 'ভোট' : 'votes'}',
-                style: GoogleFonts.roboto(
-                  fontSize: 13,
-                  color: isDark ? const Color(0xFF8E8E8E) : const Color(0xFF536471),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildActions(bool isBn) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
       child: Row(
         children: [
           // Like button
-          _ActionButton(
-            icon: post.isLiked ? Icons.favorite : Icons.favorite_border,
-            label: _formatCount(post.likes),
-            isActive: post.isLiked,
+          Obx(() => _ActionButton(
+            icon: controller.isPostLiked(post.id) ? Icons.favorite : Icons.favorite_border,
+            label: _formatCount(controller.getLikeCount(post)),
+            isActive: controller.isPostLiked(post.id),
             onTap: () => controller.handleLike(post.id),
             isDark: isDark,
-          ),
+          )),
           
           const SizedBox(width: 8),
           
           // Comment button
           _ActionButton(
             icon: Icons.chat_bubble_outline,
-            label: _formatCount(post.comments),
+            label: _formatCount(post.postCommentCount),
             isActive: false,
             onTap: () => controller.handleComment(post.id),
             isDark: isDark,
@@ -1083,5 +887,3 @@ class _ActionButton extends StatelessWidget {
     );
   }
 }
-
-

@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/controllers/app_controller.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_colors.dart';
+import '../../services/logout_service.dart';
 
 class SettingsView extends StatefulWidget {
   const SettingsView({super.key});
@@ -15,6 +16,97 @@ class SettingsView extends StatefulWidget {
 class _SettingsViewState extends State<SettingsView> {
   final appController = Get.find<AppController>();
   bool _showNearby = false;
+
+  /// Handle logout with confirmation dialog
+  Future<void> _handleLogout(bool isDark, bool isBn) async {
+    // Show confirmation dialog
+    final shouldLogout = await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          isBn ? 'লগ আউট' : 'Logout',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+        ),
+        content: Text(
+          isBn
+              ? 'আপনি কি নিশ্চিত যে আপনি লগ আউট করতে চান?'
+              : 'Are you sure you want to logout?',
+          style: TextStyle(
+            fontSize: 16,
+            color: isDark ? Colors.white70 : Colors.black54,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: Text(
+              isBn ? 'বাতিল' : 'Cancel',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black54,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text(
+              'Logout',
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+      barrierDismissible: true,
+    );
+
+    if (shouldLogout == true) {
+      try {
+        // Clear all user data using centralized logout service
+        await LogoutService.clearAllData();
+
+        // Show success message
+        Get.snackbar(
+          isBn ? 'লগ আউট সফল' : 'Logged Out',
+          isBn
+              ? 'আপনি সফলভাবে লগ আউট করেছেন'
+              : 'You have been logged out successfully',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: isDark ? Colors.grey[800] : Colors.grey[200],
+          colorText: isDark ? Colors.white : Colors.black87,
+          duration: const Duration(seconds: 2),
+          margin: const EdgeInsets.all(16),
+          borderRadius: 8,
+        );
+
+        // Navigate to splash screen
+        Get.offAllNamed(AppRoutes.splash);
+      } catch (e) {
+        Get.snackbar(
+          isBn ? 'ত্রুটি' : 'Error',
+          isBn
+              ? 'লগ আউট করার সময় একটি ত্রুটি ঘটেছে'
+              : 'An error occurred while logging out',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+          margin: const EdgeInsets.all(16),
+          borderRadius: 8,
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +287,7 @@ class _SettingsViewState extends State<SettingsView> {
                     Padding(
                       padding: const EdgeInsets.only(top: 32),
                       child: GestureDetector(
-                        onTap: () => Get.offAllNamed(AppRoutes.onboarding),
+                        onTap: () => _handleLogout(isDark, isBn),
                         child: Container(
                           width: double.infinity,
                           height: 48,

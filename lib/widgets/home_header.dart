@@ -5,8 +5,8 @@ import '../core/controllers/app_controller.dart';
 import '../core/routes/app_routes.dart';
 import '../core/theme/app_colors.dart';
 import '../controllers/navigation_controller.dart';
+import '../services/logout_service.dart';
 import '../services/user_info.dart';
-import '../controllers/post_controller.dart';
 
 class HomeHeader extends StatefulWidget {
   final Function(String)? onNavigate;
@@ -341,14 +341,8 @@ class _AppDrawerState extends State<_AppDrawer> {
     // If user confirmed logout
     if (shouldLogout == true) {
       try {
-        // Clear PostController data if registered
-        if (Get.isRegistered<PostController>()) {
-          final postController = Get.find<PostController>();
-          postController.clearPosts();
-        }
-
-        // Clear all user data (token, profile, etc.)
-        await UserInfo.clear();
+        // Clear all user data using centralized logout service
+        await LogoutService.clearAllData();
 
         // Show success message
         Get.snackbar(
