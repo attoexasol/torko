@@ -13,11 +13,23 @@ class Urls{
 
 
     // Post API endPoints
-    static const get_all_post = "$_baseUrL/get_all_post" ;
     static const create_post = "$_baseUrL/create_post" ;
     static const update_post = "$_baseUrL/update_post" ;
     static const single_post = "$_baseUrL/single_post" ;
     static const delete_post = "$_baseUrL/delete_post" ;
+    static const user_own_posts = "$_baseUrL/user/posts" ;
+
+
+    // Comment API endPoints
+    static const get_all_comment = "$_baseUrL/get_all_comment" ;
+    static const single_comment = "$_baseUrL/single_comment" ;
+    static const create_comment = "$_baseUrL/create_comment" ;
+    static const update_comment = "$_baseUrL/update_comment" ;
+    static const delete_comment = "$_baseUrL/delete_comment" ;
+
+
+    // Feed page
+    static const get_all_post = "$_baseUrL/get_all_post" ;
 
 
 
