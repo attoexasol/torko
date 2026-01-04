@@ -35,6 +35,61 @@ class PostController extends GetxController {
     // Don't auto-load posts on init - let views decide when to load
   }
 
+  // ==================== Helper: Fetch User ID ====================
+  /// Fetches user ID from API if not stored locally
+  Future<int?> _ensureUserId() async {
+    // If we already have userId, return it
+    if (UserInfo.userId != null) {
+      print('DEBUG _ensureUserId: Already have userId = ${UserInfo.userId}');
+      return UserInfo.userId;
+    }
+
+    print('DEBUG _ensureUserId: No userId stored, fetching from API...');
+    
+    // Try to fetch user profile from update_users API
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) {
+      print('DEBUG _ensureUserId: No token available');
+      return null;
+    }
+
+    try {
+      final response = await NetworkCaller.postRequest(
+        url: Urls.update_users,
+        body: {
+          'api_token': token,
+        },
+      );
+
+      print('DEBUG _ensureUserId: API response success = ${response.isSuccess}');
+      
+      if (response.isSuccess && response.body != null) {
+        final data = response.body!;
+        print('DEBUG _ensureUserId: Response data = $data');
+        
+        if (data['status'] == true && data['data'] != null) {
+          final userData = data['data'];
+          final userId = userData['id'];
+          print('DEBUG _ensureUserId: Found userId = $userId (type: ${userId.runtimeType})');
+          
+          if (userId != null) {
+            if (userId is int) {
+              await UserInfo.setUserId(userId);
+              return userId;
+            } else if (userId is String) {
+              final parsedId = int.tryParse(userId) ?? 0;
+              await UserInfo.setUserId(parsedId);
+              return parsedId;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('DEBUG _ensureUserId: Error = $e');
+    }
+    return null;
+  }
+
   // ==================== Get All Posts ====================
   Future<void> loadAllPosts() async {
     isLoading.value = true;
@@ -97,7 +152,6 @@ class PostController extends GetxController {
 
     try {
       final token = UserInfo.apiToken;
-      final currentUserId = UserInfo.userId;
       
       if (token == null || token.isEmpty) {
         errorMessage.value = 'Please login first';
@@ -106,13 +160,26 @@ class PostController extends GetxController {
         return;
       }
 
+      // Try to get userId, fetch from API if not available
+      int? currentUserId = UserInfo.userId;
+      print('DEBUG loadUserPosts: Initial userId from storage = $currentUserId');
+      
       if (currentUserId == null) {
+        print('DEBUG loadUserPosts: userId is null, calling _ensureUserId()');
+        currentUserId = await _ensureUserId();
+        print('DEBUG loadUserPosts: After _ensureUserId(), userId = $currentUserId');
+      }
+
+      if (currentUserId == null) {
+        print('DEBUG loadUserPosts: userId is still null, returning empty');
         errorMessage.value = 'User ID not found';
         isLoading.value = false;
         posts.value = []; // Clear posts if user ID is missing
         _lastUserId = null;
         return;
       }
+      
+      print('DEBUG loadUserPosts: Using userId = $currentUserId for filtering');
 
       // Clear posts if user has changed (new login)
       if (_lastUserId != null && _lastUserId != currentUserId) {
@@ -144,7 +211,12 @@ class PostController extends GetxController {
           if (data is List) {
             // Filter posts by current user's ID
             final allPosts = data.map((json) => PostModel.fromJson(json)).toList();
+            print('DEBUG loadUserPosts: Total posts from API = ${allPosts.length}');
+            print('DEBUG loadUserPosts: Post userIds = ${allPosts.map((p) => p.userId).toList()}');
+            print('DEBUG loadUserPosts: Filtering for userId = $currentUserId');
+            
             posts.value = allPosts.where((post) => post.userId == currentUserId).toList();
+            print('DEBUG loadUserPosts: Filtered posts count = ${posts.length}');
             errorMessage.value = '';
           } else {
             errorMessage.value = 'Invalid response format';
@@ -260,8 +332,8 @@ class PostController extends GetxController {
 
       if (response.isSuccess && response.body != null) {
         if (response.body!['status'] == true) {
-          // Reload posts
-          await loadAllPosts();
+          // Reload user's posts only
+          await loadUserPosts();
           // Clear form
           postTitle.value = '';
           postDescription.value = '';
@@ -343,8 +415,8 @@ class PostController extends GetxController {
 
       if (response.isSuccess && response.body != null) {
         if (response.body!['status'] == true) {
-          // Reload posts
-          await loadAllPosts();
+          // Reload user's posts only
+          await loadUserPosts();
           // Clear form
           postTitle.value = '';
           postDescription.value = '';

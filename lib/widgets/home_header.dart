@@ -6,6 +6,7 @@ import '../core/routes/app_routes.dart';
 import '../core/theme/app_colors.dart';
 import '../controllers/navigation_controller.dart';
 import '../services/user_info.dart';
+import '../controllers/post_controller.dart';
 
 class HomeHeader extends StatefulWidget {
   final Function(String)? onNavigate;
@@ -273,6 +274,117 @@ class _AppDrawerState extends State<_AppDrawer> {
     });
   }
 
+  /// Professional logout handler
+  /// Shows confirmation dialog, clears user data, and navigates to login
+  Future<void> _handleLogout() async {
+    final isDark = appController.isDarkMode;
+    final language = appController.language;
+    final isBn = language == AppLanguage.bn;
+
+    // Close drawer first
+    widget.onClose();
+
+    // Show confirmation dialog
+    final shouldLogout = await Get.dialog<bool>(
+      AlertDialog(
+        backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          isBn ? 'লগ আউট' : 'Logout',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+            color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+          ),
+        ),
+        content: Text(
+          isBn 
+              ? 'আপনি কি নিশ্চিত যে আপনি লগ আউট করতে চান?'
+              : 'Are you sure you want to logout?',
+          style: TextStyle(
+            fontSize: 16,
+            color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+          ),
+        ),
+        actions: [
+          // Cancel button
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: Text(
+              isBn ? 'বাতিল' : 'Cancel',
+              style: TextStyle(
+                color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          // Logout button
+          TextButton(
+            onPressed: () => Get.back(result: true),
+            child: Text(
+              isBn ? 'লগ আউট' : 'Logout',
+              style: const TextStyle(
+                color: Colors.red,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+      barrierDismissible: true,
+    );
+
+    // If user confirmed logout
+    if (shouldLogout == true) {
+      try {
+        // Clear PostController data if registered
+        if (Get.isRegistered<PostController>()) {
+          final postController = Get.find<PostController>();
+          postController.clearPosts();
+        }
+
+        // Clear all user data (token, profile, etc.)
+        await UserInfo.clear();
+
+        // Show success message
+        Get.snackbar(
+          isBn ? 'লগ আউট সফল' : 'Logged Out',
+          isBn 
+              ? 'আপনি সফলভাবে লগ আউট করেছেন'
+              : 'You have been logged out successfully',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+          colorText: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+          duration: const Duration(seconds: 2),
+          margin: const EdgeInsets.all(16),
+          borderRadius: 8,
+        );
+
+        // Navigate to splash screen (which will auto-route to login)
+        // Using offAllNamed to clear navigation stack and prevent back navigation
+        Get.offAllNamed(AppRoutes.splash);
+      } catch (e) {
+        // Handle any errors gracefully
+        Get.snackbar(
+          isBn ? 'ত্রুটি' : 'Error',
+          isBn 
+              ? 'লগ আউট করার সময় একটি ত্রুটি ঘটেছে'
+              : 'An error occurred while logging out',
+          snackPosition: SnackPosition.BOTTOM,
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+          margin: const EdgeInsets.all(16),
+          borderRadius: 8,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -484,11 +596,7 @@ class _AppDrawerState extends State<_AppDrawer> {
                           child: _MenuItemWidget(
                             icon: Icons.logout,
                             label: isBn ? 'লগ আউট' : 'Logout',
-                            onTap: () {
-                              print('Logout');
-                              widget.onClose();
-                              // Handle logout
-                            },
+                            onTap: _handleLogout,
                             isDark: isDark,
                             isDestructive: true,
                           ),

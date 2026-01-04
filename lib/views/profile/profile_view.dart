@@ -94,9 +94,11 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
       vsync: this,
     );
     
+    // Always load posts on init to check profile completion
+    postController.loadUserPosts();
+    
     // Load posts if post tab is initially active
     if (widget.controller.activeTab.value == 'post') {
-      postController.loadUserPosts();
       _lastActiveTab = 'post';
     }
     
@@ -106,6 +108,11 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
         postController.loadUserPosts(); // Load only current user's posts
       }
       _lastActiveTab = tab;
+    });
+    
+    // Listen to posts changes and update hasFirstPost for profile completion
+    ever(postController.posts, (List<PostModel> posts) {
+      widget.controller.updateFirstPostStatus(posts.isNotEmpty);
     });
   }
   
@@ -709,9 +716,9 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
             children: [
               _buildStatItem(postCount, 'Posts', isDark),
               const SizedBox(width: 32),
-              _buildStatItem('834', isBn ? 'প্রতিবেশী' : 'Neighbours', isDark),
+              _buildStatItem('0', isBn ? 'প্রতিবেশী' : 'Neighbours', isDark),
               const SizedBox(width: 32),
-              _buildStatItem('162', 'Following', isDark),
+              _buildStatItem('0', 'Following', isDark),
             ],
           );
         }),

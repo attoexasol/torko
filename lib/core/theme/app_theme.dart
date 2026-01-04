@@ -28,6 +28,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(AppSizes.radius),
         ),
       ),
+
       // inputDecorationTheme: InputDecorationTheme(
       //   filled: true,
       //   fillColor: AppColors.lightInputBackground,

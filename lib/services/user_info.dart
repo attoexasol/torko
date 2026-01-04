@@ -285,7 +285,14 @@ class UserInfo {
 
   /// Save user profile data from update_users API response
   static Future<void> saveUserProfile(Map<String, dynamic> data) async {
-    if (data['id'] != null) await setUserId(data['id']);
+    if (data['id'] != null) {
+      final id = data['id'];
+      if (id is int) {
+        await setUserId(id);
+      } else if (id is String) {
+        await setUserId(int.tryParse(id) ?? 0);
+      }
+    }
     if (data['fullname'] != null) await setFullname(data['fullname']);
     if (data['username'] != null) await setUsername(data['username']);
     if (data['email'] != null) await setEmail(data['email']);

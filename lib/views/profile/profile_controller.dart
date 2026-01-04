@@ -634,6 +634,15 @@ class ProfileController extends GetxController {
     activeTab.value = tab;
   }
 
+  // ==================== Post Status for Profile Completion ====================
+  /// Updates hasFirstPost based on whether user has any posts
+  void updateFirstPostStatus(bool hasPosts) {
+    if (hasPosts && !hasFirstPost.value) {
+      hasFirstPost.value = true;
+      _saveCompletionState();
+    }
+  }
+
   // ==================== Snackbar Helpers ====================
   void _showSuccessSnackbar(String message) {
     Get.snackbar(

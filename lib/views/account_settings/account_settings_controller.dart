@@ -5,6 +5,7 @@ import '../../core/routes/app_routes.dart';
 import '../../services/network_caller.dart';
 import '../../services/urls.dart';
 import '../../services/user_info.dart';
+import '../../controllers/post_controller.dart';
 
 class AccountSettingsController extends GetxController {
   final appController = Get.find<AppController>();
@@ -21,6 +22,7 @@ class AccountSettingsController extends GetxController {
   final RxBool isEditing = false.obs;
   final RxBool isLoading = false.obs;
   final RxBool isSaving = false.obs;
+  final RxBool isDeleting = false.obs;
 
   // Observable values for display
   final RxString name = ''.obs;
@@ -247,36 +249,137 @@ class AccountSettingsController extends GetxController {
 
   // ==================== Delete Account ====================
   Future<void> deleteAccount() async {
-    // Show confirmation dialog
+    // Prevent multiple simultaneous deletion requests
+    if (isDeleting.value) return;
+
     final isBn = appController.language == AppLanguage.bn;
+    final isDark = appController.isDarkMode;
     
+    // Show confirmation dialog
     final confirmed = await Get.dialog<bool>(
       AlertDialog(
-        title: Text(isBn ? 'অ্যাকাউন্ট ডিলিট করুন?' : 'Delete Account?'),
+        backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          isBn ? 'অ্যাকাউন্ট ডিলিট করুন?' : 'Delete Account?',
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         content: Text(
           isBn 
             ? 'এই ক্রিয়াটি পূর্বাবস্থায় ফেরানো যাবে না। আপনার সমস্ত ডেটা মুছে ফেলা হবে।'
-            : 'This action cannot be undone. All your data will be deleted.',
+            : 'This action cannot be undone. All your data will be permanently deleted.',
+          style: TextStyle(
+            color: isDark ? Colors.white70 : Colors.black87,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Get.back(result: false),
-            child: Text(isBn ? 'বাতিল' : 'Cancel'),
+            child: Text(
+              isBn ? 'বাতিল' : 'Cancel',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () => Get.back(result: true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: Text(isBn ? 'ডিলিট করুন' : 'Delete'),
+            child: Text(
+              isBn ? 'ডিলিট করুন' : 'Delete',
+              style: const TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),
     );
 
+    // If user confirmed deletion
     if (confirmed == true) {
-      // TODO: Implement delete account API call
-      // For now, just clear local data and navigate to login
-      await UserInfo.clear();
-      Get.offAllNamed(AppRoutes.login);
+      final token = UserInfo.getToken();
+      if (token == null || token.isEmpty) {
+        _showErrorSnackbar(
+          isBn 
+            ? 'সেশন মেয়াদ শেষ হয়েছে। আবার লগইন করুন।'
+            : 'Session expired. Please login again.'
+        );
+        Get.offAllNamed(AppRoutes.splash);
+        return;
+      }
+
+      isDeleting.value = true;
+
+      try {
+        // Call delete_users API
+        final response = await NetworkCaller.postRequest(
+          url: Urls.delete_users,
+          body: {
+            'api_token': token,
+          },
+        );
+
+        if (response.isSuccess && response.body != null) {
+          final data = response.body!;
+
+          if (data['status'] == true) {
+            // Clear PostController data if registered
+            if (Get.isRegistered<PostController>()) {
+              final postController = Get.find<PostController>();
+              postController.clearPosts();
+            }
+
+            // Clear all user data from local storage
+            await UserInfo.clear();
+
+            // Show success message
+            Get.snackbar(
+              isBn ? 'অ্যাকাউন্ট ডিলিট হয়েছে' : 'Account Deleted',
+              data['message'] ?? (isBn 
+                ? 'আপনার অ্যাকাউন্ট সফলভাবে ডিলিট করা হয়েছে'
+                : 'Your account has been deleted successfully'),
+              snackPosition: SnackPosition.BOTTOM,
+              backgroundColor: isDark ? const Color(0xFF2A2A2A) : Colors.green.shade100,
+              colorText: isDark ? Colors.white : Colors.green.shade800,
+              duration: const Duration(seconds: 2),
+              margin: const EdgeInsets.all(16),
+              borderRadius: 8,
+            );
+
+            // Navigate to splash screen (which will auto-route to login)
+            Get.offAllNamed(AppRoutes.splash);
+          } else {
+            // API returned error
+            _showErrorSnackbar(
+              data['message'] ?? (isBn 
+                ? 'অ্যাকাউন্ট ডিলিট করতে ব্যর্থ হয়েছে'
+                : 'Failed to delete account')
+            );
+          }
+        } else {
+          // Network/Request error
+          _showErrorSnackbar(
+            response.errorMessage ?? (isBn 
+              ? 'নেটওয়ার্ক ত্রুটি। আবার চেষ্টা করুন।'
+              : 'Network error. Please try again.')
+          );
+        }
+      } catch (e) {
+        // Exception occurred
+        _showErrorSnackbar(
+          isBn 
+            ? 'ত্রুটি: ${e.toString()}'
+            : 'Error: ${e.toString()}'
+        );
+      } finally {
+        isDeleting.value = false;
+      }
     }
   }
 

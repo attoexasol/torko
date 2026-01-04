@@ -102,6 +102,16 @@ class LoginController extends GetxController {
 
           final otpCode = responseData['otp_code'];
           final apiToken = responseData['token'];
+          
+          // Save user ID if returned
+          final userId = responseData['id'] ?? responseData['user_id'];
+          if (userId != null) {
+            if (userId is int) {
+              await UserInfo.setUserId(userId);
+            } else if (userId is String) {
+              await UserInfo.setUserId(int.tryParse(userId) ?? 0);
+            }
+          }
 
           // Save token + OTP
           await UserInfo.saveToken(apiToken?.toString() ?? '');
@@ -166,10 +176,22 @@ class LoginController extends GetxController {
 
         if (data['status'] == true) {
           // Save verification response
-          final newToken = data['data']?['api_token'];
+          final responseData = data['data'];
+          final newToken = responseData?['api_token'];
           if (newToken != null) {
             await UserInfo.saveToken(newToken);
           }
+          
+          // Save user ID from response
+          final userId = responseData?['id'] ?? responseData?['user_id'];
+          if (userId != null) {
+            if (userId is int) {
+              await UserInfo.setUserId(userId);
+            } else if (userId is String) {
+              await UserInfo.setUserId(int.tryParse(userId) ?? 0);
+            }
+          }
+          
           await UserInfo.setVerified(true);
 
           // Navigate to profile data screen
