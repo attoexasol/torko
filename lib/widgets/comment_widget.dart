@@ -8,12 +8,15 @@ import '../core/theme/app_colors.dart';
 import '../models/comment_model.dart';
 
 /// Widget for displaying a single comment with reply and edit/delete options
+/// Implements Facebook-style threaded comments with clean vertical guide lines
 class CommentItem extends StatelessWidget {
   final CommentModel comment;
   final CommentController commentController;
   final bool isDark;
   final bool isBn;
   final int depth;
+  final bool isLastReply;
+  final bool showThreadLine;
 
   const CommentItem({
     super.key,
@@ -22,7 +25,15 @@ class CommentItem extends StatelessWidget {
     required this.isDark,
     required this.isBn,
     this.depth = 0,
+    this.isLastReply = false,
+    this.showThreadLine = true,
   });
+
+  // Thread line configuration constants
+  static const double _threadLineWidth = 2.0;
+  static const double _avatarRadiusParent = 18.0;
+  static const double _avatarRadiusReply = 14.0;
+  static const double _replyIndent = 40.0; // Horizontal indent for replies
 
   @override
   Widget build(BuildContext context) {
@@ -30,167 +41,255 @@ class CommentItem extends StatelessWidget {
     final displayName = user?.displayName ?? 'User';
     final profileImage = user?.profileImage;
     final canModify = commentController.canModifyComment(comment);
-    
+    final hasReplies = comment.replies.isNotEmpty;
+    final avatarRadius = depth > 0 ? _avatarRadiusReply : _avatarRadiusParent;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Main comment row with optional thread line
+        _buildCommentRow(
+          displayName: displayName,
+          profileImage: profileImage,
+          canModify: canModify,
+          hasReplies: hasReplies,
+          avatarRadius: avatarRadius,
+          context: context,
+        ),
+        
+        // Replies section with threading
+        if (hasReplies)
+          _buildRepliesSection(avatarRadius),
+      ],
+    );
+  }
+
+  Widget _buildCommentRow({
+    required String displayName,
+    required String? profileImage,
+    required bool canModify,
+    required bool hasReplies,
+    required double avatarRadius,
+    required BuildContext context,
+  }) {
     return Padding(
-      padding: EdgeInsets.only(
-        left: depth > 0 ? 40.0 : 0,
-        bottom: 16,
-      ),
-      child: Column(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Avatar
-              _buildAvatar(displayName, profileImage),
-              const SizedBox(width: 12),
-              
-              // Comment content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Comment bubble
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: isDark 
-                            ? const Color(0xFF0d3a4a) 
-                            : const Color(0xFFF0F2F5),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Author name
-                          Text(
-                            displayName,
-                            style: GoogleFonts.notoSansBengali(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? Colors.white : const Color(0xFF050505),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          
-                          // Comment text
-                          Text(
-                            comment.comment,
-                            style: GoogleFonts.notoSansBengali(
-                              fontSize: 14,
-                              color: isDark ? Colors.white.withOpacity(0.9) : const Color(0xFF050505),
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 4),
-                    
-                    // Actions row
-                    Row(
-                      children: [
-                        // Time
-                        Text(
-                          comment.timeAgo,
-                          style: GoogleFonts.roboto(
-                            fontSize: 12,
-                            color: isDark 
-                                ? const Color(0xFF8E8E8E) 
-                                : const Color(0xFF65676B),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        
-                        // Reply button
-                        GestureDetector(
-                          onTap: () => commentController.startReply(comment),
-                          child: Text(
-                            isBn ? 'উত্তর' : 'Reply',
-                            style: GoogleFonts.roboto(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: isDark 
-                                  ? const Color(0xFF8E8E8E) 
-                                  : const Color(0xFF65676B),
-                            ),
-                          ),
-                        ),
-                        
-                        // Edit/Delete if owner
-                        if (canModify) ...[
-                          const SizedBox(width: 16),
-                          GestureDetector(
-                            onTap: () => commentController.startEdit(comment),
-                            child: Text(
-                              isBn ? 'সম্পাদনা' : 'Edit',
-                              style: GoogleFonts.roboto(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.lightPrimary,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          GestureDetector(
-                            onTap: () => _showDeleteConfirmation(context),
-                            child: Text(
-                              isBn ? 'মুছুন' : 'Delete',
-                              style: GoogleFonts.roboto(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.red,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          // Avatar with thread line below (if has replies)
+          _buildAvatarWithThreadLine(
+            displayName: displayName,
+            profileImage: profileImage,
+            avatarRadius: avatarRadius,
+            hasReplies: hasReplies,
           ),
+          const SizedBox(width: 10),
           
-          // Replies
-          if (comment.replies.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                children: comment.replies.map((reply) => CommentItem(
-                  comment: reply,
-                  commentController: commentController,
-                  isDark: isDark,
-                  isBn: isBn,
-                  depth: depth + 1,
-                )).toList(),
-              ),
+          // Comment content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Comment bubble
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark 
+                        ? const Color(0xFF0d3a4a) 
+                        : const Color(0xFFF0F2F5),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Author name
+                      Text(
+                        displayName,
+                        style: GoogleFonts.notoSansBengali(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isDark ? Colors.white : const Color(0xFF050505),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      
+                      // Comment text
+                      Text(
+                        comment.comment,
+                        style: GoogleFonts.notoSansBengali(
+                          fontSize: 14,
+                          color: isDark ? Colors.white.withOpacity(0.9) : const Color(0xFF050505),
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 4),
+                
+                // Actions row
+                _buildActionsRow(canModify, context),
+              ],
             ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildAvatar(String displayName, String? profileImage) {
+  Widget _buildAvatarWithThreadLine({
+    required String displayName,
+    required String? profileImage,
+    required double avatarRadius,
+    required bool hasReplies,
+  }) {
+    final lineColor = isDark 
+        ? Colors.white.withOpacity(0.15)
+        : Colors.grey.withOpacity(0.35);
+
+    // For parent comments with replies, show avatar + line below
+    // For reply comments, show the line continuing from parent
+    return Column(
+      children: [
+        // Avatar
+        _buildAvatar(displayName, profileImage, avatarRadius),
+        
+        // Vertical line below avatar (only for comments with replies)
+        if (hasReplies)
+          Container(
+            width: _threadLineWidth,
+            height: 8, // Small connector from avatar to replies
+            color: lineColor,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildRepliesSection(double parentAvatarRadius) {
+    final lineColor = isDark 
+        ? Colors.white.withOpacity(0.15)
+        : Colors.grey.withOpacity(0.35);
+    
+    return Padding(
+      padding: EdgeInsets.only(left: parentAvatarRadius - 1), // Align line with parent avatar center
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Vertical thread line for all replies
+          _ThreadLine(
+            lineColor: lineColor,
+            lineWidth: _threadLineWidth,
+          ),
+          
+          // Replies column
+          Expanded(
+            child: Column(
+              children: comment.replies.asMap().entries.map((entry) {
+                final index = entry.key;
+                final reply = entry.value;
+                final isLast = index == comment.replies.length - 1;
+                
+                return _ReplyItem(
+                  comment: reply,
+                  commentController: commentController,
+                  isDark: isDark,
+                  isBn: isBn,
+                  depth: depth + 1,
+                  isLastReply: isLast,
+                  lineColor: lineColor,
+                  lineWidth: _threadLineWidth,
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionsRow(bool canModify, BuildContext context) {
+    return Row(
+      children: [
+        // Time
+        Text(
+          comment.timeAgo,
+          style: GoogleFonts.roboto(
+            fontSize: 12,
+            color: isDark 
+                ? const Color(0xFF8E8E8E) 
+                : const Color(0xFF65676B),
+          ),
+        ),
+        const SizedBox(width: 16),
+        
+        // Reply button
+        GestureDetector(
+          onTap: () => commentController.startReply(comment),
+          child: Text(
+            isBn ? 'উত্তর' : 'Reply',
+            style: GoogleFonts.roboto(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark 
+                  ? const Color(0xFF8E8E8E) 
+                  : const Color(0xFF65676B),
+            ),
+          ),
+        ),
+        
+        // Edit/Delete if owner
+        if (canModify) ...[
+          const SizedBox(width: 16),
+          GestureDetector(
+            onTap: () => commentController.startEdit(comment),
+            child: Text(
+              isBn ? 'সম্পাদনা' : 'Edit',
+              style: GoogleFonts.roboto(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.lightPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          GestureDetector(
+            onTap: () => _showDeleteConfirmation(context),
+            child: Text(
+              isBn ? 'মুছুন' : 'Delete',
+              style: GoogleFonts.roboto(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAvatar(String displayName, String? profileImage, double radius) {
+    final fontSize = radius > 16 ? 14.0 : 11.0;
+    
     if (profileImage != null && profileImage.isNotEmpty) {
       return CircleAvatar(
-        radius: depth > 0 ? 14 : 18,
+        radius: radius,
         backgroundColor: AppColors.lightPrimary.withOpacity(0.2),
         backgroundImage: CachedNetworkImageProvider(profileImage),
       );
     }
     
     return CircleAvatar(
-      radius: depth > 0 ? 14 : 18,
+      radius: radius,
       backgroundColor: AppColors.lightPrimary.withOpacity(0.2),
       child: Text(
         displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
         style: TextStyle(
           color: AppColors.lightPrimary,
           fontWeight: FontWeight.w600,
-          fontSize: depth > 0 ? 11 : 14,
+          fontSize: fontSize,
         ),
       ),
     );
@@ -245,6 +344,351 @@ class CommentItem extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Individual reply item with horizontal connector to thread line
+class _ReplyItem extends StatelessWidget {
+  final CommentModel comment;
+  final CommentController commentController;
+  final bool isDark;
+  final bool isBn;
+  final int depth;
+  final bool isLastReply;
+  final Color lineColor;
+  final double lineWidth;
+
+  const _ReplyItem({
+    required this.comment,
+    required this.commentController,
+    required this.isDark,
+    required this.isBn,
+    required this.depth,
+    required this.isLastReply,
+    required this.lineColor,
+    required this.lineWidth,
+  });
+
+  static const double _avatarRadius = 14.0;
+  static const double _horizontalConnectorWidth = 12.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final user = comment.user;
+    final displayName = user?.displayName ?? 'User';
+    final profileImage = user?.profileImage;
+    final canModify = commentController.canModifyComment(comment);
+    final hasReplies = comment.replies.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Reply row with horizontal connector
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Horizontal connector line + vertical continuation
+              SizedBox(
+                width: _horizontalConnectorWidth + 4,
+                child: Stack(
+                  children: [
+                    // Vertical line continuation (if not last reply)
+                    if (!isLastReply)
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: lineWidth,
+                          color: lineColor,
+                        ),
+                      ),
+                    // Vertical line up to connector (if last reply)
+                    if (isLastReply)
+                      Positioned(
+                        left: 0,
+                        top: 0,
+                        height: _avatarRadius, // Stop at avatar center
+                        child: Container(
+                          width: lineWidth,
+                          color: lineColor,
+                        ),
+                      ),
+                    // Horizontal connector to avatar
+                    Positioned(
+                      left: 0,
+                      top: _avatarRadius - (lineWidth / 2),
+                      child: Container(
+                        width: _horizontalConnectorWidth,
+                        height: lineWidth,
+                        color: lineColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Avatar with thread line below (if has nested replies)
+              Column(
+                children: [
+                  _buildAvatar(displayName, profileImage),
+                  if (hasReplies)
+                    Container(
+                      width: lineWidth,
+                      height: 8,
+                      color: lineColor,
+                    ),
+                ],
+              ),
+              
+              const SizedBox(width: 10),
+              
+              // Comment content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Comment bubble
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isDark 
+                              ? const Color(0xFF0d3a4a) 
+                              : const Color(0xFFF0F2F5),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              displayName,
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isDark ? Colors.white : const Color(0xFF050505),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              comment.comment,
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 14,
+                                color: isDark ? Colors.white.withOpacity(0.9) : const Color(0xFF050505),
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 4),
+                      
+                      // Actions row
+                      _buildActionsRow(canModify, context),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // Nested replies (recursive)
+        if (hasReplies)
+          _buildNestedReplies(),
+      ],
+    );
+  }
+
+  Widget _buildNestedReplies() {
+    return Padding(
+      padding: EdgeInsets.only(left: _avatarRadius + _horizontalConnectorWidth + 4 - 1),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Vertical thread line for nested replies
+          _ThreadLine(
+            lineColor: lineColor,
+            lineWidth: lineWidth,
+          ),
+          
+          // Nested replies column
+          Expanded(
+            child: Column(
+              children: comment.replies.asMap().entries.map((entry) {
+                final index = entry.key;
+                final reply = entry.value;
+                final isLast = index == comment.replies.length - 1;
+                
+                return _ReplyItem(
+                  comment: reply,
+                  commentController: commentController,
+                  isDark: isDark,
+                  isBn: isBn,
+                  depth: depth + 1,
+                  isLastReply: isLast,
+                  lineColor: lineColor,
+                  lineWidth: lineWidth,
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionsRow(bool canModify, BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          comment.timeAgo,
+          style: GoogleFonts.roboto(
+            fontSize: 12,
+            color: isDark 
+                ? const Color(0xFF8E8E8E) 
+                : const Color(0xFF65676B),
+          ),
+        ),
+        const SizedBox(width: 16),
+        GestureDetector(
+          onTap: () => commentController.startReply(comment),
+          child: Text(
+            isBn ? 'উত্তর' : 'Reply',
+            style: GoogleFonts.roboto(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark 
+                  ? const Color(0xFF8E8E8E) 
+                  : const Color(0xFF65676B),
+            ),
+          ),
+        ),
+        if (canModify) ...[
+          const SizedBox(width: 16),
+          GestureDetector(
+            onTap: () => commentController.startEdit(comment),
+            child: Text(
+              isBn ? 'সম্পাদনা' : 'Edit',
+              style: GoogleFonts.roboto(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.lightPrimary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          GestureDetector(
+            onTap: () => _showDeleteConfirmation(context),
+            child: Text(
+              isBn ? 'মুছুন' : 'Delete',
+              style: GoogleFonts.roboto(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAvatar(String displayName, String? profileImage) {
+    if (profileImage != null && profileImage.isNotEmpty) {
+      return CircleAvatar(
+        radius: _avatarRadius,
+        backgroundColor: AppColors.lightPrimary.withOpacity(0.2),
+        backgroundImage: CachedNetworkImageProvider(profileImage),
+      );
+    }
+    
+    return CircleAvatar(
+      radius: _avatarRadius,
+      backgroundColor: AppColors.lightPrimary.withOpacity(0.2),
+      child: Text(
+        displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U',
+        style: const TextStyle(
+          color: AppColors.lightPrimary,
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+        ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context) {
+    Get.dialog(
+      AlertDialog(
+        backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          isBn ? 'মন্তব্য মুছুন?' : 'Delete Comment?',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: isDark ? Colors.white : Colors.black87,
+          ),
+        ),
+        content: Text(
+          isBn 
+              ? 'আপনি কি নিশ্চিত যে আপনি এই মন্তব্যটি মুছতে চান?'
+              : 'Are you sure you want to delete this comment?',
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark ? Colors.white70 : Colors.black54,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: Text(
+              isBn ? 'বাতিল' : 'Cancel',
+              style: TextStyle(
+                color: isDark ? Colors.white70 : Colors.black54,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              commentController.deleteComment(comment.id);
+            },
+            child: Text(
+              isBn ? 'মুছুন' : 'Delete',
+              style: const TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Simple vertical thread line widget
+class _ThreadLine extends StatelessWidget {
+  final Color lineColor;
+  final double lineWidth;
+
+  const _ThreadLine({
+    required this.lineColor,
+    required this.lineWidth,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: lineWidth,
+      color: lineColor,
     );
   }
 }
