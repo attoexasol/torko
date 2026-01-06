@@ -176,6 +176,23 @@ class HomeController extends GetxController {
   }
 
   void handleComment(int postId) {
+    // Find the post and pass full data
+    final post = posts.firstWhereOrNull((p) => p.id == postId);
+    if (post != null) {
+      final appController = Get.find<AppController>();
+      appController.openPostDetail({
+        'id': post.id,
+        'post_title': post.postTitle,
+        'post_description': post.postDescription,
+        'post_images': post.postImages,
+        'post_like_count': post.postLikeCount,
+        'post_comment_count': post.postCommentCount,
+        'createdBy': {
+          'name': post.createdBy?.name ?? 'User',
+        },
+        'created_at': post.createdAt,
+      });
+    }
     Get.toNamed(AppRoutes.postDetail, arguments: {'postId': postId.toString()});
   }
 

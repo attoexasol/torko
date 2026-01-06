@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../controllers/comment_controller.dart';
 import '../controllers/post_controller.dart';
 import '../views/profile/profile_controller.dart';
 import '../views/home/home_controller.dart';
@@ -133,6 +134,12 @@ class LogoutService {
         homeController.followingUsers.clear();
         homeController.errorMessage.value = '';
       }
+      
+      // Clear CommentController if registered
+      if (Get.isRegistered<CommentController>()) {
+        final commentController = Get.find<CommentController>();
+        commentController.clearComments();
+      }
     } catch (e) {
       print('LogoutService._clearControllerStates error: $e');
     }
@@ -152,6 +159,10 @@ class LogoutService {
       
       if (Get.isRegistered<HomeController>()) {
         Get.delete<HomeController>(force: true);
+      }
+      
+      if (Get.isRegistered<CommentController>()) {
+        Get.delete<CommentController>(force: true);
       }
     } catch (e) {
       print('LogoutService._deleteControllers error: $e');
