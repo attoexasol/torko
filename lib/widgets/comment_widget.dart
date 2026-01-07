@@ -244,25 +244,19 @@ class CommentItem extends StatelessWidget {
           const SizedBox(width: 16),
           GestureDetector(
             onTap: () => commentController.startEdit(comment),
-            child: Text(
-              isBn ? 'সম্পাদনা' : 'Edit',
-              style: GoogleFonts.roboto(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.lightPrimary,
-              ),
+            child: Icon(
+              Icons.edit,
+              size: 16,
+              color: AppColors.lightPrimary,
             ),
           ),
           const SizedBox(width: 16),
           GestureDetector(
             onTap: () => _showDeleteConfirmation(context),
-            child: Text(
-              isBn ? 'মুছুন' : 'Delete',
-              style: GoogleFonts.roboto(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.red,
-              ),
+            child: Icon(
+              Icons.delete,
+              size: 16,
+              color: Colors.red,
             ),
           ),
         ],
@@ -572,25 +566,19 @@ class _ReplyItem extends StatelessWidget {
           const SizedBox(width: 16),
           GestureDetector(
             onTap: () => commentController.startEdit(comment),
-            child: Text(
-              isBn ? 'সম্পাদনা' : 'Edit',
-              style: GoogleFonts.roboto(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.lightPrimary,
-              ),
+            child: Icon(
+              Icons.edit,
+              size: 16,
+              color: AppColors.lightPrimary,
             ),
           ),
           const SizedBox(width: 16),
           GestureDetector(
             onTap: () => _showDeleteConfirmation(context),
-            child: Text(
-              isBn ? 'মুছুন' : 'Delete',
-              style: GoogleFonts.roboto(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Colors.red,
-              ),
+            child: Icon(
+              Icons.delete,
+              size: 16,
+              color: Colors.red,
             ),
           ),
         ],
