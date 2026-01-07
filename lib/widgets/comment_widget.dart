@@ -820,40 +820,49 @@ class _CommentInputFieldState extends State<CommentInputField> {
             child: Row(
               children: [
                 Expanded(
-                  child: Container(
-                    constraints: const BoxConstraints(minHeight: 44, maxHeight: 120),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: widget.isDark 
-                          ? AppColors.darkBackground 
-                          : AppColors.lightBackground,
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: TextField(
-                      controller: _textController,
-                      maxLines: null,
-                      style: TextStyle(
-                        color: widget.isDark 
-                            ? AppColors.darkForeground 
-                            : AppColors.lightForeground,
-                        fontSize: 15,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22), // 🔥 SAME radius
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: 44, maxHeight: 120),
+                      decoration: BoxDecoration(
+                        color: widget.isDark
+                            ? AppColors.darkBackground
+                            : AppColors.lightBackground,
+                        borderRadius: BorderRadius.circular(22), // 🔥 SAME radius
                       ),
-                      decoration: InputDecoration(
-                        hintText: isReplyMode
-                            ? (widget.isBn ? 'উত্তর লিখুন...' : 'Write a reply...')
-                            : (widget.isBn ? 'মন্তব্য করুন...' : 'Add a comment...'),
-                        hintStyle: TextStyle(
-                          color: widget.isDark 
-                              ? AppColors.darkMutedForeground 
-                              : AppColors.lightMutedForeground,
+                      child: TextField(
+                        controller: _textController,
+                        maxLines: null,
+                        style: TextStyle(
+                          color: widget.isDark
+                              ? AppColors.darkForeground
+                              : AppColors.lightForeground,
+                          fontSize: 15,
                         ),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: InputDecoration(
+                          hintText: isReplyMode
+                              ? (widget.isBn ? 'উত্তর লিখুন...' : 'Write a reply...')
+                              : (widget.isBn ? 'মন্তব্য করুন...' : 'Add a comment...'),
+                          hintStyle: TextStyle(
+                            color: widget.isDark
+                                ? AppColors.darkMutedForeground
+                                : AppColors.lightMutedForeground,
+                          ),
+
+                          // 🚫 NO borders
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+
+                          isDense: true,
+                          contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        ),
                       ),
                     ),
                   ),
                 ),
+
                 const SizedBox(width: 12),
                 
                 // Submit button
