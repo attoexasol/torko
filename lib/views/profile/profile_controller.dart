@@ -181,6 +181,10 @@ class ProfileController extends GetxController {
       bio.value = _savedBio;
       profileImageUrl.value = storedProfileImage;
       coverImageUrl.value = storedCoverImage;
+      // Update AppController for reactive updates in drawer
+      if (storedProfileImage.isNotEmpty) {
+        appController.updateProfileImageUrl(storedProfileImage);
+      }
 
       // Update text controllers
       nameController.text = _savedName;
@@ -476,6 +480,8 @@ class ProfileController extends GetxController {
           if (imageUrl.isNotEmpty) {
             await UserInfo.setProfileImage(imageUrl);
             profileImageUrl.value = imageUrl;
+            // Update AppController for reactive updates in drawer
+            appController.updateProfileImageUrl(imageUrl);
           }
           _showSuccessSnackbar('Profile photo updated');
         } else {

@@ -1,6 +1,7 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/user_info.dart';
 import '../translations/app_translations.dart';
 
 enum AppLanguage { bn, en }
@@ -61,11 +62,26 @@ class AppController extends GetxController {
   final RxInt _messageNotificationCount = 5.obs;
   int get messageNotificationCount => _messageNotificationCount.value;
 
+  // Profile Image (reactive)
+  final RxString _profileImageUrl = ''.obs;
+  String? get profileImageUrl => _profileImageUrl.value.isEmpty ? null : _profileImageUrl.value;
+  void updateProfileImageUrl(String? url) {
+    _profileImageUrl.value = url ?? '';
+  }
+
   @override
   void onInit() {
     super.onInit();
     _loadLanguage();
     _loadTheme();
+    _loadProfileImage();
+  }
+
+  void _loadProfileImage() {
+    final imageUrl = UserInfo.profileImage;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      _profileImageUrl.value = imageUrl;
+    }
   }
 
   Future<void> _loadLanguage() async {

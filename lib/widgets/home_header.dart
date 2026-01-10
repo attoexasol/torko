@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../core/controllers/app_controller.dart';
 import '../core/routes/app_routes.dart';
 import '../core/theme/app_colors.dart';
@@ -102,32 +103,6 @@ class _HomeHeaderState extends State<HomeHeader> {
     }
   }
 
-  void _handleNavigateLegacy(String screen) {
-    if (widget.onNavigate != null) {
-      widget.onNavigate!(screen);
-    } else {
-      switch (screen) {
-        case 'home':
-          Get.offAllNamed(AppRoutes.home);
-          break;
-        case 'localCommunity':
-          Get.toNamed(AppRoutes.localCommunity);
-          break;
-        case 'messages':
-          Get.toNamed(AppRoutes.messages);
-          break;
-        case 'notifications':
-          Get.toNamed(AppRoutes.notifications);
-          break;
-        case 'profile':
-          Get.toNamed(AppRoutes.profile);
-          break;
-        case 'settings':
-          Get.toNamed(AppRoutes.settings);
-          break;
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -385,8 +360,10 @@ class _AppDrawerState extends State<_AppDrawer> {
       final isDark = appController.isDarkMode;
       final language = appController.language;
       final isBn = language == AppLanguage.bn;
+      // Access profileImageUrl to make this widget reactive to profile image changes
+      final _ = appController.profileImageUrl;
 
-      // Get user name dynamically from UserInfo
+      // Get user info dynamically from UserInfo
       final userName = UserInfo.fullname ?? (isBn ? 'আপনার নাম' : 'Your Name');
       final username = UserInfo.username ?? '@username';
 
@@ -509,24 +486,7 @@ class _AppDrawerState extends State<_AppDrawer> {
                           padding: const EdgeInsets.all(20),
                           child: Row(
                             children: [
-                              Container(
-                                width: 48, // React: w-12 h-12
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  color: AppColors.lightPrimary,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18, // React: fontSize: '18px'
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                              _buildUserAvatar(userName, isDark),
                               const SizedBox(width: 12), // React: gap-3
                               Expanded(
                                 child: Column(
@@ -605,6 +565,62 @@ class _AppDrawerState extends State<_AppDrawer> {
         ],
       );
     });
+  }
+
+  /// Build user avatar - shows profile photo if available, otherwise first letter
+  Widget _buildUserAvatar(String userName, bool isDark) {
+    // Get profile image from AppController (reactive) or fallback to UserInfo
+    final appController = Get.find<AppController>();
+    final profileImageUrl = appController.profileImageUrl ?? UserInfo.profileImage;
+    
+    // Build full URL if profile image exists
+    String? fullImageUrl;
+    if (profileImageUrl != null && profileImageUrl.isNotEmpty) {
+      // If URL doesn't start with http, prepend base URL
+      fullImageUrl = profileImageUrl.startsWith('http') 
+          ? profileImageUrl 
+          : 'https://torko.attoexasolutions.com/$profileImageUrl';
+    }
+    
+    // Fallback widget (first letter)
+    final fallbackWidget = Center(
+      child: Text(
+        userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+    
+    return Container(
+      width: 48, // React: w-12 h-12
+      height: 48,
+      decoration: BoxDecoration(
+        color: AppColors.lightPrimary,
+        shape: BoxShape.circle,
+      ),
+      child: ClipOval(
+        child: fullImageUrl != null
+            ? CachedNetworkImage(
+                imageUrl: fullImageUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  color: AppColors.lightPrimary,
+                  child: fallbackWidget,
+                ),
+                errorWidget: (context, url, error) => Container(
+                  color: AppColors.lightPrimary,
+                  child: fallbackWidget,
+                ),
+              )
+            : Container(
+                color: AppColors.lightPrimary,
+                child: fallbackWidget,
+              ),
+      ),
+    );
   }
 }
 

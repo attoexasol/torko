@@ -208,7 +208,10 @@ class AccountSettingsController extends GetxController {
 
           // Update profile image if returned
           if (data['data']['profile_image'] != null) {
-            profileImageUrl.value = data['data']['profile_image'];
+            final imageUrl = data['data']['profile_image'];
+            profileImageUrl.value = imageUrl;
+            // Update AppController for reactive updates in drawer
+            appController.updateProfileImageUrl(imageUrl);
           }
 
           _showSuccessSnackbar('Profile updated successfully');
