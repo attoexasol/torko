@@ -795,13 +795,13 @@ class _HomePostCard extends StatelessWidget {
           const SizedBox(width: 8),
           
           // Comment button
-          _ActionButton(
+          Obx(() => _ActionButton(
             icon: Icons.chat_bubble_outline,
-            label: _formatCount(post.postCommentCount),
+            label: _formatCount(controller.getCommentCount(post)),
             isActive: false,
             onTap: () => controller.handleComment(post.id),
             isDark: isDark,
-          ),
+          )),
           
           const Spacer(),
           

@@ -3,6 +3,7 @@ import '../models/comment_model.dart';
 import '../services/network_caller.dart';
 import '../services/urls.dart';
 import '../services/user_info.dart';
+import '../views/home/home_controller.dart';
 
 /// Controller for handling all comment-related operations
 class CommentController extends GetxController {
@@ -198,8 +199,32 @@ class CommentController extends GetxController {
 
       if (response.isSuccess && response.body != null) {
         if (response.body!['status'] == true) {
+          // Get updated comment count from API response if available
+          final newCommentCount = response.body!['post_comment_count'];
+          
           // Clear reply mode
           cancelReply();
+          
+          // Update post comment count in feed if HomeController exists
+          if (Get.isRegistered<HomeController>()) {
+            try {
+              final homeController = Get.find<HomeController>();
+              if (newCommentCount != null && newCommentCount is int) {
+                // Use the count from API response (most accurate)
+                homeController.updatePostCommentCount(postId, newCommentCount);
+              } else {
+                // Fallback: Increment by 1 (API didn't return count)
+                final currentPost = homeController.posts.firstWhereOrNull((p) => p.id == postId);
+                if (currentPost != null) {
+                  final currentCount = homeController.getCommentCount(currentPost);
+                  // Increment by 1 for the new comment (replies are counted separately)
+                  homeController.updatePostCommentCount(postId, currentCount + 1);
+                }
+              }
+            } catch (e) {
+              print('DEBUG createComment: Error updating post count - $e');
+            }
+          }
           
           // Reload comments to get fresh data with user info
           await loadComments(postId);
@@ -291,6 +316,46 @@ class CommentController extends GetxController {
     isDeleting.value = true;
     errorMessage.value = '';
 
+    // Store original state for rollback if API fails
+    final List<CommentModel> originalComments = List.from(comments);
+    final int originalCommentCount = commentCount;
+    
+    // INSTANT UI UPDATE: Remove from local list immediately (optimistic update)
+    final initialLength = comments.length;
+    comments.removeWhere((c) => c.id == commentId);
+    bool foundInMain = comments.length < initialLength;
+    
+    // If not found in main, search in replies
+    if (!foundInMain) {
+      for (var comment in comments) {
+        final replyIndex = comment.replies.indexWhere((r) => r.id == commentId);
+        if (replyIndex != -1) {
+          comment.replies.removeAt(replyIndex);
+          break;
+        }
+        // Also check nested replies recursively
+        if (_removeFromNestedReplies(comment.replies, commentId)) {
+          break;
+        }
+      }
+    }
+    comments.refresh(); // Instant UI update
+    
+    // Update post comment count immediately (optimistic)
+    if (currentPostId.value > 0 && Get.isRegistered<HomeController>()) {
+      try {
+        final homeController = Get.find<HomeController>();
+        final currentPost = homeController.posts.firstWhereOrNull((p) => p.id == currentPostId.value);
+        if (currentPost != null) {
+          final currentCount = homeController.getCommentCount(currentPost);
+          final updatedCount = (currentCount - 1).clamp(0, double.infinity).toInt();
+          homeController.updatePostCommentCount(currentPostId.value, updatedCount);
+        }
+      } catch (e) {
+        print('DEBUG deleteComment: Error updating post count (optimistic) - $e');
+      }
+    }
+
     try {
       final response = await NetworkCaller.postRequest(
         url: Urls.delete_comment,
@@ -302,27 +367,114 @@ class CommentController extends GetxController {
 
       if (response.isSuccess && response.body != null) {
         if (response.body!['status'] == true) {
-          // Remove from local list
-          comments.removeWhere((c) => c.id == commentId);
+          // Get the updated comment count from API response (most accurate)
+          final newCommentCount = response.body!['post_comment_count'];
           
-          // Also remove from any replies
-          for (var comment in comments) {
-            comment.replies.removeWhere((r) => r.id == commentId);
+          // Update post comment count in feed if HomeController exists
+          if (currentPostId.value > 0 && Get.isRegistered<HomeController>()) {
+            try {
+              final homeController = Get.find<HomeController>();
+              if (newCommentCount != null && newCommentCount is int) {
+                // Use API response count (most accurate - includes all nested replies)
+                homeController.updatePostCommentCount(currentPostId.value, newCommentCount);
+              } else {
+                // Fallback: Calculate from current comment count
+                final currentPost = homeController.posts.firstWhereOrNull((p) => p.id == currentPostId.value);
+                if (currentPost != null) {
+                  final currentCount = homeController.getCommentCount(currentPost);
+                  // Decrement by 1 (the deleted comment, nested replies are handled by server)
+                  final updatedCount = (currentCount - 1).clamp(0, double.infinity).toInt();
+                  homeController.updatePostCommentCount(currentPostId.value, updatedCount);
+                }
+              }
+            } catch (e) {
+              print('DEBUG deleteComment: Error updating post count - $e');
+            }
           }
-          comments.refresh();
+          
+          // Reload comments to ensure sync with server (gets accurate count and structure)
+          if (currentPostId.value > 0) {
+            await loadComments(currentPostId.value);
+            // Update feed with actual count from reloaded comments
+            if (Get.isRegistered<HomeController>()) {
+              try {
+                final homeController = Get.find<HomeController>();
+                final actualCount = commentCount;
+                homeController.updatePostCommentCount(currentPostId.value, actualCount);
+              } catch (e) {
+                print('DEBUG deleteComment: Error updating count after reload - $e');
+              }
+            }
+          }
           
           isDeleting.value = false;
           return true;
         } else {
+          // API returned false - rollback optimistic update
+          comments.value = originalComments;
+          comments.refresh();
+          if (currentPostId.value > 0 && Get.isRegistered<HomeController>()) {
+            try {
+              final homeController = Get.find<HomeController>();
+              final currentPost = homeController.posts.firstWhereOrNull((p) => p.id == currentPostId.value);
+              if (currentPost != null) {
+                homeController.updatePostCommentCount(currentPostId.value, originalCommentCount);
+              }
+            } catch (e) {
+              print('DEBUG deleteComment: Error rolling back post count - $e');
+            }
+          }
           errorMessage.value = response.body!['message'] ?? 'Failed to delete comment';
         }
       } else {
+        // API call failed - rollback optimistic update
+        comments.value = originalComments;
+        comments.refresh();
+        if (currentPostId.value > 0 && Get.isRegistered<HomeController>()) {
+          try {
+            final homeController = Get.find<HomeController>();
+            final currentPost = homeController.posts.firstWhereOrNull((p) => p.id == currentPostId.value);
+            if (currentPost != null) {
+              homeController.updatePostCommentCount(currentPostId.value, originalCommentCount);
+            }
+          } catch (e) {
+            print('DEBUG deleteComment: Error rolling back post count - $e');
+          }
+        }
         errorMessage.value = response.errorMessage ?? 'Failed to delete comment';
       }
     } catch (e) {
+      // Exception occurred - rollback optimistic update
+      comments.value = originalComments;
+      comments.refresh();
+      if (currentPostId.value > 0 && Get.isRegistered<HomeController>()) {
+        try {
+          final homeController = Get.find<HomeController>();
+          final currentPost = homeController.posts.firstWhereOrNull((p) => p.id == currentPostId.value);
+          if (currentPost != null) {
+            homeController.updatePostCommentCount(currentPostId.value, originalCommentCount);
+          }
+        } catch (e) {
+          print('DEBUG deleteComment: Error rolling back post count - $e');
+        }
+      }
       errorMessage.value = 'Error: ${e.toString()}';
     } finally {
       isDeleting.value = false;
+    }
+    return false;
+  }
+
+  /// Helper to remove comment from nested replies recursively
+  bool _removeFromNestedReplies(List<CommentModel> replies, int commentId) {
+    for (var reply in replies) {
+      if (reply.id == commentId) {
+        replies.remove(reply);
+        return true;
+      }
+      if (_removeFromNestedReplies(reply.replies, commentId)) {
+        return true;
+      }
     }
     return false;
   }

@@ -272,6 +272,25 @@ class HomeController extends GetxController {
     return post.postLikeCount;
   }
 
+  // Track updated comment counts
+  final RxMap<int, int> postCommentCounts = <int, int>{}.obs;
+
+  /// Update post comment count in the feed
+  void updatePostCommentCount(int postId, int newCount) {
+    postCommentCounts[postId] = newCount;
+    
+    // Trigger reactive update - UI will use getCommentCount which checks postCommentCounts
+    posts.refresh();
+  }
+
+  /// Get current comment count for a post (uses tracked count if available)
+  int getCommentCount(PostModel post) {
+    if (postCommentCounts.containsKey(post.id)) {
+      return postCommentCounts[post.id] ?? post.postCommentCount;
+    }
+    return post.postCommentCount;
+  }
+
   void handleComment(int postId) {
     // Find the post and pass full data
     final post = posts.firstWhereOrNull((p) => p.id == postId);

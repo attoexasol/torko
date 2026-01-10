@@ -252,7 +252,7 @@ class CommentItem extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           GestureDetector(
-            onTap: () => _showDeleteConfirmation(context),
+            onTap: () => commentController.deleteComment(comment.id),
             child: Icon(
               Icons.delete,
               size: 16,
@@ -285,58 +285,6 @@ class CommentItem extends StatelessWidget {
           fontWeight: FontWeight.w600,
           fontSize: fontSize,
         ),
-      ),
-    );
-  }
-
-  void _showDeleteConfirmation(BuildContext context) {
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text(
-          isBn ? 'মন্তব্য মুছুন?' : 'Delete Comment?',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
-        content: Text(
-          isBn 
-              ? 'আপনি কি নিশ্চিত যে আপনি এই মন্তব্যটি মুছতে চান?'
-              : 'Are you sure you want to delete this comment?',
-          style: TextStyle(
-            fontSize: 14,
-            color: isDark ? Colors.white70 : Colors.black54,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: Text(
-              isBn ? 'বাতিল' : 'Cancel',
-              style: TextStyle(
-                color: isDark ? Colors.white70 : Colors.black54,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Get.back();
-              commentController.deleteComment(comment.id);
-            },
-            child: Text(
-              isBn ? 'মুছুন' : 'Delete',
-              style: const TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -574,7 +522,7 @@ class _ReplyItem extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           GestureDetector(
-            onTap: () => _showDeleteConfirmation(context),
+            onTap: () => commentController.deleteComment(comment.id),
             child: Icon(
               Icons.delete,
               size: 16,
@@ -609,57 +557,6 @@ class _ReplyItem extends StatelessWidget {
     );
   }
 
-  void _showDeleteConfirmation(BuildContext context) {
-    Get.dialog(
-      AlertDialog(
-        backgroundColor: isDark ? AppColors.darkBackground : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: Text(
-          isBn ? 'মন্তব্য মুছুন?' : 'Delete Comment?',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: isDark ? Colors.white : Colors.black87,
-          ),
-        ),
-        content: Text(
-          isBn 
-              ? 'আপনি কি নিশ্চিত যে আপনি এই মন্তব্যটি মুছতে চান?'
-              : 'Are you sure you want to delete this comment?',
-          style: TextStyle(
-            fontSize: 14,
-            color: isDark ? Colors.white70 : Colors.black54,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: Text(
-              isBn ? 'বাতিল' : 'Cancel',
-              style: TextStyle(
-                color: isDark ? Colors.white70 : Colors.black54,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              Get.back();
-              commentController.deleteComment(comment.id);
-            },
-            child: Text(
-              isBn ? 'মুছুন' : 'Delete',
-              style: const TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// Simple vertical thread line widget
