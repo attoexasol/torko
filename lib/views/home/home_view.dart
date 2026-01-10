@@ -863,22 +863,36 @@ class _ActionButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isActive
-                  ? AppColors.lightPrimary
-                  : const Color(0xFF9D9D9D),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              transitionBuilder: (child, animation) {
+                return ScaleTransition(
+                  scale: animation,
+                  child: child,
+                );
+              },
+              child: Icon(
+                icon,
+                key: ValueKey<bool>(isActive),
+                size: 18,
+                color: isActive
+                    ? (icon == Icons.favorite ? Colors.red : AppColors.lightPrimary)
+                    : const Color(0xFF9D9D9D),
+              ),
             ),
             const SizedBox(width: 6),
-            Text(
-              label,
-              style: GoogleFonts.roboto(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: isActive
-                    ? AppColors.lightPrimary
-                    : const Color(0xFF9D9D9D),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Text(
+                label,
+                key: ValueKey<String>(label),
+                style: GoogleFonts.roboto(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: isActive
+                      ? (icon == Icons.favorite ? Colors.red : AppColors.lightPrimary)
+                      : const Color(0xFF9D9D9D),
+                ),
               ),
             ),
           ],

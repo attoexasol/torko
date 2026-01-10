@@ -30,4 +30,7 @@ class Urls{
 
     // Feed page
     static const get_all_post = "$_baseUrL/get_all_post" ;
+
+    // like
+    static const like_create = "$_baseUrL/like_create" ;
 }

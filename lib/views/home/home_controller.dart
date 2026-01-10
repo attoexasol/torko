@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../core/controllers/app_controller.dart';
 import '../../core/routes/app_routes.dart';
@@ -17,6 +18,8 @@ class HomeController extends GetxController {
   final RxSet<int> savedPosts = <int>{}.obs;
   final RxSet<int> hiddenPosts = <int>{}.obs;
   final RxSet<int> likedPosts = <int>{}.obs;
+  final RxMap<int, int> postLikeCounts = <int, int>{}.obs;  // Track updated like counts
+  final RxSet<int> likingInProgress = <int>{}.obs;  // Prevent rapid taps
   final RxSet<String> followingUsers = <String>{}.obs;
   
   final ScrollController scrollController = ScrollController();
@@ -157,22 +160,116 @@ class HomeController extends GetxController {
     activeTab.value = tab;
   }
 
-  void handleLike(int postId) {
-    if (likedPosts.contains(postId)) {
+  /// Handle like button tap with API call and optimistic update
+  Future<void> handleLike(int postId) async {
+    // Prevent rapid taps - if already processing, ignore
+    if (likingInProgress.contains(postId)) return;
+    
+    // Get token
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) {
+      final appController = Get.find<AppController>();
+      final isBn = appController.language == AppLanguage.bn;
+      appController.showNotification(
+        title: isBn ? 'ত্রুটি' : 'Error',
+        message: isBn ? 'অনুগ্রহ করে আগে লগইন করুন' : 'Please login first',
+      );
+      return;
+    }
+    
+    // Store original state for rollback
+    final bool wasLiked = likedPosts.contains(postId);
+    final int? originalCount = postLikeCounts[postId];
+    
+    // Optimistic update
+    likingInProgress.add(postId);
+    if (wasLiked) {
       likedPosts.remove(postId);
+      if (postLikeCounts.containsKey(postId)) {
+        postLikeCounts[postId] = (postLikeCounts[postId] ?? 1) - 1;
+      }
     } else {
       likedPosts.add(postId);
+      final post = posts.firstWhereOrNull((p) => p.id == postId);
+      final currentCount = postLikeCounts[postId] ?? post?.postLikeCount ?? 0;
+      postLikeCounts[postId] = currentCount + 1;
     }
+    
+    // Haptic feedback
+    HapticFeedback.lightImpact();
+    
+    try {
+      // Make API call
+      final response = await NetworkCaller.postRequest(
+        url: Urls.like_create,
+        body: {
+          'api_token': token,
+          'post_id': postId,
+        },
+      );
+      
+      print('DEBUG handleLike: Response = ${response.body}');
+      
+      if (response.isSuccess && response.body != null) {
+        if (response.body!['status'] == true) {
+          // Sync with API response
+          final int likeStatus = response.body!['like'] ?? (likedPosts.contains(postId) ? 1 : 0);
+          final int serverLikeCount = response.body!['post_like_count'] ?? postLikeCounts[postId] ?? 0;
+          
+          // Update state based on server response
+          if (likeStatus == 1) {
+            likedPosts.add(postId);
+          } else {
+            likedPosts.remove(postId);
+          }
+          postLikeCounts[postId] = serverLikeCount;
+          
+          print('DEBUG handleLike: Success - liked=$likeStatus, count=$serverLikeCount');
+        } else {
+          // API returned false status - rollback
+          _rollbackLike(postId, wasLiked, originalCount);
+          print('DEBUG handleLike: API returned false - ${response.body!['message']}');
+        }
+      } else {
+        // API call failed - rollback
+        _rollbackLike(postId, wasLiked, originalCount);
+        print('DEBUG handleLike: API failed - ${response.errorMessage}');
+      }
+    } catch (e) {
+      // Exception - rollback
+      _rollbackLike(postId, wasLiked, originalCount);
+      print('DEBUG handleLike: Exception - $e');
+    } finally {
+      likingInProgress.remove(postId);
+    }
+  }
+  
+  /// Rollback like state on failure
+  void _rollbackLike(int postId, bool wasLiked, int? originalCount) {
+    if (wasLiked) {
+      likedPosts.add(postId);
+    } else {
+      likedPosts.remove(postId);
+    }
+    if (originalCount != null) {
+      postLikeCounts[postId] = originalCount;
+    } else {
+      postLikeCounts.remove(postId);
+    }
+    HapticFeedback.heavyImpact();
   }
 
   bool isPostLiked(int postId) => likedPosts.contains(postId);
+  
+  /// Check if like action is in progress for a post
+  bool isLiking(int postId) => likingInProgress.contains(postId);
 
   int getLikeCount(PostModel post) {
-    final baseLikes = post.postLikeCount;
-    if (likedPosts.contains(post.id)) {
-      return baseLikes + 1;
+    // Use tracked count if available, otherwise use original from API
+    if (postLikeCounts.containsKey(post.id)) {
+      return postLikeCounts[post.id] ?? post.postLikeCount;
     }
-    return baseLikes;
+    return post.postLikeCount;
   }
 
   void handleComment(int postId) {
