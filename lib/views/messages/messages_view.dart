@@ -82,17 +82,8 @@ class MessagesView extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  actions: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.edit_outlined,
-                        color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-                      ),
-                      onPressed: () {},
-                    ),
-                  ],
                 ),
-                
+
                 // Search Bar
                 SliverToBoxAdapter(
                   child: Padding(
@@ -103,36 +94,48 @@ class MessagesView extends StatelessWidget {
                         color: isDark ? AppColors.darkCard : AppColors.lightCard,
                         borderRadius: BorderRadius.circular(22),
                       ),
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 16),
-                          Icon(
+                      child: TextField(
+                        style: TextStyle(
+                          color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+                          fontSize: 15,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: language == AppLanguage.bn ? 'খুঁজুন...' : 'Search...',
+                          hintStyle: TextStyle(
+                            color: isDark
+                                ? AppColors.darkMutedForeground
+                                : AppColors.lightMutedForeground,
+                          ),
+                          prefixIcon: Icon(
                             Icons.search,
-                            color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
                             size: 20,
+                            color: isDark
+                                ? AppColors.darkMutedForeground
+                                : AppColors.lightMutedForeground,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              style: TextStyle(
-                                color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-                                fontSize: 15,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: language == AppLanguage.bn ? 'খুঁজুন...' : 'Search...',
-                                hintStyle: TextStyle(
-                                  color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-                                ),
-                                border: InputBorder.none,
-                              ),
-                            ),
+
+                          // 🔹 Border Radius applied here
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide.none,
                           ),
-                        ],
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide.none,
+                          ),
+
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
                       ),
                     ),
                   ),
                 ),
-                
+
+
                 // Conversations List
                 SliverList(
                   delegate: SliverChildBuilderDelegate(

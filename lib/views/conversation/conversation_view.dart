@@ -191,27 +191,51 @@ class _ConversationViewState extends State<ConversationView> {
                   Expanded(
                     child: Container(
                       height: 44,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       decoration: BoxDecoration(
-                        color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+                        color: isDark
+                            ? AppColors.darkBackground
+                            : AppColors.lightBackground,
                         borderRadius: BorderRadius.circular(22),
                       ),
                       child: TextField(
                         controller: messageController,
                         style: TextStyle(
-                          color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+                          color: isDark
+                              ? AppColors.darkForeground
+                              : AppColors.lightForeground,
                           fontSize: 15,
                         ),
                         decoration: InputDecoration(
                           hintText: 'Message...',
                           hintStyle: TextStyle(
-                            color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                            color: isDark
+                                ? AppColors.darkMutedForeground
+                                : AppColors.lightMutedForeground,
                           ),
-                          border: InputBorder.none,
+
+                          // 🔹 Border radius applied here
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide.none,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide.none,
+                          ),
+
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
                       ),
                     ),
                   ),
+                  
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () {
