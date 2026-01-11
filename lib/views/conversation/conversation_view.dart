@@ -235,7 +235,7 @@ class _ConversationViewState extends State<ConversationView> {
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () {
