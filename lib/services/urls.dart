@@ -33,4 +33,12 @@ class Urls{
 
     // like
     static const like_create = "$_baseUrL/like_create" ;
+
+    // Send Message
+    static const send_message = "$_baseUrL/messages/send" ;
+    static const get_Message_API = "$_baseUrL/messages" ;
+    static const get_Single_Message_API = "$_baseUrL/single/message" ;
+
+
+
 }

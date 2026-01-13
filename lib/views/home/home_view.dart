@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../models/post_model.dart';
 import '../../widgets/bottom_nav.dart';
 import '../../widgets/home_header.dart';
+import '../../services/user_info.dart';
 import 'home_controller.dart';
 
 class HomeView extends StatelessWidget {
@@ -389,6 +390,50 @@ class _HomePostCard extends StatelessWidget {
     );
   }
 
+  void _handleMessageTap() {
+    final currentUserId = UserInfo.userId;
+    final receiverUserId = post.userId;
+    
+    if (currentUserId == null) {
+      Get.snackbar(
+        appController.language == AppLanguage.bn ? 'ত্রুটি' : 'Error',
+        appController.language == AppLanguage.bn ? 'অনুগ্রহ করে লগইন করুন' : 'Please login first',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+    
+    if (receiverUserId <= 0) {
+      Get.snackbar(
+        appController.language == AppLanguage.bn ? 'ত্রুটি' : 'Error',
+        appController.language == AppLanguage.bn ? 'অবৈধ ব্যবহারকারী' : 'Invalid user',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+    
+    // Prevent messaging yourself
+    if (receiverUserId == currentUserId) {
+      Get.snackbar(
+        appController.language == AppLanguage.bn ? 'সতর্কতা' : 'Warning',
+        appController.language == AppLanguage.bn ? 'আপনি নিজেকে মেসেজ করতে পারবেন না' : 'You cannot message yourself',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+    
+    // Get receiver info from post
+    final receiverName = post.createdBy?.name ?? 'User';
+    
+    // Navigate to conversation using overlay system
+    appController.openConversation({
+      'toUserId': receiverUserId,
+      'fromUserId': currentUserId,
+      'name': receiverName,
+      'avatar': null, // Can be extended if avatar is available in post
+    });
+  }
+
   Widget _buildMenuButton(bool isBn, String authorName) {
     return PopupMenuButton<String>(
       icon: Icon(
@@ -405,6 +450,9 @@ class _HomePostCard extends StatelessWidget {
       ),
       onSelected: (value) {
         switch (value) {
+          case 'message':
+            _handleMessageTap();
+            break;
           case 'save':
             controller.handleSavePost(post.id);
             break;
@@ -423,6 +471,27 @@ class _HomePostCard extends StatelessWidget {
         }
       },
       itemBuilder: (context) => [
+        PopupMenuItem(
+          value: 'message',
+          child: Row(
+            children: [
+              Icon(
+                Icons.message_outlined,
+                size: 18,
+                color: isDark ? Colors.white70 : Colors.black87,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                isBn ? 'মেসেজ' : 'Message',
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const PopupMenuDivider(),
         PopupMenuItem(
           value: 'save',
           child: Obx(() => Row(

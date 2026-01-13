@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/controllers/app_controller.dart';
 import '../../core/theme/app_colors.dart';
+import '../../controllers/chat_controller.dart';
+import '../../models/message_model.dart';
+import '../../services/user_info.dart';
 
 class ConversationView extends StatefulWidget {
   const ConversationView({super.key});
@@ -12,36 +15,121 @@ class ConversationView extends StatefulWidget {
 
 class _ConversationViewState extends State<ConversationView> {
   final appController = Get.find<AppController>();
+  late final ChatController chatController;
   final messageController = TextEditingController();
   final scrollController = ScrollController();
+  bool _hasInitialized = false;
+  Map<String, dynamic>? _conversationArgs;
 
-  // Sample messages
-  final List<Map<String, dynamic>> messages = [
-    {'text': 'Hey! How are you?', 'isMe': false, 'time': '10:30 AM'},
-    {'text': 'I\'m good! How about you?', 'isMe': true, 'time': '10:31 AM'},
-    {'text': 'Great! Did you see the new post?', 'isMe': false, 'time': '10:32 AM'},
-    {'text': 'Yes, it was amazing! 🎉', 'isMe': true, 'time': '10:33 AM'},
-    {'text': 'Let\'s meet up this weekend', 'isMe': false, 'time': '10:35 AM'},
-    {'text': 'Sounds good! Where?', 'isMe': true, 'time': '10:36 AM'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    chatController = Get.put(ChatController());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_hasInitialized) {
+      _initializeChat();
+      _hasInitialized = true;
+    }
+  }
+
+  Future<void> _initializeChat() async {
+    // Try route arguments first (from inbox navigation)
+    final args = Get.arguments;
+    if (args != null && args is Map<String, dynamic>) {
+      final toUserId = args['toUserId'];
+      if (toUserId != null && toUserId is int) {
+        _conversationArgs = args;
+        await chatController.init(
+          toUserId: toUserId,
+          receiverName: args['receiverName']?.toString(),
+          receiverAvatar: args['receiverAvatar']?.toString(),
+        );
+        // Scroll to bottom after messages load
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+        return;
+      }
+    }
+
+    // Fallback to appController.conversationData (from overlay system)
+    final conversationData = appController.conversationData;
+    if (conversationData != null) {
+      _conversationArgs = conversationData;
+      final toUserId = conversationData['toUserId'];
+      final receiverName = conversationData['name'];
+      final receiverAvatar = conversationData['avatar'];
+
+      if (toUserId != null && toUserId is int) {
+        await chatController.init(
+          toUserId: toUserId,
+          receiverName: receiverName?.toString(),
+          receiverAvatar: receiverAvatar?.toString(),
+        );
+        // Scroll to bottom after messages load
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      }
+
+    }
+  }
 
   @override
   void dispose() {
+    chatController.clearChat();
     messageController.dispose();
     scrollController.dispose();
     super.dispose();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (scrollController.hasClients && chatController.messages.isNotEmpty) {
+        scrollController.animateTo(
+          scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _handleSendMessage() async {
+    if (messageController.text.trim().isEmpty) return;
+    if (chatController.isSending.value) return;
+
+    final content = messageController.text.trim();
+    
+    final success = await chatController.sendMessage(content);
+    if (success) {
+      // Only clear input on success
+      messageController.clear();
+      _scrollToBottom();
+    }
+    // If failed, keep the text so user can retry
   }
 
   @override
   Widget build(BuildContext context) {
     return Obx(() {
       final isDark = appController.isDarkMode;
-      final conversationData = appController.conversationData;
+      final isBn = appController.language == AppLanguage.bn;
       
+      // Get conversation data from route args or appController
+      final conversationData = _conversationArgs ?? appController.conversationData;
       if (conversationData == null) return const SizedBox();
       
-      final name = conversationData['name'] ?? 'User';
+      final name = conversationData['name']?.toString() ?? 
+                   conversationData['receiverName']?.toString() ?? 
+                   'User';
       final online = conversationData['online'] ?? false;
+      final currentUserId = UserInfo.userId;
+      
+      // Scroll to bottom when messages load or new messages arrive
+      if (chatController.messages.isNotEmpty && !chatController.isLoading.value) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      }
       
       return Scaffold(
         backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
@@ -53,7 +141,13 @@ class _ConversationViewState extends State<ConversationView> {
               Icons.arrow_back,
               color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
             ),
-            onPressed: () => appController.closeConversation(),
+            onPressed: () {
+              if (Get.arguments != null) {
+                Get.back();
+              } else {
+                appController.closeConversation();
+              }
+            },
           ),
           title: Row(
             children: [
@@ -61,9 +155,9 @@ class _ConversationViewState extends State<ConversationView> {
                 children: [
                   CircleAvatar(
                     radius: 18,
-                    backgroundColor: AppColors.lightPrimary.withValues(alpha: 0.2),
+                    backgroundColor: AppColors.lightPrimary.withOpacity(0.2),
                     child: Text(
-                      name[0],
+                      name.isNotEmpty ? name[0].toUpperCase() : 'U',
                       style: TextStyle(
                         color: AppColors.lightPrimary,
                         fontWeight: FontWeight.w600,
@@ -104,7 +198,7 @@ class _ConversationViewState extends State<ConversationView> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      online ? 'Online' : 'Offline',
+                      online ? (isBn ? 'অনলাইন' : 'Online') : (isBn ? 'অফলাইন' : 'Offline'),
                       style: TextStyle(
                         color: online ? Colors.green : AppColors.lightMutedForeground,
                         fontSize: 12,
@@ -147,20 +241,42 @@ class _ConversationViewState extends State<ConversationView> {
           children: [
             // Messages List
             Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                padding: const EdgeInsets.all(16),
-                itemCount: messages.length,
-                itemBuilder: (context, index) {
-                  final message = messages[index];
-                  return _buildMessageBubble(
-                    text: message['text'],
-                    isMe: message['isMe'],
-                    time: message['time'],
-                    isDark: isDark,
+              child: Obx(() {
+                if (chatController.isLoading.value) {
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.lightPrimary,
+                    ),
                   );
-                },
-              ),
+                }
+
+                if (chatController.messages.isEmpty) {
+                  return Center(
+                    child: Text(
+                      isBn ? 'কোন মেসেজ নেই' : 'No messages yet',
+                      style: TextStyle(
+                        color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: chatController.messages.length,
+                  itemBuilder: (context, index) {
+                    final message = chatController.messages[index];
+                    final isMe = currentUserId != null && message.isMine(currentUserId);
+                    
+                    return _buildMessageBubble(
+                      message: message,
+                      isMe: isMe,
+                      isDark: isDark,
+                    );
+                  },
+                );
+              }),
             ),
             
             // Input Area
@@ -179,7 +295,7 @@ class _ConversationViewState extends State<ConversationView> {
                   ),
                 ),
               ),
-              child: Row(
+              child: Obx(() => Row(
                 children: [
                   IconButton(
                     icon: Icon(
@@ -199,6 +315,7 @@ class _ConversationViewState extends State<ConversationView> {
                       ),
                       child: TextField(
                         controller: messageController,
+                        enabled: !chatController.isSending.value,
                         style: TextStyle(
                           color: isDark
                               ? AppColors.darkForeground
@@ -206,14 +323,12 @@ class _ConversationViewState extends State<ConversationView> {
                           fontSize: 15,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Message...',
+                          hintText: isBn ? 'মেসেজ লিখুন...' : 'Message...',
                           hintStyle: TextStyle(
                             color: isDark
                                 ? AppColors.darkMutedForeground
                                 : AppColors.lightMutedForeground,
                           ),
-
-                          // 🔹 Border radius applied here
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22),
                             borderSide: BorderSide.none,
@@ -226,51 +341,50 @@ class _ConversationViewState extends State<ConversationView> {
                             borderRadius: BorderRadius.circular(22),
                             borderSide: BorderSide.none,
                           ),
-
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 16,
                             vertical: 12,
                           ),
                         ),
+                        onSubmitted: (_) => _handleSendMessage(),
                       ),
                     ),
                   ),
-
                   const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () {
-                      if (messageController.text.isNotEmpty) {
-                        setState(() {
-                          messages.add({
-                            'text': messageController.text,
-                            'isMe': true,
-                            'time': 'Now',
-                          });
-                          messageController.clear();
-                        });
-                        scrollController.animateTo(
-                          scrollController.position.maxScrollExtent + 100,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOut,
-                        );
-                      }
-                    },
+                  Obx(() => GestureDetector(
+                    onTap: chatController.isSending.value 
+                        ? null 
+                        : () {
+                            if (messageController.text.trim().isNotEmpty) {
+                              _handleSendMessage();
+                            }
+                          },
                     child: Container(
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: AppColors.lightPrimary,
+                        color: chatController.isSending.value
+                            ? AppColors.lightPrimary.withOpacity(0.5)
+                            : AppColors.lightPrimary,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.send,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                      child: chatController.isSending.value
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.send,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                     ),
-                  ),
+                  )),
                 ],
-              ),
+              )),
             ),
           ],
         ),
@@ -279,9 +393,8 @@ class _ConversationViewState extends State<ConversationView> {
   }
 
   Widget _buildMessageBubble({
-    required String text,
+    required MessageModel message,
     required bool isMe,
-    required String time,
     required bool isDark,
   }) {
     return Align(
@@ -307,19 +420,44 @@ class _ConversationViewState extends State<ConversationView> {
                   bottomRight: Radius.circular(isMe ? 4 : 18),
                 ),
               ),
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: isMe 
-                      ? Colors.white 
-                      : (isDark ? AppColors.darkForeground : AppColors.lightForeground),
-                  fontSize: 15,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      message.messageContent,
+                      style: TextStyle(
+                        color: isMe 
+                            ? Colors.white 
+                            : (isDark ? AppColors.darkForeground : AppColors.lightForeground),
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  if (message.isSending || message.isFailed) ...[
+                    const SizedBox(width: 8),
+                    if (message.isSending)
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: isMe ? Colors.white70 : AppColors.lightMutedForeground,
+                        ),
+                      )
+                    else if (message.isFailed)
+                      Icon(
+                        Icons.error_outline,
+                        size: 12,
+                        color: Colors.red,
+                      ),
+                  ],
+                ],
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              time,
+              message.formattedTime,
               style: TextStyle(
                 color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
                 fontSize: 11,
