@@ -209,33 +209,33 @@ class _ConversationViewState extends State<ConversationView> {
               ),
             ],
           ),
-          actions: [
-            IconButton(
-              icon: Icon(
-                Icons.phone_outlined,
-                color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-              ),
-              onPressed: () {
-                appController.startCall({'name': name, 'isVideo': false});
-              },
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.videocam_outlined,
-                color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-              ),
-              onPressed: () {
-                appController.startCall({'name': name, 'isVideo': true});
-              },
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.more_vert,
-                color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-              ),
-              onPressed: () {},
-            ),
-          ],
+          // actions: [
+          //   IconButton(
+          //     icon: Icon(
+          //       Icons.phone_outlined,
+          //       color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+          //     ),
+          //     onPressed: () {
+          //       appController.startCall({'name': name, 'isVideo': false});
+          //     },
+          //   ),
+          //   IconButton(
+          //     icon: Icon(
+          //       Icons.videocam_outlined,
+          //       color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+          //     ),
+          //     onPressed: () {
+          //       appController.startCall({'name': name, 'isVideo': true});
+          //     },
+          //   ),
+          //   IconButton(
+          //     icon: Icon(
+          //       Icons.more_vert,
+          //       color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+          //     ),
+          //     onPressed: () {},
+          //   ),
+          // ],
         ),
         body: Column(
           children: [
