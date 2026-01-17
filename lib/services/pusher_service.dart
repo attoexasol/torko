@@ -1,10 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
+import '../models/message_model.dart';
 
 /// Service for managing Pusher real-time connections
 /// 
-/// Handles connection, subscription, and event streaming for real-time messaging
+/// CRITICAL ARCHITECTURE:
+/// - True singleton (one instance app-wide)
+/// - Uses ONLY key + cluster (NO app_id in Flutter)
+/// - Emits MessageModel objects for easy consumption
+/// - connect() is idempotent
+/// - subscribeToUserChannel() is idempotent
+/// - NEVER calls APIs
+/// - NEVER reconnects unnecessarily
 class PusherService {
   static final PusherService _instance = PusherService._internal();
   factory PusherService() => _instance;
@@ -12,18 +21,34 @@ class PusherService {
 
   PusherChannelsFlutter? _pusher;
   PusherChannel? _currentChannel;
+  
+  // CRITICAL: StreamController created ONCE, never recreated
   final StreamController<Map<String, dynamic>> _eventController = 
       StreamController<Map<String, dynamic>>.broadcast();
   
+  // CRITICAL: StreamController for parsed MessageModel objects
+  StreamController<MessageModel>? _incomingMessagesController;
+  
   bool _isConnected = false;
   int? _currentUserId;
+  bool _isInitialized = false;
 
   // Pusher configuration
-  static const String _pusherKey = 'f252ee4951f42b5ce3b5';
+  // CRITICAL: Flutter uses ONLY key + cluster (NO app_id, NO secret)
+  static const String _pusherKey = '9df09725d514e737df9a';
   static const String _pusherCluster = 'ap2';
   
-  /// Stream of events from Pusher
+  /// Stream of raw events from Pusher (for backward compatibility)
   Stream<Map<String, dynamic>> get onEventStream => _eventController.stream;
+  
+  /// Stream of incoming messages (MessageModel objects)
+  /// 
+  /// CRITICAL: Returns same stream instance, never recreates
+  /// CRITICAL: Emits MessageModel objects (already parsed)
+  Stream<MessageModel> get incomingMessages {
+    _incomingMessagesController ??= StreamController<MessageModel>.broadcast();
+    return _incomingMessagesController!.stream;
+  }
 
   /// Check if Pusher is connected
   bool get isConnected => _isConnected;
@@ -32,53 +57,115 @@ class PusherService {
   /// 
   /// [currentUserId] - Current user's ID for channel subscription
   /// 
+  /// CRITICAL: Idempotent - safe to call multiple times
+  /// CRITICAL: Subscribes to CURRENT USER's channel (user.{currentUserId})
+  /// CRITICAL: Backend must broadcast messages TO this channel
+  /// 
   /// Note: For private channels, backend must provide auth endpoint
   /// Currently uses public channel as fallback (see TODOs below)
   Future<void> connect({required int currentUserId}) async {
-    if (_isConnected && _currentUserId == currentUserId) {
-      print('DEBUG PusherService: Already connected for user $currentUserId');
+    if (kDebugMode) {
+      print('═══════════════════════════════════════════════════════════');
+      print('🔌 [CHECKPOINT 1] PusherService.connect() called');
+      print('   currentUserId: $currentUserId');
+      print('   _isConnected: $_isConnected');
+      print('   _currentUserId: $_currentUserId');
+    }
+    
+    // Idempotent check: already connected for same user
+    if (_isConnected && _currentUserId == currentUserId && _isInitialized) {
+      if (kDebugMode) {
+        print('✅ [CHECKPOINT 1] Already connected for user $currentUserId - skipping');
+        print('═══════════════════════════════════════════════════════════');
+      }
       return;
     }
 
     _currentUserId = currentUserId;
 
     try {
-      // Initialize Pusher instance
-      _pusher ??= PusherChannelsFlutter.getInstance();
+      // CRITICAL: Initialize StreamController ONCE (never recreate)
+      _incomingMessagesController ??= StreamController<MessageModel>.broadcast();
+      
+      // CRITICAL: Initialize Pusher instance ONCE
+      if (!_isInitialized) {
+        if (kDebugMode) {
+          print('🔄 [CHECKPOINT 1] Initializing Pusher connection...');
+        }
+        
+        _pusher ??= PusherChannelsFlutter.getInstance();
+        
+        if (kDebugMode) {
+          print('✅ [CHECKPOINT 1] Pusher instance obtained');
+        }
 
-      // Configure Pusher options
-      await _pusher!.init(
-        apiKey: _pusherKey,
-        cluster: _pusherCluster,
-        onConnectionStateChange: _onConnectionStateChange,
-        onError: _onError,
-        onSubscriptionSucceeded: _onSubscriptionSucceeded,
-        onEvent: _onEvent,
-        onSubscriptionError: _onSubscriptionError,
-        onDecryptionFailure: _onDecryptionFailure,
-        onMemberAdded: _onMemberAdded,
-        onMemberRemoved: _onMemberRemoved,
-      );
+        // Configure Pusher options (only once)
+        await _pusher!.init(
+          apiKey: _pusherKey,
+          cluster: _pusherCluster,
+          onConnectionStateChange: _onConnectionStateChange,
+          onError: _onError,
+          onSubscriptionSucceeded: _onSubscriptionSucceeded,
+          onEvent: _onEvent,
+          onSubscriptionError: _onSubscriptionError,
+          onDecryptionFailure: _onDecryptionFailure,
+          onMemberAdded: _onMemberAdded,
+          onMemberRemoved: _onMemberRemoved,
+        );
 
-      // Connect to Pusher
-      await _pusher!.connect();
+        if (kDebugMode) {
+          print('✅ [CHECKPOINT 1] Pusher initialized');
+        }
+        
+        _isInitialized = true;
+      }
 
-      // Wait a bit for connection to establish
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Connect to Pusher (idempotent)
+      if (!_isConnected) {
+        if (kDebugMode) {
+          print('🔄 [CHECKPOINT 1] Connecting to Pusher servers...');
+        }
+        await _pusher!.connect();
 
-      // Subscribe to user channel
-      await subscribeToUserChannel(currentUserId: currentUserId);
+        // Wait a bit for connection to establish
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        if (kDebugMode) {
+          print('✅ [CHECKPOINT 1] Pusher connection established');
+        }
+      }
+
+      // Subscribe to user channel (CRITICAL: user.{currentUserId})
+      // Only subscribe if not already subscribed to this channel
+      if (_currentChannel == null || _currentChannel!.channelName != 'user.$currentUserId') {
+        await subscribeToUserChannel(currentUserId: currentUserId);
+      }
 
       _isConnected = true;
-      print('DEBUG PusherService: Connected to Pusher for user $currentUserId');
-    } catch (e) {
-      print('DEBUG PusherService: Connection error - $e');
+      
+      if (kDebugMode) {
+        print('✅ [CHECKPOINT 1] ✅ PusherService.connect() SUCCESS');
+        print('   Connected: $_isConnected');
+        print('   Channel: user.$currentUserId');
+        print('═══════════════════════════════════════════════════════════');
+      }
+    } catch (e, stackTrace) {
       _isConnected = false;
+      if (kDebugMode) {
+        print('❌ [CHECKPOINT 1] PusherService.connect() FAILED');
+        print('   Error: $e');
+        print('   Stack: $stackTrace');
+        print('═══════════════════════════════════════════════════════════');
+      }
       rethrow;
     }
   }
 
   /// Subscribe to user's private channel
+  /// 
+  /// CRITICAL: Subscribes to CURRENT USER's channel: user.{currentUserId}
+  /// CRITICAL: Backend MUST broadcast messages TO this channel
+  /// CRITICAL: Idempotent - won't resubscribe if already subscribed
   /// 
   /// TODO: Backend must provide Pusher private channel auth endpoint
   /// Expected endpoint: POST /api/pusher/auth
@@ -92,21 +179,46 @@ class PusherService {
     }
 
     try {
-      // TODO: Replace with private channel once backend provides auth endpoint
-      // Private channel: "private-user.$currentUserId"
-      // For now, using public channel as fallback
+      // CRITICAL: Channel name is user.{currentUserId}
+      // Backend must broadcast messages TO this channel when sending to currentUserId
       final channelName = 'user.$currentUserId';
       
-      print('DEBUG PusherService: Subscribing to channel: $channelName');
+      // Idempotent: don't resubscribe if already subscribed to same channel
+      if (_currentChannel != null && _currentChannel!.channelName == channelName) {
+        if (kDebugMode) {
+          print('✅ [CHECKPOINT 2] Already subscribed to channel: $channelName');
+        }
+        return;
+      }
+      
+      if (kDebugMode) {
+        print('═══════════════════════════════════════════════════════════');
+        print('🔌 [CHECKPOINT 2] Subscribing to Pusher channel');
+        print('   Channel name: $channelName');
+        print('   Current user ID: $currentUserId');
+        print('   ⚠️  Backend MUST broadcast messages TO this channel');
+        print('═══════════════════════════════════════════════════════════');
+      }
 
+      // CRITICAL: subscribe() doesn't take onEvent parameter
+      // Events are handled by the global onEvent callback set in init()
       _currentChannel = await _pusher!.subscribe(
         channelName: channelName,
-        onEvent: _onEvent,
       );
 
-      print('DEBUG PusherService: Subscribed to channel: $channelName');
-    } catch (e) {
-      print('DEBUG PusherService: Subscription error - $e');
+      if (kDebugMode) {
+        print('✅ [CHECKPOINT 2] ✅ Channel subscription SUCCESS');
+        print('   Channel: $channelName');
+        print('   Waiting for events...');
+        print('═══════════════════════════════════════════════════════════');
+      }
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print('❌ [CHECKPOINT 2] Channel subscription FAILED');
+        print('   Error: $e');
+        print('   Stack: $stackTrace');
+        print('═══════════════════════════════════════════════════════════');
+      }
       rethrow;
     }
   }
@@ -132,11 +244,19 @@ class PusherService {
   // ==================== Pusher Event Handlers ====================
 
   void _onConnectionStateChange(dynamic currentState, dynamic previousState) {
-    print('DEBUG PusherService: Connection state changed: $previousState -> $currentState');
+    if (kDebugMode) {
+      print('🔄 [CHECKPOINT 1] Connection state changed: $previousState -> $currentState');
+    }
     if (currentState == 'CONNECTED') {
       _isConnected = true;
+      if (kDebugMode) {
+        print('✅ [CHECKPOINT 1] Pusher CONNECTED');
+      }
     } else if (currentState == 'DISCONNECTED' || currentState == 'FAILED') {
       _isConnected = false;
+      if (kDebugMode) {
+        print('❌ [CHECKPOINT 1] Pusher DISCONNECTED/FAILED');
+      }
     }
   }
 
@@ -145,43 +265,124 @@ class PusherService {
   }
 
   void _onSubscriptionSucceeded(String channelName, dynamic data) {
-    print('DEBUG PusherService: Subscription succeeded: $channelName');
+    if (kDebugMode) {
+      print('✅ [CHECKPOINT 2] ✅ Subscription SUCCEEDED');
+      print('   Channel: $channelName');
+      print('   Data: $data');
+      print('   Ready to receive events!');
+    }
   }
 
   void _onEvent(PusherEvent event) {
-    print('DEBUG PusherService: Event received - Channel: ${event.channelName}, Event: ${event.eventName}');
+    if (kDebugMode) {
+      print('═══════════════════════════════════════════════════════════');
+      print('📨 [CHECKPOINT 3] ✅ EVENT RECEIVED FROM PUSHER');
+      print('   Channel: ${event.channelName}');
+      print('   Event Name: ${event.eventName}');
+      print('   Raw Data Type: ${event.data.runtimeType}');
+    }
     
     try {
       // Parse event data
       Map<String, dynamic> eventData;
       if (event.data is String) {
-        eventData = jsonDecode(event.data);
+        final dataString = event.data as String;
+        if (kDebugMode) {
+          final preview = dataString.length > 200 ? '${dataString.substring(0, 200)}...' : dataString;
+          print('📨 [CHECKPOINT 3] Raw data (string, first 200 chars): $preview');
+        }
+        eventData = jsonDecode(dataString);
       } else if (event.data is Map) {
+        if (kDebugMode) {
+          print('📨 [CHECKPOINT 3] Raw data (Map): ${event.data}');
+        }
         eventData = Map<String, dynamic>.from(event.data);
       } else {
-        print('DEBUG PusherService: Unknown event data type: ${event.data.runtimeType}');
+        if (kDebugMode) {
+          print('❌ [CHECKPOINT 3] ❌ Unknown event data type: ${event.data.runtimeType}');
+          print('   Data: ${event.data}');
+        }
         return;
       }
 
-      // Expected event structure:
-      // {
-      //   "from_user_id": <int>,
-      //   "to_user_id": <int>,
-      //   "message_content": "<string>",
-      //   "id": <int>,
-      //   "created_at": "<ISO8601 string>"
-      // }
-      // 
-      // Event name expected: "message.sent" or "App\\Events\\MessageSent" (depends on backend)
+      if (kDebugMode) {
+        print('✅ [CHECKPOINT 3] Event data parsed successfully');
+        print('   Parsed data: $eventData');
+      }
 
-      // Forward event to stream
-      _eventController.add({
-        'eventName': event.eventName,
-        'channelName': event.channelName,
-        'data': eventData,
-      });
-    } catch (e) {
-      print('DEBUG PusherService: Error parsing event data - $e');
+      // CRITICAL: Forward raw event to legacy stream (for backward compatibility)
+      if (!_eventController.isClosed) {
+        _eventController.add({
+          'eventName': event.eventName,
+          'channelName': event.channelName,
+          'data': eventData,
+        });
+      }
+
+      // CRITICAL: Parse and emit MessageModel if it's a message event
+      final eventName = event.eventName;
+      final isMessageEvent = eventName != null && 
+          (eventName.toLowerCase().contains('message') || 
+           eventName.contains('Message') ||
+           eventName == 'message.sent' ||
+           eventName == 'App\\Events\\MessageSent' ||
+           eventName.contains('MessageSent'));
+
+      if (isMessageEvent) {
+        if (kDebugMode) {
+          print('📨 [CHECKPOINT 3] Message event detected - parsing MessageModel...');
+        }
+        
+        try {
+          // Parse MessageModel from event data
+          final message = MessageModel.fromJson(eventData);
+          
+          if (kDebugMode) {
+            print('✅ [CHECKPOINT 3] MessageModel parsed successfully');
+            print('   Message ID: ${message.id}');
+            print('   From User ID: ${message.fromUserId}');
+            print('   To User ID: ${message.toUserId}');
+            print('   Content: ${message.messageContent.length > 50 ? message.messageContent.substring(0, 50) + "..." : message.messageContent}');
+          }
+          
+          // CRITICAL: Emit MessageModel to incomingMessages stream
+          if (_incomingMessagesController != null && !_incomingMessagesController!.isClosed) {
+            _incomingMessagesController!.add(message);
+            
+            if (kDebugMode) {
+              print('✅ [CHECKPOINT 3] ✅ MessageModel emitted to incomingMessages stream');
+              print('   Waiting for ChatController listener...');
+            }
+          } else {
+            if (kDebugMode) {
+              print('❌ [CHECKPOINT 3] ❌ incomingMessages stream is closed');
+            }
+          }
+        } catch (e, stackTrace) {
+          if (kDebugMode) {
+            print('❌ [CHECKPOINT 3] ❌ Failed to parse MessageModel');
+            print('   Error: $e');
+            print('   Stack: $stackTrace');
+            print('   Event Data: $eventData');
+          }
+        }
+      } else {
+        if (kDebugMode) {
+          print('⏭️  [CHECKPOINT 3] Event is not a message event - ignoring');
+        }
+      }
+      
+      if (kDebugMode) {
+        print('═══════════════════════════════════════════════════════════');
+      }
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print('❌ [CHECKPOINT 3] ❌ Error parsing event data');
+        print('   Error: $e');
+        print('   Stack: $stackTrace');
+        print('   Raw data: ${event.data}');
+        print('═══════════════════════════════════════════════════════════');
+      }
     }
   }
 
@@ -207,8 +408,12 @@ class PusherService {
   }
 
   /// Dispose resources
+  /// CRITICAL: Only call on app logout, not on screen close
   void dispose() {
+    _incomingMessagesController?.close();
+    _incomingMessagesController = null;
     _eventController.close();
     disconnect();
+    _isInitialized = false;
   }
 }

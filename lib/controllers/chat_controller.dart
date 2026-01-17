@@ -26,10 +26,10 @@ class ChatController extends GetxController {
   final Set<int> receivedMessageIds = <int>{};
   
   // Stream subscription
-  StreamSubscription<Map<String, dynamic>>? _pusherSubscription;
+  StreamSubscription<MessageModel>? _pusherSubscription;
   
-  // Fallback polling timer (only if Pusher not connected)
-  Timer? _pollTimer;
+  // CRITICAL: NO polling timer - removed completely
+  // Realtime updates come ONLY from Pusher
 
   @override
   void onClose() {
@@ -72,6 +72,9 @@ class ChatController extends GetxController {
   }
 
   /// Load conversation history from API
+  /// 
+  /// CRITICAL: Called ONCE on init
+  /// CRITICAL: Never called again (Pusher handles new messages)
   /// Merges with existing messages without duplicates
   Future<void> loadConversation() async {
     if (toUserId == null) return;
@@ -129,113 +132,189 @@ class ChatController extends GetxController {
   }
 
   /// Connect to Pusher and set up event listeners
+  /// 
+  /// CRITICAL: NO fallback polling
+  /// CRITICAL: If Pusher fails, app continues without real-time (graceful degradation)
   Future<void> _connectPusher() async {
-    if (currentUserId == null) return;
+    if (currentUserId == null) {
+      if (kDebugMode) {
+        print('DEBUG ChatController._connectPusher: ❌ currentUserId is null - cannot connect');
+      }
+      return;
+    }
 
     try {
       final pusherService = PusherService();
       
+      if (kDebugMode) {
+        print('DEBUG ChatController._connectPusher: Connecting to Pusher for user $currentUserId');
+        print('DEBUG ChatController._connectPusher: Pusher isConnected: ${pusherService.isConnected}');
+      }
+      
       // Connect to Pusher if not already connected
       if (!pusherService.isConnected) {
-        await pusherService.connect(currentUserId: currentUserId!);
-      }
-
-      // Listen to events
-      _pusherSubscription = pusherService.onEventStream.listen((eventData) {
-        _handlePusherEvent(eventData);
-      });
-
-      if (kDebugMode) {
-        print('DEBUG ChatController: Pusher connected and listening');
-      }
-
-      // Start fallback polling ONLY if Pusher is not connected
-      if (!pusherService.isConnected) {
-        _startFallbackPolling();
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('DEBUG ChatController: Pusher connection error - $e');
-      }
-      // Start fallback polling if Pusher fails
-      _startFallbackPolling();
-    }
-  }
-
-  /// Start fallback polling timer (only if Pusher is not working)
-  void _startFallbackPolling() {
-    _pollTimer?.cancel();
-    
-    // Poll every 3 seconds while conversation is open
-    _pollTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      if (toUserId != null && !isLoading.value) {
         if (kDebugMode) {
-          print('DEBUG ChatController: Fallback polling - checking for new messages');
+          print('DEBUG ChatController._connectPusher: Pusher not connected - calling connect()');
         }
-        await loadConversation();
+        await pusherService.connect(currentUserId: currentUserId!);
+      } else {
+        if (kDebugMode) {
+          print('DEBUG ChatController._connectPusher: Pusher already connected');
+        }
       }
-    });
 
-    if (kDebugMode) {
-      print('DEBUG ChatController: Fallback polling started (Pusher not available)');
+      // CRITICAL: Cancel previous subscription if exists
+      if (_pusherSubscription != null) {
+        if (kDebugMode) {
+          print('DEBUG ChatController._connectPusher: Cancelling previous subscription');
+        }
+        await _pusherSubscription?.cancel();
+        _pusherSubscription = null;
+      }
+
+      // Listen to Pusher incoming messages (MessageModel stream)
+      if (kDebugMode) {
+        print('DEBUG ChatController._connectPusher: Setting up message listener');
+        print('   Using incomingMessages stream (MessageModel objects)');
+      }
+      
+      _pusherSubscription = pusherService.incomingMessages.listen(
+        (message) {
+          if (kDebugMode) {
+            print('═══════════════════════════════════════════════════════════');
+            print('📨 [CHECKPOINT 4] ✅ MESSAGE RECEIVED IN ChatController LISTENER');
+            print('   Message ID: ${message.id}');
+            print('   From User ID: ${message.fromUserId}');
+            print('   To User ID: ${message.toUserId}');
+            print('   Content: ${message.messageContent.length > 50 ? message.messageContent.substring(0, 50) + "..." : message.messageContent}');
+            print('═══════════════════════════════════════════════════════════');
+          }
+          _handleIncomingMessage(message);
+        },
+        onError: (error) {
+          if (kDebugMode) {
+            print('DEBUG ChatController._connectPusher: ❌ Stream error: $error');
+          }
+        },
+        onDone: () {
+          if (kDebugMode) {
+            print('DEBUG ChatController._connectPusher: ⚠️ Stream closed');
+          }
+        },
+        cancelOnError: false, // Keep listening even on error
+      );
+
+      if (kDebugMode) {
+        print('DEBUG ChatController._connectPusher: ✅ Pusher connected and listening for user $currentUserId, conversation with user $toUserId');
+      }
+      
+      // CRITICAL: NO fallback polling - removed completely
+      // Realtime updates come ONLY from Pusher
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print('DEBUG ChatController._connectPusher: ❌ Pusher connection error - $e');
+        print('DEBUG ChatController._connectPusher: Stack trace: $stackTrace');
+      }
+      // CRITICAL: Do NOT start polling - graceful degradation
+      // User can manually refresh if needed
     }
   }
 
-  /// Stop fallback polling
-  void _stopFallbackPolling() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
-  }
-
-  /// Handle incoming Pusher events
-  void _handlePusherEvent(Map<String, dynamic> eventData) {
+  /// Handle incoming message from Pusher
+  /// 
+  /// CRITICAL: Filters messages to show ONLY messages for this conversation
+  /// Message is shown if:
+  /// - FROM other user TO current user (incoming)
+  /// - FROM current user TO other user (outgoing)
+  void _handleIncomingMessage(MessageModel message) {
     try {
-      final eventName = eventData['eventName'] as String?;
-      final data = eventData['data'] as Map<String, dynamic>?;
-
-      if (data == null) return;
-
-      // Handle message events
-      if (eventName != null && 
-          (eventName.contains('message') || eventName.contains('Message'))) {
-        
-        // Parse message from event data
-        final message = MessageModel.fromJson(data);
-        
-        // Check if this message is for this conversation
-        if (toUserId != null && 
-            (message.toUserId == toUserId || message.fromUserId == toUserId)) {
-          
-          // Duplicate protection
-          if (receivedMessageIds.contains(message.id)) {
-            if (kDebugMode) {
-              print('DEBUG ChatController: Duplicate message ignored (id: ${message.id})');
-            }
-            return;
-          }
-
-          receivedMessageIds.add(message.id);
-          
-          // Add message in sorted position (by createdAt asc)
-          _addMessageSorted(message);
-
-          if (kDebugMode) {
-            print('DEBUG ChatController: Message received via Pusher - ID: ${message.id}, messages.length: ${messages.length}');
-          }
-
-          // Notify InboxController to update conversation preview
-          _notifyInboxUpdate(message);
-        }
-      }
-    } catch (e) {
       if (kDebugMode) {
-        print('DEBUG ChatController: Error handling Pusher event - $e');
+        print('🔍 [CHECKPOINT 5] Processing incoming message');
+        print('   Message ID: ${message.id}');
+        print('   From User ID: ${message.fromUserId}');
+        print('   To User ID: ${message.toUserId}');
+        print('   Current User ID: $currentUserId');
+        print('   Other User ID (toUserId): $toUserId');
+      }
+        
+      // CRITICAL: Check if this message is for THIS conversation
+      // Message must be between currentUserId and toUserId
+      if (toUserId == null || currentUserId == null) {
+        if (kDebugMode) {
+          print('❌ [CHECKPOINT 5] ❌ Conversation not initialized (toUserId: $toUserId, currentUserId: $currentUserId)');
+        }
+        return;
+      }
+        
+      // Message is for this conversation if:
+      // 1. FROM other user TO current user (incoming message)
+      // 2. FROM current user TO other user (outgoing message we sent)
+      final isIncomingMessage = message.fromUserId == toUserId && message.toUserId == currentUserId;
+      final isOutgoingMessage = message.fromUserId == currentUserId && message.toUserId == toUserId;
+      final isForThisConversation = isIncomingMessage || isOutgoingMessage;
+      
+      if (kDebugMode) {
+        print('   isIncomingMessage: $isIncomingMessage (fromUserId==toUserId && toUserId==currentUserId)');
+        print('   isOutgoingMessage: $isOutgoingMessage (fromUserId==currentUserId && toUserId==toUserId)');
+        print('   isForThisConversation: $isForThisConversation');
+      }
+      
+      if (!isForThisConversation) {
+        if (kDebugMode) {
+          print('❌ [CHECKPOINT 6] ❌ Message NOT for this conversation - IGNORING');
+          print('   This message is for a different conversation');
+        }
+        return;
+      }
+      
+      if (kDebugMode) {
+        print('✅ [CHECKPOINT 6] ✅ Message IS for this conversation');
+        print('   Type: ${isIncomingMessage ? "INCOMING" : "OUTGOING"}');
+      }
+      
+      // Duplicate protection
+      if (receivedMessageIds.contains(message.id)) {
+        if (kDebugMode) {
+          print('⏭️  [CHECKPOINT 6] Duplicate message - already received (id: ${message.id})');
+        }
+        return;
+      }
+
+      receivedMessageIds.add(message.id);
+      
+      // Add message in sorted position (by createdAt asc)
+      _addMessageSorted(message);
+
+      if (kDebugMode) {
+        print('═══════════════════════════════════════════════════════════');
+        print('🎉 [CHECKPOINT 7] ✅✅✅ MESSAGE ADDED SUCCESSFULLY ✅✅✅');
+        print('   Message ID: ${message.id}');
+        print('   Type: ${isIncomingMessage ? "INCOMING" : "OUTGOING"}');
+        print('   Total messages: ${messages.length}');
+        print('   ⚠️  UI should rebuild now via Obx');
+        print('═══════════════════════════════════════════════════════════');
+      }
+
+      // Notify InboxController to update conversation preview
+      _notifyInboxUpdate(message);
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        print('DEBUG ChatController._handleIncomingMessage: ❌ Error handling message - $e');
+        print('DEBUG ChatController._handleIncomingMessage: Stack trace: $stackTrace');
       }
     }
   }
 
   /// Add message to list in sorted order (by createdAt asc, then id asc)
+  /// 
+  /// CRITICAL: Uses messages.insert() which triggers Obx rebuild
   void _addMessageSorted(MessageModel message) {
+    if (kDebugMode) {
+      print('🔄 [CHECKPOINT 7] Adding message to list');
+      print('   Message ID: ${message.id}');
+      print('   Current messages.length: ${messages.length}');
+    }
+    
     // Find insertion index (sorted by createdAt asc, then id asc)
     int insertIndex = messages.length; // Default to end if newer than all
     
@@ -256,7 +335,15 @@ class ChatController extends GetxController {
       }
     }
 
+    // CRITICAL: Use insert() which triggers Obx rebuild
     messages.insert(insertIndex, message);
+    
+    if (kDebugMode) {
+      print('✅ [CHECKPOINT 7] ✅ Message added to list');
+      print('   Inserted at index: $insertIndex');
+      print('   New messages.length: ${messages.length}');
+      print('   ⚠️  Obx should detect change and rebuild UI');
+    }
   }
 
   /// Notify InboxController to update conversation preview
@@ -391,8 +478,9 @@ class ChatController extends GetxController {
   }
 
   /// Clear chat state
+  /// 
+  /// CRITICAL: Called on screen dispose
   void clearChat() {
-    _stopFallbackPolling();
     _pusherSubscription?.cancel();
     _pusherSubscription = null;
     messages.clear();

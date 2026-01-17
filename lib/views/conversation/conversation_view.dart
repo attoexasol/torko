@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../../core/controllers/app_controller.dart';
 import '../../core/theme/app_colors.dart';
@@ -20,11 +21,32 @@ class _ConversationViewState extends State<ConversationView> {
   final scrollController = ScrollController();
   bool _hasInitialized = false;
   Map<String, dynamic>? _conversationArgs;
+  bool _shouldAutoScroll = true; // Track if user is near bottom for smart auto-scroll
 
   @override
   void initState() {
     super.initState();
-    chatController = Get.put(ChatController());
+    // CRITICAL: Get.put() will reuse existing controller or create new one
+    // This ensures controller persists across rebuilds
+    chatController = Get.put(ChatController(), tag: null);
+    
+    if (kDebugMode) {
+      print('🔧 ConversationView.initState: ChatController obtained');
+      print('   Controller instance: ${chatController.hashCode}');
+    }
+    
+    // Listen to scroll position for smart auto-scroll
+    scrollController.addListener(_onScroll);
+  }
+  
+  void _onScroll() {
+    // Track if user is near bottom (within 200px)
+    if (scrollController.hasClients) {
+      final maxScroll = scrollController.position.maxScrollExtent;
+      final currentScroll = scrollController.position.pixels;
+      final threshold = maxScroll - 200;
+      _shouldAutoScroll = currentScroll >= threshold;
+    }
   }
 
   @override
@@ -37,19 +59,34 @@ class _ConversationViewState extends State<ConversationView> {
   }
 
   Future<void> _initializeChat() async {
+    if (kDebugMode) {
+      print('🔧 ConversationView._initializeChat: Initializing chat');
+    }
+    
     // Try route arguments first (from inbox navigation)
     final args = Get.arguments;
     if (args != null && args is Map<String, dynamic>) {
       final toUserId = args['toUserId'];
       if (toUserId != null && toUserId is int) {
         _conversationArgs = args;
+        
+        if (kDebugMode) {
+          print('🔧 ConversationView._initializeChat: Calling chatController.init()');
+          print('   toUserId: $toUserId');
+        }
+        
         await chatController.init(
           toUserId: toUserId,
           receiverName: args['receiverName']?.toString(),
           receiverAvatar: args['receiverAvatar']?.toString(),
         );
-        // Scroll to bottom after messages load
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+        
+        if (kDebugMode) {
+          print('🔧 ConversationView._initializeChat: Chat initialized, setting up scroll');
+        }
+        
+        // Scroll to bottom after initial load
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(force: true));
         return;
       }
     }
@@ -68,8 +105,8 @@ class _ConversationViewState extends State<ConversationView> {
           receiverName: receiverName?.toString(),
           receiverAvatar: receiverAvatar?.toString(),
         );
-        // Scroll to bottom after messages load
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+        // Scroll to bottom after initial load
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(force: true));
       }
 
     }
@@ -77,13 +114,17 @@ class _ConversationViewState extends State<ConversationView> {
 
   @override
   void dispose() {
+    scrollController.removeListener(_onScroll);
     chatController.clearChat();
     messageController.dispose();
     scrollController.dispose();
     super.dispose();
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool force = false}) {
+    // Only auto-scroll if user is near bottom (unless forced)
+    if (!force && !_shouldAutoScroll) return;
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (scrollController.hasClients && chatController.messages.isNotEmpty) {
         scrollController.animateTo(
@@ -105,33 +146,34 @@ class _ConversationViewState extends State<ConversationView> {
     if (success) {
       // Only clear input on success
       messageController.clear();
-      _scrollToBottom();
+      _shouldAutoScroll = true; // Re-enable auto-scroll after sending
+      _scrollToBottom(force: true); // Force scroll after sending
     }
     // If failed, keep the text so user can retry
   }
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      final isDark = appController.isDarkMode;
-      final isBn = appController.language == AppLanguage.bn;
-      
-      // Get conversation data from route args or appController
-      final conversationData = _conversationArgs ?? appController.conversationData;
-      if (conversationData == null) return const SizedBox();
-      
-      final name = conversationData['name']?.toString() ?? 
-                   conversationData['receiverName']?.toString() ?? 
-                   'User';
-      final online = conversationData['online'] ?? false;
-      final currentUserId = UserInfo.userId;
-      
-      // Scroll to bottom when messages load or new messages arrive
-      if (chatController.messages.isNotEmpty && !chatController.isLoading.value) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-      }
-      
-      return Scaffold(
+    // CRITICAL: Do NOT wrap entire build in Obx()
+    // Only specific widgets use Obx for granular reactivity
+    
+    final isDark = appController.isDarkMode;
+    final isBn = appController.language == AppLanguage.bn;
+    
+    // Get conversation data from route args or appController
+    final conversationData = _conversationArgs ?? appController.conversationData;
+    if (conversationData == null) return const SizedBox();
+    
+    final name = conversationData['name']?.toString() ?? 
+                 conversationData['receiverName']?.toString() ?? 
+                 'User';
+    final online = conversationData['online'] ?? false;
+    final currentUserId = UserInfo.userId;
+    
+    // CRITICAL: Do NOT use PostFrameCallback in build()
+    // Scroll handling is done via scroll listener or explicit calls
+    
+    return Scaffold(
         backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
         appBar: AppBar(
           backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
@@ -240,6 +282,7 @@ class _ConversationViewState extends State<ConversationView> {
         body: Column(
           children: [
             // Messages List
+            // CRITICAL: Only message list uses Obx for granular reactivity
             Expanded(
               child: Obx(() {
                 if (chatController.isLoading.value) {
@@ -259,6 +302,11 @@ class _ConversationViewState extends State<ConversationView> {
                       ),
                     ),
                   );
+                }
+
+                // Auto-scroll when new messages arrive (if user is near bottom)
+                if (_shouldAutoScroll) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
                 }
 
                 return ListView.builder(
@@ -389,7 +437,6 @@ class _ConversationViewState extends State<ConversationView> {
           ],
         ),
       );
-    });
   }
 
   Widget _buildMessageBubble({
