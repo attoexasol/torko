@@ -285,7 +285,11 @@ class _ConversationViewState extends State<ConversationView> {
             // CRITICAL: Only message list uses Obx for granular reactivity
             Expanded(
               child: Obx(() {
-                if (chatController.isLoading.value) {
+                // CRITICAL: Access messages.length explicitly to ensure Obx tracks changes
+                final messageCount = chatController.messages.length;
+                final isLoading = chatController.isLoading.value;
+                
+                if (isLoading) {
                   return Center(
                     child: CircularProgressIndicator(
                       color: AppColors.lightPrimary,
@@ -293,7 +297,7 @@ class _ConversationViewState extends State<ConversationView> {
                   );
                 }
 
-                if (chatController.messages.isEmpty) {
+                if (messageCount == 0) {
                   return Center(
                     child: Text(
                       isBn ? 'কোন মেসেজ নেই' : 'No messages yet',
@@ -305,14 +309,17 @@ class _ConversationViewState extends State<ConversationView> {
                 }
 
                 // Auto-scroll when new messages arrive (if user is near bottom)
+                // Use PostFrameCallback to ensure scroll happens after build
                 if (_shouldAutoScroll) {
                   WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
                 }
 
                 return ListView.builder(
+                  // CRITICAL: Add key to force rebuild when message count changes
+                  key: ValueKey('messages_$messageCount'),
                   controller: scrollController,
                   padding: const EdgeInsets.all(16),
-                  itemCount: chatController.messages.length,
+                  itemCount: messageCount,
                   itemBuilder: (context, index) {
                     final message = chatController.messages[index];
                     final isMe = currentUserId != null && message.isMine(currentUserId);

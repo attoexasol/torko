@@ -47,7 +47,9 @@ class ConversationItemModel {
       isRead: json['is_read'] is int 
           ? json['is_read'] 
           : (json['is_read'] == true ? 1 : 0),
-      receiver: UserMiniModel.fromJson(json['receiver'] ?? {}),
+      receiver: json['receiver'] != null 
+          ? UserMiniModel.fromJson(json['receiver']) 
+          : UserMiniModel(id: 0, fullname: 'Unknown User'),
     );
   }
 

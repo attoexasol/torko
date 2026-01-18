@@ -39,6 +39,8 @@ class Urls{
     static const get_Message_API = "$_baseUrL/messages" ;
     static const get_Single_Message_API = "$_baseUrL/single/message" ;
 
+    // Pusher Broadcasting Auth
+    static const pusher_auth = "$_baseUrL/broadcasting/auth";
 
 
 }

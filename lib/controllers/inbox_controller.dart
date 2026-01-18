@@ -156,30 +156,66 @@ class InboxController extends GetxController {
 
   /// Fetch inbox/conversation list
   Future<void> fetchInbox() async {
+    if (kDebugMode) {
+      print('═══════════════════════════════════════════════════════════');
+      print('🔍 [fetchInbox] fetchInbox() called');
+    }
+    
     final token = UserInfo.apiToken;
     if (token == null || token.isEmpty) {
+      if (kDebugMode) {
+        print('❌ [fetchInbox] Token is null or empty');
+      }
       errorMessage.value = 'User not logged in';
+      isLoading.value = false;
       return;
+    }
+
+    if (kDebugMode) {
+      print('✅ [fetchInbox] Token found (length: ${token.length})');
     }
 
     isLoading.value = true;
     errorMessage.value = '';
 
     try {
+      if (kDebugMode) {
+        print('🔄 [fetchInbox] Calling MessageApiService.fetchInbox()...');
+      }
+      
       final rawList = await MessageApiService.fetchInbox(token: token);
+      
+      if (kDebugMode) {
+        print('✅ [fetchInbox] API returned ${rawList.length} raw messages');
+      }
       
       // Group by receiver.id to show ONE conversation per user
       final uniqueConversations = _groupByReceiver(rawList);
       
+      if (kDebugMode) {
+        print('✅ [fetchInbox] Grouped into ${uniqueConversations.length} unique conversations');
+        for (var conv in uniqueConversations) {
+          print('   - User ${conv.receiver.id} (${conv.receiver.fullname}): "${conv.lastMessage}"');
+        }
+      }
+      
       conversations.value = uniqueConversations;
 
       if (kDebugMode) {
-        print('DEBUG InboxController: Grouped ${rawList.length} messages into ${uniqueConversations.length} unique conversations');
+        print('✅ [fetchInbox] Conversations list updated (length: ${conversations.length})');
+        print('═══════════════════════════════════════════════════════════');
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       errorMessage.value = e is MessageApiException 
           ? e.message 
           : 'Failed to load conversations';
+      
+      if (kDebugMode) {
+        print('❌ [fetchInbox] Error: $e');
+        print('   Stack trace: $stackTrace');
+        print('═══════════════════════════════════════════════════════════');
+      }
+      
       Get.snackbar(
         'Error',
         errorMessage.value,

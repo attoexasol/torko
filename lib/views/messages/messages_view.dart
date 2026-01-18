@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../../core/controllers/app_controller.dart';
 import '../../core/routes/app_routes.dart';
@@ -10,13 +11,38 @@ import '../../widgets/bottom_nav.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class MessagesView extends StatelessWidget {
+class MessagesView extends StatefulWidget {
   const MessagesView({super.key});
+
+  @override
+  State<MessagesView> createState() => _MessagesViewState();
+}
+
+class _MessagesViewState extends State<MessagesView> {
+  late final InboxController inboxController;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kDebugMode) {
+      print('🔍 [MessagesView] MessagesView opened');
+    }
+    
+    // Get or create InboxController
+    inboxController = Get.put(InboxController(), permanent: false);
+    
+    // Ensure inbox is loaded
+    if (inboxController.conversations.isEmpty && !inboxController.isLoading.value) {
+      if (kDebugMode) {
+        print('🔄 [MessagesView] Calling fetchInbox() from initState');
+      }
+      inboxController.fetchInbox();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final appController = Get.find<AppController>();
-    final inboxController = Get.put(InboxController());
     
     // Sync navigation state
     if (Get.isRegistered<NavigationController>()) {

@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
+import 'package:flutter/foundation.dart';
 import '../core/controllers/app_controller.dart';
 import '../core/routes/app_routes.dart';
+import 'inbox_controller.dart';
 
 /// Centralized navigation controller - single source of truth for navigation state
 class NavigationController extends GetxController {
@@ -113,6 +115,15 @@ class NavigationController extends GetxController {
     // Handle messages notification reset
     if (screen == 'messages') {
       appController.resetMessageNotifications();
+      
+      // Refresh inbox when messages screen is selected
+      if (Get.isRegistered<InboxController>()) {
+        final inboxController = Get.find<InboxController>();
+        if (kDebugMode) {
+          print('🔄 [NavigationController] Refreshing inbox on messages screen select');
+        }
+        inboxController.fetchInbox();
+      }
     }
     
     // If already on the same route, just refresh state (don't navigate again)
@@ -184,6 +195,16 @@ class NavigationController extends GetxController {
   /// Handle messages tap (with notification reset)
   void handleMessagesTap() {
     appController.resetMessageNotifications();
+    
+    // Refresh inbox when messages tab is tapped
+    if (Get.isRegistered<InboxController>()) {
+      final inboxController = Get.find<InboxController>();
+      if (kDebugMode) {
+        print('🔄 [NavigationController] Refreshing inbox on messages tap');
+      }
+      inboxController.fetchInbox();
+    }
+    
     navigateTo('messages');
   }
   

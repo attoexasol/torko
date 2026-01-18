@@ -43,7 +43,7 @@ class AppTranslations {
     'selectGender': {'bn': 'লিঙ্গ নির্বাচন করুন', 'en': 'Select gender'},
     'male': {'bn': 'পুরুষ', 'en': 'Male'},
     'female': {'bn': 'নারী', 'en': 'Female'},
-    'other': {'bn': 'অন্যান্য', 'en': 'Other'},
+    'other': {'bn': 'অন্যান্য', 'en': 'others'},
     'preferNotToSay': {'bn': 'বলতে চাই না', 'en': 'Prefer not to say'},
     'letsGo': {'bn': 'চলুন শুরু করি', 'en': 'Let\'s Go'},
     

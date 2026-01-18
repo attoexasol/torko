@@ -180,15 +180,15 @@ class ChatController extends GetxController {
       
       _pusherSubscription = pusherService.incomingMessages.listen(
         (message) {
-          if (kDebugMode) {
-            print('═══════════════════════════════════════════════════════════');
-            print('📨 [CHECKPOINT 4] ✅ MESSAGE RECEIVED IN ChatController LISTENER');
-            print('   Message ID: ${message.id}');
-            print('   From User ID: ${message.fromUserId}');
-            print('   To User ID: ${message.toUserId}');
-            print('   Content: ${message.messageContent.length > 50 ? message.messageContent.substring(0, 50) + "..." : message.messageContent}');
-            print('═══════════════════════════════════════════════════════════');
-          }
+      if (kDebugMode) {
+        print('═══════════════════════════════════════════════════════════');
+        print('📨 [MESSAGE RECEIVED] ✅ MESSAGE RECEIVED IN ChatController LISTENER');
+        print('   Message ID: ${message.id}');
+        print('   From User ID: ${message.fromUserId}');
+        print('   To User ID: ${message.toUserId}');
+        print('   Content: ${message.messageContent.length > 50 ? message.messageContent.substring(0, 50) + "..." : message.messageContent}');
+        print('═══════════════════════════════════════════════════════════');
+      }
           _handleIncomingMessage(message);
         },
         onError: (error) {
@@ -229,7 +229,7 @@ class ChatController extends GetxController {
   void _handleIncomingMessage(MessageModel message) {
     try {
       if (kDebugMode) {
-        print('🔍 [CHECKPOINT 5] Processing incoming message');
+        print('🔍 Processing incoming message');
         print('   Message ID: ${message.id}');
         print('   From User ID: ${message.fromUserId}');
         print('   To User ID: ${message.toUserId}');
@@ -241,7 +241,7 @@ class ChatController extends GetxController {
       // Message must be between currentUserId and toUserId
       if (toUserId == null || currentUserId == null) {
         if (kDebugMode) {
-          print('❌ [CHECKPOINT 5] ❌ Conversation not initialized (toUserId: $toUserId, currentUserId: $currentUserId)');
+          print('❌ Conversation not initialized (toUserId: $toUserId, currentUserId: $currentUserId)');
         }
         return;
       }
@@ -261,21 +261,21 @@ class ChatController extends GetxController {
       
       if (!isForThisConversation) {
         if (kDebugMode) {
-          print('❌ [CHECKPOINT 6] ❌ Message NOT for this conversation - IGNORING');
+          print('❌ Message NOT for this conversation - IGNORING');
           print('   This message is for a different conversation');
         }
         return;
       }
       
       if (kDebugMode) {
-        print('✅ [CHECKPOINT 6] ✅ Message IS for this conversation');
+        print('✅ Message IS for this conversation');
         print('   Type: ${isIncomingMessage ? "INCOMING" : "OUTGOING"}');
       }
       
       // Duplicate protection
       if (receivedMessageIds.contains(message.id)) {
         if (kDebugMode) {
-          print('⏭️  [CHECKPOINT 6] Duplicate message - already received (id: ${message.id})');
+          print('⏭️  Duplicate message - already received (id: ${message.id})');
         }
         return;
       }
@@ -286,13 +286,11 @@ class ChatController extends GetxController {
       _addMessageSorted(message);
 
       if (kDebugMode) {
-        print('═══════════════════════════════════════════════════════════');
-        print('🎉 [CHECKPOINT 7] ✅✅✅ MESSAGE ADDED SUCCESSFULLY ✅✅✅');
+        print('🎉 [UI UPDATED] ✅✅✅ MESSAGE ADDED SUCCESSFULLY ✅✅✅');
         print('   Message ID: ${message.id}');
         print('   Type: ${isIncomingMessage ? "INCOMING" : "OUTGOING"}');
         print('   Total messages: ${messages.length}');
-        print('   ⚠️  UI should rebuild now via Obx');
-        print('═══════════════════════════════════════════════════════════');
+        print('   ✅ UI should rebuild now via Obx');
       }
 
       // Notify InboxController to update conversation preview
@@ -307,10 +305,10 @@ class ChatController extends GetxController {
 
   /// Add message to list in sorted order (by createdAt asc, then id asc)
   /// 
-  /// CRITICAL: Uses messages.insert() which triggers Obx rebuild
+  /// CRITICAL: Creates new list to ensure Obx rebuilds UI properly
   void _addMessageSorted(MessageModel message) {
     if (kDebugMode) {
-      print('🔄 [CHECKPOINT 7] Adding message to list');
+      print('🔄 [MESSAGE ADDED] Adding message to list');
       print('   Message ID: ${message.id}');
       print('   Current messages.length: ${messages.length}');
     }
@@ -335,14 +333,18 @@ class ChatController extends GetxController {
       }
     }
 
-    // CRITICAL: Use insert() which triggers Obx rebuild
-    messages.insert(insertIndex, message);
+    // CRITICAL FIX: Create new list to ensure Obx detects change and rebuilds UI
+    // RxList.insert() sometimes doesn't trigger Obx rebuilds reliably
+    final newMessages = List<MessageModel>.from(messages);
+    newMessages.insert(insertIndex, message);
+    messages.value = newMessages; // This explicitly triggers Obx rebuild
     
     if (kDebugMode) {
-      print('✅ [CHECKPOINT 7] ✅ Message added to list');
+      print('✅ [MESSAGE ADDED] ✅ Message added to list');
       print('   Inserted at index: $insertIndex');
       print('   New messages.length: ${messages.length}');
-      print('   ⚠️  Obx should detect change and rebuild UI');
+      print('   ✅ Obx will detect change and rebuild UI');
+      print('═══════════════════════════════════════════════════════════');
     }
   }
 

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../../core/routes/app_routes.dart';
 import '../../services/network_caller.dart';
 import '../../services/urls.dart';
 import '../../services/user_info.dart';
+import '../../utils/gender_mapper.dart';
 
 class ProfileDataOnboardingController extends GetxController {
   // Text controllers
@@ -81,13 +83,22 @@ class ProfileDataOnboardingController extends GetxController {
     errorMessage.value = '';
 
     try {
+      // Map Flutter gender value to backend format
+      final backendGender = GenderMapper.mapToBackend(selectedGender.value);
+      
+      if (kDebugMode) {
+        print('🔍 [ProfileDataOnboarding] Gender mapping:');
+        print('   Flutter value: "${selectedGender.value}"');
+        print('   Backend value: "$backendGender"');
+      }
+      
       final response = await NetworkCaller.postRequest(
         url: Urls.update_users,
         body: {
           'api_token': token,
           'fullname': nameController.text.trim(),
           'date_of_birth': formatDateForApi(selectedDate.value!),
-          'gender': selectedGender.value,
+          'gender': backendGender, // Use mapped backend value
         },
       );
 

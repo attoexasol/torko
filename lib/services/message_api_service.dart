@@ -51,28 +51,64 @@ class MessageApiService {
       if (response.isSuccess && response.body != null) {
         final body = response.body!;
         
-        // API returns: { "sent": [ ... ] }
+        if (kDebugMode) {
+          print('═══════════════════════════════════════════════════════════');
+          print('🔍 [fetchInbox] Parsing API response');
+          print('   Response keys: ${body.keys.toList()}');
+          print('   Has "sent": ${body.containsKey("sent")}');
+          print('   Has "data": ${body.containsKey("data")}');
+          print('   Has "status": ${body.containsKey("status")}');
+        }
+        
+        // API returns either: { "sent": [ ... ] } OR { "status": true, "data": [ ... ] }
+        List<dynamic> messagesList = [];
+        
         if (body.containsKey('sent') && body['sent'] is List) {
-          final List<dynamic> sentList = body['sent'];
-          final conversations = sentList
-              .map((item) => ConversationItemModel.fromJson(item))
-              .toList();
-          
-          // Sort by createdAt desc (newest first)
-          conversations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          
+          // Format 1: { "sent": [ ... ] }
+          messagesList = body['sent'] as List<dynamic>;
           if (kDebugMode) {
-            print('DEBUG MessageApiService.fetchInbox: Loaded ${conversations.length} conversations');
+            print('✅ [fetchInbox] Found "sent" array with ${messagesList.length} messages');
           }
-          
-          return conversations;
+        } else if (body.containsKey('data') && body['data'] is List && body['status'] == true) {
+          // Format 2: { "status": true, "data": [ ... ] }
+          messagesList = body['data'] as List<dynamic>;
+          if (kDebugMode) {
+            print('✅ [fetchInbox] Found "data" array with ${messagesList.length} messages');
+          }
         } else {
           // Empty inbox or unexpected format
           if (kDebugMode) {
-            print('DEBUG MessageApiService.fetchInbox: No "sent" array in response, returning empty list');
+            print('❌ [fetchInbox] No "sent" or "data" array in response, returning empty list');
+            print('   Response body: ${jsonEncode(body)}');
           }
           return [];
         }
+        
+        // Parse messages
+        final conversations = messagesList
+            .map((item) {
+              try {
+                return ConversationItemModel.fromJson(item);
+              } catch (e) {
+                if (kDebugMode) {
+                  print('❌ [fetchInbox] Error parsing conversation item: $e');
+                  print('   Item: ${jsonEncode(item)}');
+                }
+                return null;
+              }
+            })
+            .whereType<ConversationItemModel>()
+            .toList();
+        
+        // Sort by createdAt desc (newest first)
+        conversations.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        
+        if (kDebugMode) {
+          print('✅ [fetchInbox] Loaded ${conversations.length} conversations');
+          print('═══════════════════════════════════════════════════════════');
+        }
+        
+        return conversations;
       } else {
         final errorMessage = response.errorMessage ?? 'Failed to load conversations';
         throw MessageApiException(errorMessage, response.statusCode);
