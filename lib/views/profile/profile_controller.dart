@@ -23,8 +23,10 @@ class ProfileController extends GetxController {
   // ==================== Observable States ====================
   // Edit mode
   final RxBool isEditMode = false.obs;
+  final RxBool isBioEditing = false.obs; // Separate state for bio-only editing
   final RxBool isLoading = false.obs;
   final RxBool isSaving = false.obs;
+  final RxBool isSavingBio = false.obs; // Separate state for bio saving
   final RxBool isUploadingProfile = false.obs;
   final RxBool isUploadingCover = false.obs;
 
@@ -237,6 +239,101 @@ class ProfileController extends GetxController {
     locationController.text = _savedAddress;
     bioController.text = _savedBio;
     isEditMode.value = false;
+  }
+
+  // ==================== Bio-Only Editing ====================
+  void enterBioEditMode() {
+    bioController.text = _savedBio;
+    isBioEditing.value = true;
+  }
+
+  void cancelBioEdit() {
+    bioController.text = _savedBio;
+    isBioEditing.value = false;
+  }
+
+  Future<bool> saveBio() async {
+    if (isSavingBio.value) return false;
+
+    final token = UserInfo.getToken();
+    if (token == null || token.isEmpty) {
+      _showErrorSnackbar('Session expired. Please login again.');
+      Get.offAllNamed(AppRoutes.login);
+      return false;
+    }
+
+    isSavingBio.value = true;
+
+    // Get new bio value
+    final newBio = bioController.text.trim();
+
+    try {
+      final response = await NetworkCaller.postRequest(
+        url: Urls.update_users,
+        body: {
+          'api_token': token,
+          'bio': newBio,
+        },
+      );
+
+      if (response.isSuccess && response.body != null) {
+        final data = response.body!;
+
+        if (data['status'] == true && data['data'] != null) {
+          // Save to UserInfo from API response
+          await UserInfo.saveUserProfile(data['data']);
+
+          // Update saved bio
+          _savedBio = newBio;
+
+          // Optimistic UI update - only after successful save
+          bio.value = newBio;
+          isBioEditing.value = false;
+
+          // Also save to SharedPreferences for legacy support
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('torko_profile_bio', newBio);
+          
+          // Update profile JSON
+          final profileStr = prefs.getString('torko_user_profile');
+          if (profileStr != null) {
+            try {
+              final profile = jsonDecode(profileStr);
+              profile['bio'] = newBio;
+              await prefs.setString('torko_user_profile', jsonEncode(profile));
+            } catch (_) {}
+          }
+
+          // Mark bio step completed if bio is not empty
+          if (newBio.isNotEmpty) {
+            await _markStepCompleted(2);
+          }
+
+          _showSuccessSnackbar('Bio updated successfully');
+          
+          isSavingBio.value = false;
+          return true; // Return true on success
+        } else {
+          // Revert on API error
+          bioController.text = _savedBio;
+          _showErrorSnackbar(data['message'] ?? 'Failed to update bio');
+          isSavingBio.value = false;
+          return false; // Return false on error
+        }
+      } else {
+        // Revert on request error
+        bioController.text = _savedBio;
+        _showErrorSnackbar(response.errorMessage ?? 'Failed to update bio');
+        isSavingBio.value = false;
+        return false; // Return false on error
+      }
+    } catch (e) {
+      // Revert on exception
+      bioController.text = _savedBio;
+      _showErrorSnackbar('Network error: ${e.toString()}');
+      isSavingBio.value = false;
+      return false; // Return false on error
+    }
   }
 
   // ==================== Save Profile ====================

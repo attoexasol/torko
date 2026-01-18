@@ -348,10 +348,8 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
             _buildProfilePicture(isDark),
             _buildNameSection(isDark),
             _buildLocationSection(isDark),
-                if (!controller.isEditMode.value && controller.bio.value.isNotEmpty)
-                  _buildBioDisplay(isDark),
-                if (controller.isEditMode.value) _buildBioField(isDark, isBn),
-                if (controller.isEditMode.value) _buildEditButtons(isDark, isBn),
+            // Always show bio display (tappable to edit)
+            _buildBioDisplay(isDark),
             _buildStats(isDark, isBn),
                 if (!controller.isProfileComplete) _buildProfileCompletionCard(isDark, isBn),
             _buildTabs(isDark, isBn),
@@ -388,12 +386,12 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                     child: _buildProfileImage(),
               ),
             ),
-                // Edit button
+                // Edit button - only opens profile image picker
             Positioned(
               bottom: 0,
               right: 0,
               child: GestureDetector(
-                    onTap: controller.enterEditMode,
+                    onTap: controller.pickProfileImage, // Directly open image picker
                 child: Container(
                   width: 28,
                   height: 28,
@@ -405,28 +403,23 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                 ),
               ),
             ),
-                // Camera overlay when in edit mode
-                if (controller.isEditMode.value)
+                // Camera overlay when uploading
+                if (controller.isUploadingProfile.value)
               Positioned.fill(
-                child: GestureDetector(
-                      onTap: controller.pickProfileImage,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      shape: BoxShape.circle,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
                     ),
-                        child: controller.isUploadingProfile.value
-                            ? const Center(
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              )
-                            : const Icon(Icons.camera_alt, color: Colors.white, size: 24),
                   ),
                 ),
               ),
@@ -461,46 +454,15 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
       offset: const Offset(0, -50),
       child: Padding(
         padding: const EdgeInsets.only(top: 0, bottom: 8),
-        child: Obx(() => controller.isEditMode.value
-            ? Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: TextField(
-                  controller: controller.nameController,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? Colors.white : const Color(0xFF0f1419),
-                  ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(
-                        color: isDark
-                            ? const Color(0xFF0d3a4a)
-                            : Colors.black.withOpacity(0.1),
-                        width: 2,
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: AppColors.lightPrimary, width: 2),
-                    ),
-                  ),
-                ),
-              )
-            : Text(
-                controller.name.value,
-                style: GoogleFonts.inter(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: isDark ? Colors.white : const Color(0xFF0f1419),
-                ),
-                textAlign: TextAlign.center,
-              )),
+        child: Obx(() => Text(
+              controller.name.value,
+              style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDark ? Colors.white : const Color(0xFF0f1419),
+              ),
+              textAlign: TextAlign.center,
+            )),
       ),
     );
   }
@@ -512,171 +474,212 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
       offset: const Offset(0, -50),
       child: Padding(
         padding: const EdgeInsets.only(bottom: 8),
-        child: Obx(() => controller.isEditMode.value
-            ? Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.location_on, size: 14, color: AppColors.lightPrimary),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Container(
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? const Color(0xFF1A3B43)
-                            : const Color(0xFFFAFAF8),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: TextField(
-                        controller: controller.locationController,
-                        textAlign: TextAlign.left,
-                        style: GoogleFonts.roboto(
-                          fontSize: 16,
-                          color: isDark
-                              ? const Color(0xFFE0E0E0)
-                              : const Color(0xFF2C2C2E),
-                        ),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 18),
-                        ),
-                      ),
-                    ),
+        child: Obx(() => Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.location_on, size: 14, color: AppColors.lightPrimary),
+                const SizedBox(width: 6),
+                Text(
+                  controller.address.value,
+                  style: GoogleFonts.roboto(
+                    fontSize: 14,
+                    color: isDark
+                        ? const Color(0xFF8e8e8e)
+                        : const Color(0xFF536471),
                   ),
-                ],
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.location_on, size: 14, color: AppColors.lightPrimary),
-                  const SizedBox(width: 6),
-                  Text(
-                    controller.address.value,
-                    style: GoogleFonts.roboto(
-                      fontSize: 14,
-                      color: isDark
-                          ? const Color(0xFF8e8e8e)
-                          : const Color(0xFF536471),
-                    ),
-                  ),
-                ],
-              )),
+                ),
+              ],
+            )),
       ),
     );
   }
 
   Widget _buildBioDisplay(bool isDark) {
     final controller = widget.controller;
+    final isBn = widget.isBn;
 
     return Transform.translate(
       offset: const Offset(0, -50),
       child: Padding(
         padding: const EdgeInsets.only(bottom: 16),
-        child: Obx(() => Text(
-              controller.bio.value,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.roboto(
-                fontSize: 13,
-                color: isDark ? const Color(0xFF9e9e9e) : const Color(0xFF657786),
-                height: 1.4,
+        child: Obx(() {
+          final bioText = controller.bio.value.isNotEmpty 
+              ? controller.bio.value 
+              : (isBn ? 'বায়ো যোগ করুন' : 'Add bio');
+          
+          return GestureDetector(
+            onTap: () => _showBioEditDialog(isDark, isBn),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: isDark 
+                    ? const Color(0xFF1A1A1A).withValues(alpha: 0.5)
+                    : const Color(0xFFF5F6F7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark 
+                      ? const Color(0xFF3A3A3A)
+                      : const Color(0xFFE0E0E0),
+                  width: 1,
+                ),
               ),
-            )),
+              child: Text(
+                bioText,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.roboto(
+                  fontSize: 13,
+                  color: controller.bio.value.isNotEmpty
+                      ? (isDark ? const Color(0xFF9e9e9e) : const Color(0xFF657786))
+                      : (isDark ? const Color(0xFF6e6e6e) : const Color(0xFF9CA3AF)),
+                  height: 1.4,
+                  fontStyle: controller.bio.value.isEmpty ? FontStyle.italic : FontStyle.normal,
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
 
-  Widget _buildBioField(bool isDark, bool isBn) {
+  void _showBioEditDialog(bool isDark, bool isBn) {
     final controller = widget.controller;
+    
+    // Initialize bio controller with current bio
+    controller.bioController.text = controller.bio.value;
+    controller.isBioEditing.value = true;
 
-    return Transform.translate(
-      offset: const Offset(0, -50),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: TextField(
-          controller: controller.bioController,
-          maxLength: 200,
-          maxLines: 3,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.roboto(
-            fontSize: 14,
-            color: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF2C2C2E),
-          ),
-          decoration: InputDecoration(
-            hintText: isBn ? 'একটি সংক্ষিপ্ত বায়ো লিখুন' : 'Write a short bio',
-            hintStyle: GoogleFonts.roboto(
-              fontSize: 14,
-              color: isDark ? const Color(0xFF6e6e6e) : const Color(0xFF9CA3AF),
-            ),
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: isDark
-                    ? const Color(0xFF0d3a4a)
-                    : Colors.black.withOpacity(0.1),
-                width: 1,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: AppColors.lightPrimary, width: 2),
-            ),
-            counterStyle: GoogleFonts.roboto(
-              fontSize: 11,
-              color: isDark ? const Color(0xFF6e6e6e) : const Color(0xFF9CA3AF),
-            ),
-          ),
-              ),
-      ),
-    );
-  }
-  
-  Widget _buildEditButtons(bool isDark, bool isBn) {
-    final controller = widget.controller;
-
-    return Transform.translate(
-      offset: const Offset(0, -50),
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 20),
-        child: Obx(() => Row(
+    Get.bottomSheet(
+      Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0a2f3d) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(Get.context!).padding.bottom,
+          top: 20,
+          left: 20,
+          right: 20,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: GestureDetector(
-                    onTap: controller.isSaving.value ? null : controller.cancelEdit,
-                child: Container(
-                  height: 40,
-                  decoration: BoxDecoration(
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  isBn ? 'বায়ো সম্পাদনা করুন' : 'Edit Bio',
+                  style: GoogleFonts.roboto(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF0f1419),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    controller.cancelBioEdit();
+                    Get.back();
+                  },
+                  child: Icon(
+                    Icons.close,
+                    color: isDark ? Colors.white : const Color(0xFF0f1419),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            // Bio TextField
+            TextField(
+              controller: controller.bioController,
+              maxLength: 200,
+              maxLines: 4,
+              style: GoogleFonts.roboto(
+                fontSize: 14,
+                color: isDark ? const Color(0xFFE0E0E0) : const Color(0xFF2C2C2E),
+              ),
+              decoration: InputDecoration(
+                hintText: isBn ? 'একটি সংক্ষিপ্ত বায়ো লিখুন' : 'Write a short bio',
+                hintStyle: GoogleFonts.roboto(
+                  fontSize: 14,
+                  color: isDark ? const Color(0xFF6e6e6e) : const Color(0xFF9CA3AF),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(
+                    color: isDark
+                        ? const Color(0xFF0d3a4a)
+                        : Colors.black.withOpacity(0.1),
+                    width: 1,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: AppColors.lightPrimary, width: 2),
+                ),
+                counterStyle: GoogleFonts.roboto(
+                  fontSize: 11,
+                  color: isDark ? const Color(0xFF6e6e6e) : const Color(0xFF9CA3AF),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Action Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: controller.isSavingBio.value
+                        ? null
+                        : () {
+                            controller.cancelBioEdit();
+                            Get.back();
+                          },
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
                         color: isDark
                             ? const Color(0xFF0d3a4a)
                             : const Color(0xFFf0f0f0),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Text(
-                      isBn ? 'বাতিল' : 'Cancel',
-                      style: GoogleFonts.roboto(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: isDark ? Colors.white : Colors.black,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          isBn ? 'বাতিল' : 'Cancel',
+                          style: GoogleFonts.roboto(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: GestureDetector(
-                    onTap: controller.isSaving.value ? null : controller.saveProfile,
-                child: Container(
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.lightPrimary,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                        child: controller.isSaving.value
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Obx(() => GestureDetector(
+                    onTap: controller.isSavingBio.value
+                        ? null
+                        : () async {
+                            // Save bio and close dialog
+                            final success = await controller.saveBio();
+                            if (success) {
+                              Get.back(); // Close dialog only on success
+                            }
+                          },
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.lightPrimary,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: controller.isSavingBio.value
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
@@ -686,22 +689,28 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                                 ),
                               )
                             : Text(
-                      isBn ? 'সংরক্ষণ করুন' : 'Save',
-                      style: GoogleFonts.roboto(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white,
+                                isBn ? 'সংরক্ষণ করুন' : 'Save',
+                                style: GoogleFonts.roboto(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
-                  ),
+                  )),
                 ),
-              ),
+              ],
             ),
+            const SizedBox(height: 10),
           ],
-            )),
+        ),
       ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
     );
   }
+
   
   Widget _buildStats(bool isDark, bool isBn) {
     return Transform.translate(
