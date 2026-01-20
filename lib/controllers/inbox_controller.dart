@@ -202,6 +202,7 @@ class InboxController extends GetxController {
       
       if (kDebugMode) {
         print('✅ [fetchInbox] Grouped into ${threads.length} unique threads');
+        print('🔧 Inbox threads=${threads.length}');
         for (var thread in threads.take(5)) {
           print('   - User ${thread.otherUserId} (${thread.otherName}): "${thread.lastMessage}" (${thread.unreadCount} unread)');
         }
@@ -228,10 +229,19 @@ class InboxController extends GetxController {
   }
 
   /// Navigate to conversation from inbox thread
+  /// Uses standardized argument format: to_user_id, fullname, profile_image
   void openThreadFromInbox(InboxThreadModel thread) {
+    if (kDebugMode) {
+      print('🔍 [InboxController] Opening conversation with user ${thread.otherUserId}');
+    }
+    
     Get.toNamed(
       AppRoutes.conversation,
       arguments: {
+        'to_user_id': thread.otherUserId,
+        'fullname': thread.otherName,
+        'profile_image': thread.otherAvatar,
+        // Legacy support
         'toUserId': thread.otherUserId,
         'receiverName': thread.otherName,
         'receiverAvatar': thread.otherAvatar,
@@ -304,10 +314,19 @@ class InboxController extends GetxController {
   }
 
   /// Navigate to conversation from search result
+  /// Uses standardized argument format: to_user_id, fullname, profile_image
   void openThreadFromSearch(SearchMessageResultModel item) {
+    if (kDebugMode) {
+      print('🔍 [InboxController] Opening conversation from search with user ${item.user.id}');
+    }
+    
     Get.toNamed(
       AppRoutes.conversation,
       arguments: {
+        'to_user_id': item.user.id,
+        'fullname': item.user.fullname,
+        'profile_image': item.user.profileImage,
+        // Legacy support
         'toUserId': item.user.id,
         'receiverName': item.user.fullname,
         'receiverAvatar': item.user.profileImage,

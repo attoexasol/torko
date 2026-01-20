@@ -63,30 +63,60 @@ class _ConversationViewState extends State<ConversationView> {
       print('🔧 ConversationView._initializeChat: Initializing chat');
     }
     
+    final token = UserInfo.apiToken;
+    if (kDebugMode) {
+      print('🔧 DM open tokenLen=${token?.length ?? 0}');
+    }
+    
     // Try route arguments first (from inbox navigation)
+    // Support both standardized format (to_user_id, fullname, profile_image) and legacy format
     final args = Get.arguments;
     if (args != null && args is Map<String, dynamic>) {
-      final toUserId = args['toUserId'];
-      if (toUserId != null && toUserId is int) {
+      // Try standardized format first
+      int? toUserId = args['to_user_id'] is int 
+          ? args['to_user_id'] 
+          : (args['to_user_id'] != null ? int.tryParse(args['to_user_id'].toString()) : null);
+      
+      // Fallback to legacy format
+      if (toUserId == null || toUserId == 0) {
+        toUserId = args['toUserId'] is int 
+            ? args['toUserId'] 
+            : (args['toUserId'] != null ? int.tryParse(args['toUserId'].toString()) : null);
+      }
+      
+      if (toUserId != null && toUserId > 0) {
         _conversationArgs = args;
+        
+        // Get receiver info (standardized or legacy)
+        final receiverName = args['fullname']?.toString() ?? args['receiverName']?.toString();
+        final receiverAvatar = args['profile_image']?.toString() ?? args['receiverAvatar']?.toString();
         
         if (kDebugMode) {
           print('🔧 ConversationView._initializeChat: Calling chatController.init()');
           print('   toUserId: $toUserId');
+          print('   receiverName: $receiverName');
         }
         
         await chatController.init(
           toUserId: toUserId,
-          receiverName: args['receiverName']?.toString(),
-          receiverAvatar: args['receiverAvatar']?.toString(),
+          receiverName: receiverName,
+          receiverAvatar: receiverAvatar,
         );
         
         if (kDebugMode) {
           print('🔧 ConversationView._initializeChat: Chat initialized, setting up scroll');
+          print('🔧 DM response count=${chatController.messages.length}');
         }
         
         // Scroll to bottom after initial load
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(force: true));
+        return;
+      } else {
+        // Invalid user ID
+        if (kDebugMode) {
+          print('❌ ConversationView._initializeChat: Invalid toUserId - showing error');
+        }
+        chatController.errorMessage.value = 'Invalid user';
         return;
       }
     }
@@ -288,6 +318,44 @@ class _ConversationViewState extends State<ConversationView> {
                 // CRITICAL: Access messages.length explicitly to ensure Obx tracks changes
                 final messageCount = chatController.messages.length;
                 final isLoading = chatController.isLoading.value;
+                final errorMsg = chatController.errorMessage.value;
+                
+                // Show error if invalid user or other error
+                if (errorMsg.isNotEmpty && !isLoading) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          errorMsg == 'Invalid user' 
+                              ? (isBn ? 'অবৈধ ব্যবহারকারী' : 'Invalid user')
+                              : errorMsg,
+                          style: TextStyle(
+                            color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () => Get.back(),
+                          icon: const Icon(Icons.arrow_back),
+                          label: Text(isBn ? 'ফিরে যান' : 'Go Back'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.lightPrimary,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
                 
                 if (isLoading) {
                   return Center(

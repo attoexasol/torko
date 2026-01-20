@@ -77,12 +77,24 @@ class ChatController extends GetxController {
   /// CRITICAL: Never called again (Pusher handles new messages)
   /// Merges with existing messages without duplicates
   Future<void> loadConversation() async {
-    if (toUserId == null) return;
+    if (toUserId == null) {
+      if (kDebugMode) {
+        print('❌ ChatController.loadConversation: toUserId is null');
+      }
+      return;
+    }
 
     final token = UserInfo.apiToken;
     if (token == null || token.isEmpty) {
+      if (kDebugMode) {
+        print('❌ ChatController.loadConversation: Token is null or empty');
+      }
       errorMessage.value = 'User not logged in';
       return;
+    }
+
+    if (kDebugMode) {
+      print('🔧 DM open toUserId=$toUserId tokenLen=${token.length}');
     }
 
     isLoading.value = true;
@@ -93,6 +105,10 @@ class ChatController extends GetxController {
         token: token,
         toUserId: toUserId!,
       );
+      
+      if (kDebugMode) {
+        print('🔧 DM response count=${history.length}');
+      }
 
       // Merge with existing messages (avoid duplicates)
       final existingIds = receivedMessageIds.toSet();
