@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/message_model.dart';
 import '../models/conversation_item_model.dart';
+import '../models/message_row_model.dart';
+import '../models/search_message_result_model.dart';
 import '../services/network_caller.dart';
 import '../services/urls.dart';
 
@@ -18,7 +20,108 @@ class MessageApiException implements Exception {
 
 /// Service for message-related API calls
 class MessageApiService {
-  /// Fetch inbox/conversation list
+  /// Fetch raw message rows from inbox API
+  /// 
+  /// [token] - User's API token
+  /// 
+  /// Returns list of raw message rows (not grouped)
+  /// Throws [MessageApiException] on failure
+  static Future<List<MessageRowModel>> fetchInboxRows({
+    required String token,
+  }) async {
+    final url = Urls.get_Message_API;
+    final requestBody = {
+      'api_token': token,
+    };
+
+    if (kDebugMode) {
+      print('DEBUG MessageApiService.fetchInboxRows: POST $url');
+      print('DEBUG Request Body: ${jsonEncode(requestBody)}');
+    }
+
+    try {
+      final response = await NetworkCaller.postRequest(
+        url: url,
+        body: requestBody,
+      );
+
+      if (kDebugMode) {
+        print('DEBUG MessageApiService.fetchInboxRows - Response Status: ${response.statusCode}');
+        print('DEBUG Response Body: ${response.body != null ? jsonEncode(response.body) : 'null'}');
+      }
+
+      if (response.isSuccess && response.body != null) {
+        final body = response.body!;
+        
+        if (kDebugMode) {
+          print('═══════════════════════════════════════════════════════════');
+          print('🔍 [fetchInboxRows] Parsing API response');
+          print('   Response keys: ${body.keys.toList()}');
+          print('   Has "sent": ${body.containsKey("sent")}');
+          print('   Has "data": ${body.containsKey("data")}');
+          print('   Has "status": ${body.containsKey("status")}');
+        }
+        
+        // API returns either: { "sent": [ ... ] } OR { "status": true, "data": [ ... ] }
+        List<dynamic> messagesList = [];
+        
+        if (body.containsKey('sent') && body['sent'] is List) {
+          // Format 1: { "sent": [ ... ] }
+          messagesList = body['sent'] as List<dynamic>;
+          if (kDebugMode) {
+            print('✅ [fetchInboxRows] Found "sent" array with ${messagesList.length} messages');
+          }
+        } else if (body.containsKey('data') && body['data'] is List && body['status'] == true) {
+          // Format 2: { "status": true, "data": [ ... ] }
+          messagesList = body['data'] as List<dynamic>;
+          if (kDebugMode) {
+            print('✅ [fetchInboxRows] Found "data" array with ${messagesList.length} messages');
+          }
+        } else {
+          // Empty inbox or unexpected format
+          if (kDebugMode) {
+            print('❌ [fetchInboxRows] No "sent" or "data" array in response, returning empty list');
+            print('   Response body: ${jsonEncode(body)}');
+          }
+          return [];
+        }
+        
+        // Parse messages as MessageRowModel
+        final rows = messagesList
+            .map((item) {
+              try {
+                return MessageRowModel.fromJson(item);
+              } catch (e) {
+                if (kDebugMode) {
+                  print('❌ [fetchInboxRows] Error parsing message row: $e');
+                  print('   Item: ${jsonEncode(item)}');
+                }
+                return null;
+              }
+            })
+            .whereType<MessageRowModel>()
+            .toList();
+        
+        if (kDebugMode) {
+          print('✅ [fetchInboxRows] Loaded ${rows.length} message rows');
+          print('═══════════════════════════════════════════════════════════');
+        }
+        
+        return rows;
+      } else {
+        final errorMessage = response.errorMessage ?? 'Failed to load messages';
+        throw MessageApiException(errorMessage, response.statusCode);
+      }
+    } catch (e) {
+      if (e is MessageApiException) {
+        rethrow;
+      } else {
+        throw MessageApiException('Unexpected error: ${e.toString()}');
+      }
+    }
+  }
+
+  /// Fetch inbox/conversation list (legacy - uses old model)
   /// 
   /// [token] - User's API token
   /// 
@@ -260,6 +363,89 @@ class MessageApiService {
         }
       } else {
         final errorMessage = response.errorMessage ?? 'Network error occurred';
+        throw MessageApiException(errorMessage, response.statusCode);
+      }
+    } catch (e) {
+      if (e is MessageApiException) {
+        rethrow;
+      } else {
+        throw MessageApiException('Unexpected error: ${e.toString()}');
+      }
+    }
+  }
+
+  /// Search messages/users by keyword
+  /// 
+  /// [token] - User's API token
+  /// [keyword] - Search keyword
+  /// 
+  /// Returns list of search results with user and last message
+  /// Throws [MessageApiException] on failure
+  static Future<List<SearchMessageResultModel>> searchMessages({
+    required String token,
+    required String keyword,
+  }) async {
+    if (keyword.trim().isEmpty) {
+      return [];
+    }
+
+    final url = Urls.message_search;
+    final requestBody = {
+      'api_token': token,
+      'keyword': keyword.trim(),
+    };
+
+    if (kDebugMode) {
+      print('DEBUG MessageApiService.searchMessages: POST $url');
+      print('DEBUG Request Body: ${jsonEncode(requestBody)}');
+    }
+
+    try {
+      final response = await NetworkCaller.postRequest(
+        url: url,
+        body: requestBody,
+      );
+
+      if (kDebugMode) {
+        print('DEBUG MessageApiService.searchMessages - Response Status: ${response.statusCode}');
+        print('DEBUG Response Body: ${response.body != null ? jsonEncode(response.body) : 'null'}');
+      }
+
+      if (response.isSuccess && response.body != null) {
+        final body = response.body!;
+        
+        // API returns: { "status": true, "data": [ ... ] }
+        if (body['status'] == true && body.containsKey('data') && body['data'] is List) {
+          final List<dynamic> dataList = body['data'];
+          final results = dataList
+              .map((item) {
+                try {
+                  return SearchMessageResultModel.fromJson(item);
+                } catch (e) {
+                  if (kDebugMode) {
+                    print('DEBUG MessageApiService.searchMessages: Error parsing result item: $e');
+                    print('   Item: ${jsonEncode(item)}');
+                  }
+                  return null;
+                }
+              })
+              .whereType<SearchMessageResultModel>()
+              .toList();
+          
+          if (kDebugMode) {
+            print('DEBUG MessageApiService.searchMessages: Loaded ${results.length} search results');
+          }
+          
+          return results;
+        } else {
+          // Empty results or unexpected format
+          if (kDebugMode) {
+            print('DEBUG MessageApiService.searchMessages: No "data" array or status != true, returning empty list');
+          }
+          return [];
+        }
+      } else {
+        final errorMessage = response.errorMessage ?? 'Failed to search messages';
         throw MessageApiException(errorMessage, response.statusCode);
       }
     } catch (e) {

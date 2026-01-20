@@ -6,7 +6,8 @@ import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../controllers/navigation_controller.dart';
 import '../../controllers/inbox_controller.dart';
-import '../../models/conversation_item_model.dart';
+import '../../models/inbox_thread_model.dart';
+import '../../models/search_message_result_model.dart';
 import '../../widgets/bottom_nav.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -28,11 +29,11 @@ class _MessagesViewState extends State<MessagesView> {
       print('🔍 [MessagesView] MessagesView opened');
     }
     
-    // Get or create InboxController
-    inboxController = Get.put(InboxController(), permanent: false);
+    // Get or create InboxController (permanent so it persists)
+    inboxController = Get.put(InboxController(), permanent: true);
     
-    // Ensure inbox is loaded
-    if (inboxController.conversations.isEmpty && !inboxController.isLoading.value) {
+    // Ensure inbox is loaded if empty
+    if (inboxController.threads.isEmpty && !inboxController.loading.value) {
       if (kDebugMode) {
         print('🔄 [MessagesView] Calling fetchInbox() from initState');
       }
@@ -57,6 +58,7 @@ class _MessagesViewState extends State<MessagesView> {
         backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
         body: Stack(
           children: [
+            // Main content
             RefreshIndicator(
               onRefresh: () => inboxController.refresh(),
               child: CustomScrollView(
@@ -81,88 +83,13 @@ class _MessagesViewState extends State<MessagesView> {
                   // Search Bar
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Container(
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.darkCard : AppColors.lightCard,
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                        child: TextField(
-                          style: TextStyle(
-                            color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
-                            fontSize: 15,
-                          ),
-                          decoration: InputDecoration(
-                            hintText: language == AppLanguage.bn ? 'খুঁজুন...' : 'Search...',
-                            hintStyle: TextStyle(
-                              color: isDark
-                                  ? AppColors.darkMutedForeground
-                                  : AppColors.lightMutedForeground,
-                            ),
-                            prefixIcon: Icon(
-                              Icons.search,
-                              size: 20,
-                              color: isDark
-                                  ? AppColors.darkMutedForeground
-                                  : AppColors.lightMutedForeground,
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(22),
-                              borderSide: BorderSide.none,
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(22),
-                              borderSide: BorderSide.none,
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(22),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                        ),
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: _buildSearchBar(isDark, language),
                     ),
                   ),
 
-                  // Loading State
-                  if (inboxController.isLoading.value)
-                    SliverFillRemaining(
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          color: AppColors.lightPrimary,
-                        ),
-                      ),
-                    )
-                  // Empty State
-                  else if (inboxController.conversations.isEmpty && inboxController.errorMessage.isEmpty)
-                    SliverFillRemaining(
-                      child: Center(
-                        child: Text(
-                          language == AppLanguage.bn ? 'কোন কথোপকথন নেই' : 'No conversations',
-                          style: TextStyle(
-                            color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
-                          ),
-                        ),
-                      ),
-                    )
-                  // Conversations List
-                  else
-                    SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final conversation = inboxController.conversations[index];
-                          return _buildConversationItem(
-                            conversation: conversation,
-                            isDark: isDark,
-                            language: language,
-                            onTap: () => inboxController.openConversation(conversation),
-                          );
-                        },
-                        childCount: inboxController.conversations.length,
-                      ),
-                    ),
+                  // Body Content
+                  Obx(() => _buildBody(isDark, language)),
                   
                   // Bottom padding for nav
                   const SliverToBoxAdapter(
@@ -188,18 +115,385 @@ class _MessagesViewState extends State<MessagesView> {
     });
   }
 
-  Widget _buildConversationItem({
-    required ConversationItemModel conversation,
+  Widget _buildSearchBar(bool isDark, AppLanguage language) {
+    return Obx(() {
+      final showClear = inboxController.isSearchMode.value || 
+                      inboxController.searchEC.text.isNotEmpty;
+      return Container(
+        height: 44,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: isDark 
+                ? AppColors.darkMutedForeground.withOpacity(0.1)
+                : AppColors.lightMutedForeground.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: TextField(
+          controller: inboxController.searchEC,
+          style: TextStyle(
+            color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+            fontSize: 15,
+          ),
+          onSubmitted: (_) => inboxController.onSubmitSearch(),
+          decoration: InputDecoration(
+            hintText: language == AppLanguage.bn ? 'খুঁজুন...' : 'Search...',
+            hintStyle: TextStyle(
+              color: isDark
+                  ? AppColors.darkMutedForeground
+                  : AppColors.lightMutedForeground,
+            ),
+            prefixIcon: IconButton(
+              onPressed: () => inboxController.onSubmitSearch(),
+              icon: Icon(
+                Icons.search,
+                size: 20,
+                color: isDark
+                    ? AppColors.darkMutedForeground
+                    : AppColors.lightMutedForeground,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+            suffixIcon: showClear
+                ? IconButton(
+                    onPressed: () => inboxController.clearSearch(),
+                    icon: Icon(
+                      Icons.clear,
+                      size: 20,
+                      color: isDark
+                          ? AppColors.darkMutedForeground
+                          : AppColors.lightMutedForeground,
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  )
+                : null,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(22),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(22),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(22),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildBody(bool isDark, AppLanguage language) {
+    if (inboxController.isSearchMode.value) {
+      // SEARCH MODE
+      if (inboxController.searching.value) {
+        return SliverFillRemaining(
+          child: Center(
+            child: CircularProgressIndicator(
+              color: AppColors.lightPrimary,
+            ),
+          ),
+        );
+      } else if (inboxController.searchError.isNotEmpty) {
+        return SliverFillRemaining(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  inboxController.searchError.value,
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => inboxController.onSubmitSearch(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.lightPrimary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text(language == AppLanguage.bn ? 'পুনরায় চেষ্টা করুন' : 'Retry'),
+                ),
+              ],
+            ),
+          ),
+        );
+      } else if (inboxController.searchResults.isEmpty) {
+        return SliverFillRemaining(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.search_off,
+                  size: 64,
+                  color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  language == AppLanguage.bn ? 'কোন ফলাফল পাওয়া যায়নি' : 'No results found',
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      } else {
+        return SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final result = inboxController.searchResults[index];
+              return _buildSearchResultItem(
+                result: result,
+                isDark: isDark,
+                language: language,
+                onTap: () => inboxController.openThreadFromSearch(result),
+              );
+            },
+            childCount: inboxController.searchResults.length,
+          ),
+        );
+      }
+    } else {
+      // INBOX MODE
+      if (inboxController.loading.value) {
+        return SliverFillRemaining(
+          child: Center(
+            child: CircularProgressIndicator(
+              color: AppColors.lightPrimary,
+            ),
+          ),
+        );
+      } else if (inboxController.error.isNotEmpty) {
+        return SliverFillRemaining(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  inboxController.error.value,
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => inboxController.fetchInbox(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.lightPrimary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: Text(language == AppLanguage.bn ? 'পুনরায় চেষ্টা করুন' : 'Retry'),
+                ),
+              ],
+            ),
+          ),
+        );
+      } else if (inboxController.threads.isEmpty) {
+        return SliverFillRemaining(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.message_outlined,
+                  size: 64,
+                  color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  language == AppLanguage.bn ? 'কোন কথোপকথন নেই' : 'No conversations',
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  language == AppLanguage.bn 
+                      ? 'আপনার বার্তা এখানে প্রদর্শিত হবে'
+                      : 'Your messages will appear here',
+                  style: TextStyle(
+                    color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      } else {
+        return SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) {
+              final thread = inboxController.threads[index];
+              return _buildThreadTile(
+                thread: thread,
+                isDark: isDark,
+                language: language,
+                onTap: () => inboxController.openThreadFromInbox(thread),
+              );
+            },
+            childCount: inboxController.threads.length,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildThreadTile({
+    required InboxThreadModel thread,
     required bool isDark,
     required AppLanguage language,
     required VoidCallback onTap,
   }) {
-    final unread = conversation.isRead == 0 ? 1 : 0;
-    final receiver = conversation.receiver;
-    final receiverName = receiver.fullname;
-    final receiverAvatar = receiver.profileImage;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            // Avatar
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: AppColors.lightPrimary.withOpacity(0.2),
+                  backgroundImage: thread.otherAvatar != null && thread.otherAvatar!.isNotEmpty
+                      ? CachedNetworkImageProvider(thread.otherAvatar!)
+                      : null,
+                  child: thread.otherAvatar == null || thread.otherAvatar!.isEmpty
+                      ? Text(
+                          thread.otherName.isNotEmpty ? thread.otherName[0].toUpperCase() : 'U',
+                          style: TextStyle(
+                            color: AppColors.lightPrimary,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      : null,
+                ),
+                if (thread.unreadCount > 0)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: AppColors.lightPrimary,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+                          width: 2,
+                        ),
+                      ),
+                      child: Text(
+                        thread.unreadCount > 9 ? '9+' : thread.unreadCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            
+            // Name and message
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          thread.otherName,
+                          style: GoogleFonts.notoSansBengali(
+                            color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+                            fontSize: 16,
+                            fontWeight: thread.unreadCount > 0 ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        thread.formattedTime,
+                        style: TextStyle(
+                          color: thread.unreadCount > 0 
+                              ? AppColors.lightPrimary 
+                              : (isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground),
+                          fontSize: 12,
+                          fontWeight: thread.unreadCount > 0 ? FontWeight.w600 : FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    thread.lastMessage,
+                    style: GoogleFonts.notoSansBengali(
+                      color: thread.unreadCount > 0 
+                          ? (isDark ? AppColors.darkForeground : AppColors.lightForeground)
+                          : (isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground),
+                      fontSize: 14,
+                      fontWeight: thread.unreadCount > 0 ? FontWeight.w500 : FontWeight.w400,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResultItem({
+    required SearchMessageResultModel result,
+    required bool isDark,
+    required AppLanguage language,
+    required VoidCallback onTap,
+  }) {
+    final user = result.user;
+    final userName = user.fullname;
+    final userAvatar = user.profileImage;
+    final lastMessage = result.lastMessage;
     
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -209,15 +503,15 @@ class _MessagesViewState extends State<MessagesView> {
             CircleAvatar(
               radius: 28,
               backgroundColor: AppColors.lightPrimary.withOpacity(0.2),
-              backgroundImage: receiverAvatar != null && receiverAvatar.isNotEmpty
-                  ? CachedNetworkImageProvider(receiverAvatar)
+              backgroundImage: userAvatar != null && userAvatar.isNotEmpty
+                  ? CachedNetworkImageProvider(userAvatar)
                   : null,
-              child: receiverAvatar == null || receiverAvatar.isEmpty
+              child: userAvatar == null || userAvatar.isEmpty
                   ? Text(
-                      receiverName.isNotEmpty ? receiverName[0].toUpperCase() : 'U',
+                      userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
                       style: TextStyle(
                         color: AppColors.lightPrimary,
-                        fontSize: 18,
+                        fontSize: 20,
                         fontWeight: FontWeight.w600,
                       ),
                     )
@@ -234,63 +528,50 @@ class _MessagesViewState extends State<MessagesView> {
                     children: [
                       Expanded(
                         child: Text(
-                          receiverName,
+                          userName,
                           style: GoogleFonts.notoSansBengali(
                             color: isDark ? AppColors.darkForeground : AppColors.lightForeground,
                             fontSize: 16,
-                            fontWeight: unread > 0 ? FontWeight.w600 : FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        conversation.formattedTime,
-                        style: TextStyle(
-                          color: unread > 0 
-                              ? AppColors.lightPrimary 
-                              : (isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground),
-                          fontSize: 13,
+                      if (lastMessage != null) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          lastMessage.formattedTime,
+                          style: TextStyle(
+                            color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                            fontSize: 12,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          conversation.lastMessage,
-                          style: GoogleFonts.notoSansBengali(
-                            color: unread > 0 
-                                ? (isDark ? AppColors.darkForeground : AppColors.lightForeground)
-                                : (isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground),
-                            fontSize: 14,
-                            fontWeight: unread > 0 ? FontWeight.w500 : FontWeight.w400,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                  if (lastMessage != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      lastMessage.messageContent,
+                      style: GoogleFonts.notoSansBengali(
+                        color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
                       ),
-                      if (unread > 0)
-                        Container(
-                          margin: const EdgeInsets.only(left: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.lightPrimary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            unread.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      language == AppLanguage.bn ? 'বার্তা পাঠাতে ট্যাপ করুন' : 'Tap to message',
+                      style: TextStyle(
+                        color: isDark ? AppColors.darkMutedForeground : AppColors.lightMutedForeground,
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

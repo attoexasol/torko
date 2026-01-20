@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../models/conversation_item_model.dart';
+import '../models/message_row_model.dart';
+import '../models/inbox_thread_model.dart';
+import '../models/search_message_result_model.dart';
+import '../models/user_mini_model.dart';
 import '../models/message_model.dart';
 import '../services/message_api_service.dart';
 import '../services/pusher_service.dart';
@@ -9,11 +13,19 @@ import '../services/user_info.dart';
 import '../core/routes/app_routes.dart';
 
 /// Controller for inbox/conversation list
-/// Groups messages by receiver.id to show ONE conversation per user (like WhatsApp)
+/// Groups messages by otherUserId to show ONE conversation per user (like Messenger)
 class InboxController extends GetxController {
-  final RxList<ConversationItemModel> conversations = <ConversationItemModel>[].obs;
-  final RxBool isLoading = false.obs;
-  final RxString errorMessage = ''.obs;
+  // Inbox threads (grouped conversations)
+  final RxList<InboxThreadModel> threads = <InboxThreadModel>[].obs;
+  final RxBool loading = false.obs;
+  final RxString error = ''.obs;
+
+  // Search functionality
+  final TextEditingController searchEC = TextEditingController();
+  final RxBool isSearchMode = false.obs; // true after search submitted OR when search text not empty
+  final RxBool searching = false.obs;
+  final RxString searchError = ''.obs;
+  final RxList<SearchMessageResultModel> searchResults = <SearchMessageResultModel>[].obs;
 
   // Pusher subscription for real-time updates
   StreamSubscription<Map<String, dynamic>>? _pusherSubscription;
@@ -21,6 +33,9 @@ class InboxController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    if (kDebugMode) {
+      print('🔍 [InboxController] onInit called');
+    }
     fetchInbox();
     _connectPusher();
   }
@@ -28,6 +43,7 @@ class InboxController extends GetxController {
   @override
   void onClose() {
     _pusherSubscription?.cancel();
+    searchEC.dispose();
     super.onClose();
   }
 
@@ -39,12 +55,10 @@ class InboxController extends GetxController {
     try {
       final pusherService = PusherService();
       
-      // Connect to Pusher if not already connected
       if (!pusherService.isConnected) {
         await pusherService.connect(currentUserId: currentUserId);
       }
 
-      // Listen to incoming messages
       _pusherSubscription = pusherService.onEventStream.listen((eventData) {
         _handlePusherEvent(eventData);
       });
@@ -56,7 +70,6 @@ class InboxController extends GetxController {
       if (kDebugMode) {
         print('DEBUG InboxController: Pusher connection error - $e');
       }
-      // Don't show error - real-time is optional
     }
   }
 
@@ -68,17 +81,10 @@ class InboxController extends GetxController {
 
       if (data == null) return;
 
-      // Handle message events
       if (eventName != null && 
           (eventName.contains('message') || eventName.contains('Message'))) {
-        try {
-          final message = MessageModel.fromJson(data);
-          updateConversationFromMessage(message);
-        } catch (e) {
-          if (kDebugMode) {
-            print('DEBUG InboxController: Error parsing message from Pusher: $e');
-          }
-        }
+        // Refresh inbox when new message arrives
+        fetchInbox();
       }
     } catch (e) {
       if (kDebugMode) {
@@ -87,74 +93,7 @@ class InboxController extends GetxController {
     }
   }
 
-  /// Update conversation list from incoming message (real-time)
-  void updateConversationFromMessage(MessageModel message) {
-    final currentUserId = UserInfo.userId;
-    if (currentUserId == null) return;
-
-    // Determine the other user in the conversation
-    final otherUserId = message.fromUserId == currentUserId 
-        ? message.toUserId 
-        : message.fromUserId;
-
-    // Find existing conversation
-    final index = conversations.indexWhere((c) => c.receiver.id == otherUserId);
-
-    if (index != -1) {
-      // Update existing conversation
-      final existing = conversations[index];
-      
-      // Create updated conversation with latest message
-      final updated = ConversationItemModel(
-        id: message.id,
-        fromUserId: message.fromUserId,
-        toUserId: message.toUserId,
-        lastMessage: message.messageContent,
-        createdAt: message.createdAt,
-        isRead: message.isRead,
-        receiver: existing.receiver, // Keep existing receiver info
-      );
-
-      // Remove from current position and insert at top (newest first)
-      conversations.removeAt(index);
-      conversations.insert(0, updated);
-
-      if (kDebugMode) {
-        print('DEBUG InboxController: Updated conversation for user $otherUserId (moved to top)');
-      }
-    } else {
-      // New conversation - refresh inbox to get full receiver data
-      fetchInbox();
-    }
-  }
-
-  /// Group conversations by receiver.id (deduplicate)
-  /// Returns unique conversations with latest message per receiver
-  List<ConversationItemModel> _groupByReceiver(List<ConversationItemModel> rawList) {
-    final Map<int, ConversationItemModel> uniqueConversations = {};
-
-    for (var item in rawList) {
-      final receiverId = item.receiver.id;
-
-      // If conversation exists, keep the one with latest message
-      if (uniqueConversations.containsKey(receiverId)) {
-        final existing = uniqueConversations[receiverId]!;
-        if (item.createdAt.isAfter(existing.createdAt)) {
-          uniqueConversations[receiverId] = item;
-        }
-      } else {
-        uniqueConversations[receiverId] = item;
-      }
-    }
-
-    // Convert to list and sort by createdAt DESC (newest first)
-    final result = uniqueConversations.values.toList();
-    result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-    return result;
-  }
-
-  /// Fetch inbox/conversation list
+  /// Fetch inbox and group messages by otherUserId
   Future<void> fetchInbox() async {
     if (kDebugMode) {
       print('═══════════════════════════════════════════════════════════');
@@ -166,47 +105,110 @@ class InboxController extends GetxController {
       if (kDebugMode) {
         print('❌ [fetchInbox] Token is null or empty');
       }
-      errorMessage.value = 'User not logged in';
-      isLoading.value = false;
+      error.value = 'User not logged in';
+      loading.value = false;
+      return;
+    }
+
+    final currentUserId = UserInfo.userId;
+    if (currentUserId == null) {
+      if (kDebugMode) {
+        print('❌ [fetchInbox] UserId is null');
+      }
+      error.value = 'User ID not found';
+      loading.value = false;
       return;
     }
 
     if (kDebugMode) {
       print('✅ [fetchInbox] Token found (length: ${token.length})');
+      print('✅ [fetchInbox] CurrentUserId: $currentUserId');
     }
 
-    isLoading.value = true;
-    errorMessage.value = '';
+    loading.value = true;
+    error.value = '';
 
     try {
       if (kDebugMode) {
-        print('🔄 [fetchInbox] Calling MessageApiService.fetchInbox()...');
+        print('🔄 [fetchInbox] Calling MessageApiService.fetchInboxRows()...');
       }
       
-      final rawList = await MessageApiService.fetchInbox(token: token);
+      final rawRows = await MessageApiService.fetchInboxRows(token: token);
       
       if (kDebugMode) {
-        print('✅ [fetchInbox] API returned ${rawList.length} raw messages');
+        print('✅ [fetchInbox] API returned ${rawRows.length} raw message rows');
       }
       
-      // Group by receiver.id to show ONE conversation per user
-      final uniqueConversations = _groupByReceiver(rawList);
+      // Group by otherUserId and count unreads
+      final Map<int, List<MessageRowModel>> rowsByOtherUser = {};
+      final Map<int, UserMiniModel> userInfoMap = {};
       
-      if (kDebugMode) {
-        print('✅ [fetchInbox] Grouped into ${uniqueConversations.length} unique conversations');
-        for (var conv in uniqueConversations) {
-          print('   - User ${conv.receiver.id} (${conv.receiver.fullname}): "${conv.lastMessage}"');
+      // First pass: group all rows by otherUserId
+      for (var row in rawRows) {
+        final otherUserId = row.getOtherUserId(currentUserId);
+        final otherUser = row.getOtherUser(currentUserId);
+        
+        if (otherUser == null || otherUserId == 0) {
+          if (kDebugMode) {
+            print('⚠️ [fetchInbox] Skipping row ${row.id}: invalid otherUser');
+          }
+          continue;
         }
+        
+        if (!rowsByOtherUser.containsKey(otherUserId)) {
+          rowsByOtherUser[otherUserId] = [];
+          userInfoMap[otherUserId] = otherUser;
+        }
+        
+        rowsByOtherUser[otherUserId]!.add(row);
       }
       
-      conversations.value = uniqueConversations;
-
+      // Second pass: create threads with proper unread counts
+      final Map<int, InboxThreadModel> threadMap = {};
+      
+      for (var entry in rowsByOtherUser.entries) {
+        final otherUserId = entry.key;
+        final rows = entry.value;
+        final otherUser = userInfoMap[otherUserId]!;
+        
+        // Sort rows by createdAt DESC to get latest
+        rows.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        final latestRow = rows.first;
+        
+        // Count unread messages (messages sent TO current user that are unread)
+        int unreadCount = 0;
+        for (var row in rows) {
+          if (row.toUserId == currentUserId && row.isRead == 0) {
+            unreadCount++;
+          }
+        }
+        
+        threadMap[otherUserId] = InboxThreadModel(
+          otherUserId: otherUserId,
+          otherName: otherUser.fullname,
+          otherAvatar: otherUser.profileImage,
+          lastMessage: latestRow.content,
+          lastTime: latestRow.createdAt,
+          unreadCount: unreadCount,
+          lastRow: latestRow,
+        );
+      }
+      
+      // Convert to list and sort by lastTime DESC (newest first)
+      final threadList = threadMap.values.toList();
+      threadList.sort((a, b) => b.lastTime.compareTo(a.lastTime));
+      
+      threads.assignAll(threadList);
+      
       if (kDebugMode) {
-        print('✅ [fetchInbox] Conversations list updated (length: ${conversations.length})');
+        print('✅ [fetchInbox] Grouped into ${threads.length} unique threads');
+        for (var thread in threads.take(5)) {
+          print('   - User ${thread.otherUserId} (${thread.otherName}): "${thread.lastMessage}" (${thread.unreadCount} unread)');
+        }
         print('═══════════════════════════════════════════════════════════');
       }
     } catch (e, stackTrace) {
-      errorMessage.value = e is MessageApiException 
+      error.value = e is MessageApiException 
           ? e.message 
           : 'Failed to load conversations';
       
@@ -215,32 +217,117 @@ class InboxController extends GetxController {
         print('   Stack trace: $stackTrace');
         print('═══════════════════════════════════════════════════════════');
       }
-      
-      Get.snackbar(
-        'Error',
-        errorMessage.value,
-        snackPosition: SnackPosition.BOTTOM,
-      );
     } finally {
-      isLoading.value = false;
+      loading.value = false;
     }
   }
 
   /// Pull to refresh
-  @override
   Future<void> refresh() async {
     await fetchInbox();
   }
 
-  /// Navigate to conversation
-  void openConversation(ConversationItemModel conversation) {
+  /// Navigate to conversation from inbox thread
+  void openThreadFromInbox(InboxThreadModel thread) {
     Get.toNamed(
       AppRoutes.conversation,
       arguments: {
-        'toUserId': conversation.receiver.id,
-        'receiverName': conversation.receiver.fullname,
-        'receiverAvatar': conversation.receiver.profileImage,
+        'toUserId': thread.otherUserId,
+        'receiverName': thread.otherName,
+        'receiverAvatar': thread.otherAvatar,
       },
     );
+  }
+
+  /// Submit search query
+  Future<void> onSubmitSearch() async {
+    final keyword = searchEC.text.trim();
+    
+    if (keyword.isEmpty) {
+      clearSearch();
+      return;
+    }
+
+    // Prevent double request while searching
+    if (searching.value) {
+      return;
+    }
+
+    isSearchMode.value = true;
+    searching.value = true;
+    searchError.value = '';
+
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) {
+      searchError.value = 'User not logged in';
+      searching.value = false;
+      return;
+    }
+
+    try {
+      if (kDebugMode) {
+        print('🔍 [InboxController] Searching messages with keyword: "$keyword"');
+      }
+
+      final results = await MessageApiService.searchMessages(
+        token: token,
+        keyword: keyword,
+      );
+
+      searchResults.assignAll(results);
+      searchError.value = '';
+
+      if (kDebugMode) {
+        print('✅ [InboxController] Search completed: ${results.length} results');
+      }
+    } catch (e) {
+      searchError.value = e is MessageApiException 
+          ? e.message 
+          : 'Failed to search messages';
+      
+      searchResults.clear();
+
+      if (kDebugMode) {
+        print('❌ [InboxController] Search error: $e');
+      }
+    } finally {
+      searching.value = false;
+    }
+  }
+
+  /// Clear search and return to inbox
+  void clearSearch() {
+    searchEC.clear();
+    isSearchMode.value = false;
+    searchResults.clear();
+    searchError.value = '';
+  }
+
+  /// Navigate to conversation from search result
+  void openThreadFromSearch(SearchMessageResultModel item) {
+    Get.toNamed(
+      AppRoutes.conversation,
+      arguments: {
+        'toUserId': item.user.id,
+        'receiverName': item.user.fullname,
+        'receiverAvatar': item.user.profileImage,
+      },
+    );
+  }
+
+  /// Update conversation list from incoming message (real-time)
+  /// Called by ChatController when a new message is sent/received
+  void updateConversationFromMessage(MessageModel message) {
+    final currentUserId = UserInfo.userId;
+    if (currentUserId == null) return;
+
+    // Determine the other user in the conversation
+    final otherUserId = message.fromUserId == currentUserId 
+        ? message.toUserId 
+        : message.fromUserId;
+
+    // Refresh inbox to get updated data
+    // This ensures we have the latest message and correct unread counts
+    fetchInbox();
   }
 }
