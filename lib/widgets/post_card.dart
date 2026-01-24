@@ -5,6 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../core/controllers/app_controller.dart';
 import '../core/theme/app_colors.dart';
 import '../services/user_info.dart';
+import '../controllers/post_controller.dart';
+import '../controllers/saved_posts_controller.dart';
+import '../models/post_model.dart';
 import 'post_with_comments.dart';
 
 // ==================== Poll Models ====================
@@ -57,6 +60,7 @@ class PostCard extends StatefulWidget {
   final int likes;
   final int comments;
   final bool isLiked;
+  final bool isSaved; // Whether post is saved
   final VoidCallback? onTap;
   final VoidCallback? onLike;
   final VoidCallback? onComment;
@@ -64,6 +68,12 @@ class PostCard extends StatefulWidget {
   final VoidCallback? onMenuClick;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onSave; // Callback when save action is triggered
+  final bool isShared;
+  final DateTime? sharedAt;
+  final int? sharedByUserId;
+  final VoidCallback? onDeleteSharedPost;
+  final PostModel? post;
 
   const PostCard({
     super.key,
@@ -86,6 +96,7 @@ class PostCard extends StatefulWidget {
     required this.likes,
     required this.comments,
     this.isLiked = false,
+    this.isSaved = false,
     this.onTap,
     this.onLike,
     this.onComment,
@@ -93,6 +104,12 @@ class PostCard extends StatefulWidget {
     this.onMenuClick,
     this.onEdit,
     this.onDelete,
+    this.onSave,
+    this.isShared = false,
+    this.sharedAt,
+    this.sharedByUserId,
+    this.onDeleteSharedPost,
+    this.post,
   });
 
   @override
@@ -102,9 +119,9 @@ class PostCard extends StatefulWidget {
 class _PostCardState extends State<PostCard> {
   final appController = Get.find<AppController>();
   bool showShareMenu = false;
-  bool showPostMenu = false;
   bool showMediaViewer = false;
   int mediaViewerIndex = 0;
+  bool isSaving = false; // Loading state for save action
 
   // Poll state
   late Poll? pollState;
@@ -187,8 +204,6 @@ class _PostCardState extends State<PostCard> {
   }
 
   void _handlePostMenu(String action) {
-    setState(() => showPostMenu = false);
-    
     switch (action) {
       case 'edit':
         widget.onEdit?.call();
@@ -197,8 +212,7 @@ class _PostCardState extends State<PostCard> {
         _showDeleteConfirmation();
         break;
       case 'bookmark':
-        Get.snackbar(isBn ? 'বুকমার্ক করা হয়েছে' : 'Bookmarked', '',
-            snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green.withOpacity(0.8));
+        // This is now handled in bottom sheet
         break;
       case 'report':
         Get.snackbar(isBn ? 'রিপোর্ট করা হয়েছে' : 'Reported', '',
@@ -327,6 +341,7 @@ class _PostCardState extends State<PostCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  if (widget.isShared) _buildSharedLabel(isDark),
                   // Header Section
                   _buildHeader(isDark),
 
@@ -342,12 +357,334 @@ class _PostCardState extends State<PostCard> {
 
           // Share Menu Dropdown
           if (showShareMenu) _buildShareMenu(isDark),
-
-          // Post Menu Dropdown
-          if (showPostMenu) _buildPostMenu(isDark),
         ],
       );
     });
+  }
+
+  /// Show bottom sheet menu with Save option
+  void _showPostMenuBottomSheet(bool isDark) {
+    final currentUserId = UserInfo.userId;
+    final isOwnPost = widget.userId != null && currentUserId != null && widget.userId == currentUserId;
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0a2f3d) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF536471) : const Color(0xFF9D9D9D),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              
+              // Title
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: Text(
+                  isBn ? 'পোস্ট অপশন' : 'Post Options',
+                  style: GoogleFonts.roboto(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : const Color(0xFF0f1419),
+                  ),
+                ),
+              ),
+              
+              // Save / Unsave option
+              if (widget.post != null)
+                _buildBottomSheetMenuItem(
+                  icon: widget.post!.saved ? Icons.bookmark_remove : Icons.bookmark,
+                  label: widget.post!.saved
+                      ? (isBn ? 'আনসেভ করুন' : 'Unsave')
+                      : (isBn ? 'সংরক্ষণ করুন' : 'Save'),
+                  onTap: () async {
+                    Get.back();
+                    if (!Get.isRegistered<SavedPostsController>()) {
+                      Get.put(SavedPostsController());
+                    }
+                    await Get.find<SavedPostsController>().toggleSave(widget.post!);
+                    widget.onSave?.call();
+                  },
+                  isDark: isDark,
+                  isFirst: true,
+                )
+              else
+                Builder(
+                  builder: (context) {
+                    final postController = Get.find<PostController>();
+                    final postId = widget.id != null ? int.tryParse(widget.id!) : null;
+                    return Obx(() {
+                      final isCurrentlySaved = postId != null
+                          ? postController.posts.firstWhereOrNull((p) => p.id == postId)?.saved ?? false
+                          : widget.isSaved;
+                      return _buildBottomSheetMenuItem(
+                        icon: isCurrentlySaved ? Icons.bookmark : Icons.bookmark_border,
+                        label: isCurrentlySaved
+                            ? (isBn ? 'সংরক্ষিত' : 'Saved')
+                            : (isBn ? 'সংরক্ষণ করুন' : 'Save'),
+                        onTap: () async {
+                          if (isSaving || postId == null) return;
+                          setState(() => isSaving = true);
+                          try {
+                            final success = await postController.savePost(postId);
+                            Get.back();
+                            if (success) {
+                              Get.snackbar(isBn ? 'সংরক্ষিত' : 'Saved', '',
+                                  snackPosition: SnackPosition.BOTTOM,
+                                  backgroundColor: Colors.green.withOpacity(0.8),
+                                  colorText: Colors.white);
+                              widget.onSave?.call();
+                            } else {
+                              Get.snackbar(isBn ? 'ত্রুটি' : 'Error', isBn ? 'পোস্ট সংরক্ষণ করতে ব্যর্থ' : 'Failed to save post',
+                                  snackPosition: SnackPosition.BOTTOM,
+                                  backgroundColor: Colors.red.withOpacity(0.8),
+                                  colorText: Colors.white);
+                            }
+                          } catch (e) {
+                            Get.back();
+                            Get.snackbar(isBn ? 'ত্রুটি' : 'Error', e.toString(),
+                                snackPosition: SnackPosition.BOTTOM,
+                                backgroundColor: Colors.red.withOpacity(0.8),
+                                colorText: Colors.white);
+                          } finally {
+                            if (mounted) setState(() => isSaving = false);
+                          }
+                        },
+                        isDark: isDark,
+                        isLoading: isSaving,
+                        isFirst: true,
+                      );
+                    });
+                  },
+                ),
+              
+              // Delete shared post (only when isShared)
+              if (widget.isShared && widget.onDeleteSharedPost != null)
+                _buildBottomSheetMenuItem(
+                  icon: Icons.delete_outline,
+                  label: isBn ? 'শেয়ার করা পোস্ট মুছুন' : 'Delete shared post',
+                  onTap: () {
+                    Get.back();
+                    widget.onDeleteSharedPost?.call();
+                  },
+                  isDark: isDark,
+                ),
+              
+              // Show Edit/Delete only for own posts
+              if (isOwnPost) ...[
+                _buildBottomSheetMenuItem(
+                  icon: Icons.edit_outlined,
+                  label: isBn ? 'সম্পাদনা করুন' : 'Edit',
+                  onTap: () {
+                    Get.back();
+                    widget.onEdit?.call();
+                  },
+                  isDark: isDark,
+                ),
+                _buildBottomSheetMenuItem(
+                  icon: Icons.delete_outline,
+                  label: isBn ? 'মুছে ফেলুন' : 'Delete',
+                  onTap: () {
+                    Get.back();
+                    _showDeleteConfirmation();
+                  },
+                  isDark: isDark,
+                ),
+              ],
+              
+              // Show Report/Block only for other users' posts
+              if (!isOwnPost) ...[
+                _buildBottomSheetMenuItem(
+                  icon: Icons.flag_outlined,
+                  label: isBn ? 'রিপোর্ট করুন' : 'Report',
+                  onTap: () {
+                    Get.back();
+                    Get.snackbar(
+                      isBn ? 'রিপোর্ট করা হয়েছে' : 'Reported',
+                      '',
+                      snackPosition: SnackPosition.BOTTOM,
+                    );
+                    widget.onMenuClick?.call();
+                  },
+                  isDark: isDark,
+                ),
+                _buildBottomSheetMenuItem(
+                  icon: Icons.block,
+                  label: isBn ? 'ব্লক করুন' : 'Block',
+                  onTap: () {
+                    Get.back();
+                    Get.snackbar(
+                      isBn ? '${widget.author} ব্লক করা হয়েছে' : '${widget.author} blocked',
+                      '',
+                      snackPosition: SnackPosition.BOTTOM,
+                      backgroundColor: Colors.orange.withOpacity(0.8),
+                    );
+                    widget.onMenuClick?.call();
+                  },
+                  isDark: isDark,
+                  isLast: true,
+                ),
+              ] else ...[
+                _buildBottomSheetMenuItem(
+                  icon: Icons.flag_outlined,
+                  label: isBn ? 'রিপোর্ট করুন' : 'Report',
+                  onTap: () {
+                    Get.back();
+                    Get.snackbar(
+                      isBn ? 'রিপোর্ট করা হয়েছে' : 'Reported',
+                      '',
+                      snackPosition: SnackPosition.BOTTOM,
+                    );
+                    widget.onMenuClick?.call();
+                  },
+                  isDark: isDark,
+                  isLast: true,
+                ),
+              ],
+              
+              // Cancel button
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Get.back(),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: isDark ? const Color(0xFF0d3a4a) : const Color(0xFFe6e6e6),
+                        ),
+                      ),
+                    ),
+                    child: Text(
+                      isBn ? 'বাতিল' : 'Cancel',
+                      style: GoogleFonts.roboto(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: isDark ? Colors.white : const Color(0xFF0f1419),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              
+              // Bottom padding
+              SizedBox(height: MediaQuery.of(context).padding.bottom),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomSheetMenuItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    required bool isDark,
+    bool isLoading = false,
+    bool isFirst = false,
+    bool isLast = false,
+  }) {
+    return InkWell(
+      onTap: isLoading ? null : onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          border: Border(
+            top: isFirst ? BorderSide.none : BorderSide(
+              color: isDark ? const Color(0xFF0d3a4a) : const Color(0xFFe6e6e6),
+              width: 0.5,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            if (isLoading)
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.lightPrimary,
+                ),
+              )
+            else
+              Icon(
+                icon,
+                size: 22,
+                color: isDark ? Colors.white : const Color(0xFF0f1419),
+              ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.notoSansBengali(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.white : const Color(0xFF0f1419),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSharedLabel(bool isDark) {
+    String timeStr = '';
+    if (widget.sharedAt != null) {
+      final d = widget.sharedAt!;
+      timeStr = '${d.day}/${d.month}/${d.year} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 4),
+      child: Row(
+        children: [
+          Icon(
+            Icons.share,
+            size: 14,
+            color: isDark ? const Color(0xFF8e8e8e) : const Color(0xFF536471),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isBn ? 'শেয়ার করা' : 'Shared',
+            style: GoogleFonts.roboto(
+              fontSize: 12,
+              color: isDark ? const Color(0xFF8e8e8e) : const Color(0xFF536471),
+            ),
+          ),
+          if (timeStr.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Text(
+              timeStr,
+              style: GoogleFonts.roboto(
+                fontSize: 11,
+                color: isDark ? const Color(0xFF8e8e8e) : const Color(0xFF536471),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _buildHeader(bool isDark) {
@@ -429,7 +766,7 @@ class _PostCardState extends State<PostCard> {
 
           // Menu Button
           GestureDetector(
-            onTap: () => setState(() => showPostMenu = !showPostMenu),
+            onTap: () => _showPostMenuBottomSheet(isDark),
             child: Container(
               width: 32,
               height: 32,
@@ -879,78 +1216,9 @@ class _PostCardState extends State<PostCard> {
   }
 
   Widget _buildPostMenu(bool isDark) {
-    final currentUserId = UserInfo.userId;
-    final isOwnPost = widget.userId != null && currentUserId != null && widget.userId == currentUserId;
-    
-    return Positioned(
-      right: 0,
-      top: 50,
-      child: Material(
-        elevation: 8,
-        borderRadius: BorderRadius.circular(10),
-        color: isDark ? const Color(0xFF0a2f3d) : Colors.white,
-        child: Container(
-          constraints: const BoxConstraints(minWidth: 200),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: isDark ? const Color(0xFF0d3a4a) : const Color(0xFFe6e6e6),
-            ),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildMenuItem(
-                icon: Icons.bookmark_border,
-                label: isBn ? 'বুকমার্ক করুন' : 'Bookmark',
-                onTap: () => _handlePostMenu('bookmark'),
-                isDark: isDark,
-                isFirst: true,
-              ),
-              // Show Edit/Delete only for own posts
-              if (isOwnPost) ...[
-                _buildMenuItem(
-                  icon: Icons.edit_outlined,
-                  label: isBn ? 'সম্পাদনা করুন' : 'Edit',
-                  onTap: () => _handlePostMenu('edit'),
-                  isDark: isDark,
-                ),
-                _buildMenuItem(
-                  icon: Icons.delete_outline,
-                  label: isBn ? 'মুছে ফেলুন' : 'Delete',
-                  onTap: () => _handlePostMenu('delete'),
-                  isDark: isDark,
-                ),
-              ],
-              // Show Report/Block only for other users' posts
-              if (!isOwnPost) ...[
-                _buildMenuItem(
-                  icon: Icons.flag_outlined,
-                  label: isBn ? 'রিপোর্ট করুন' : 'Report',
-                  onTap: () => _handlePostMenu('report'),
-                  isDark: isDark,
-                ),
-                _buildMenuItem(
-                  icon: Icons.block,
-                  label: isBn ? 'ব্লক করুন' : 'Block',
-                  onTap: () => _handlePostMenu('block'),
-                  isDark: isDark,
-                  isLast: true,
-                ),
-              ] else ...[
-                _buildMenuItem(
-                  icon: Icons.flag_outlined,
-                  label: isBn ? 'রিপোর্ট করুন' : 'Report',
-                  onTap: () => _handlePostMenu('report'),
-                  isDark: isDark,
-                  isLast: true,
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
+    // DEPRECATED: This method is no longer used - replaced with bottom sheet
+    // Keeping for backward compatibility but should be removed
+    return const SizedBox.shrink();
   }
 
   Widget _buildMenuItem({

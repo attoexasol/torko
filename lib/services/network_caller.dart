@@ -1,9 +1,16 @@
-// lib/data/service/network_caller.dart
+// lib/services/network_caller.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart';
+import 'user_info.dart';
+
+/// Thrown when postAuth is called without a valid token.
+class NetworkAuthException implements Exception {
+  final String message;
+  NetworkAuthException(this.message);
+}
 
 class NetworkResponse {
   final bool isSuccess;
@@ -44,8 +51,9 @@ class NetworkCaller {
       );
 
       return NetworkResponse(
-        isSuccess: ok, statusCode: res.statusCode,
-        body: ok ? decoded : null,
+        isSuccess: ok,
+        statusCode: res.statusCode,
+        body: decoded,
         errorMessage: ok ? null : _extractError(decoded),
       );
     } on TimeoutException {
@@ -57,6 +65,30 @@ class NetworkCaller {
       _logError(method: 'GET', url: url, error: e.toString());
       return NetworkResponse(isSuccess: false, statusCode: -1, errorMessage: e.toString());
     }
+  }
+
+  /// POST with auth: adds Authorization: Bearer and api_token in body. Token from UserInfo.
+  /// Throws [NetworkAuthException] if token is null/empty.
+  static Future<NetworkResponse> postAuth({
+    required String url,
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) async {
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) {
+      throw NetworkAuthException('Session expired. Please login again.');
+    }
+    if (kDebugMode) {
+      final pre = token.length >= 6 ? token.substring(0, 6) : token;
+      debugPrint('AUTH token len=${token.length} prefix=${pre}***');
+    }
+    final fullBody = <String, dynamic>{...?body, 'api_token': token};
+    final mergedHeaders = <String, String>{
+      'Accept': 'application/json',
+      'Authorization': 'Bearer $token',
+      ...?headers,
+    };
+    return postRequest(url: url, body: fullBody, headers: mergedHeaders);
   }
 
   /// JSON POST
@@ -85,8 +117,9 @@ class NetworkCaller {
       );
 
       return NetworkResponse(
-        isSuccess: ok, statusCode: res.statusCode,
-        body: ok ? decoded : null,
+        isSuccess: ok,
+        statusCode: res.statusCode,
+        body: decoded,
         errorMessage: ok ? null : _extractError(decoded),
       );
     } on TimeoutException {
@@ -171,9 +204,14 @@ class NetworkCaller {
   static void _logResponse({required String method, required String url, required int statusCode, required String body,
     required int durationMs, Map<String, String>? headers}) {
     if (!kDebugMode) return;
+    final String bodyLog = body.isEmpty
+        ? '<empty>'
+        : body.trimLeft().startsWith('<')
+            ? '<HTML response ${body.length} chars>'
+            : (body.length > 800 ? '${body.substring(0, 800)}...' : body);
     debugPrint('================ HTTP RESPONSE ===============\n'
         'Method   : $method\nURL      : $url\nStatus   : $statusCode\nDuration : ${durationMs}ms\n'
-        'Headers  : ${_pretty(headers)}\nBody     : ${body.isEmpty ? "<empty>" : body}\n'
+        'Headers  : ${_pretty(headers)}\nBody     : $bodyLog\n'
         '=============================================');
   }
 

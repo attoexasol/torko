@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import '../../core/controllers/app_controller.dart';
 import '../../core/routes/app_routes.dart';
 import '../../controllers/navigation_controller.dart';
+import '../../controllers/saved_posts_controller.dart';
 import '../../models/post_model.dart';
 import '../../services/network_caller.dart';
+import '../../services/post_api_service.dart';
 import '../../services/urls.dart';
 import '../../services/user_info.dart';
 
@@ -15,11 +18,12 @@ class HomeController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
   final RxList<PostModel> posts = <PostModel>[].obs;
-  final RxSet<int> savedPosts = <int>{}.obs;
   final RxSet<int> hiddenPosts = <int>{}.obs;
   final RxSet<int> likedPosts = <int>{}.obs;
-  final RxMap<int, int> postLikeCounts = <int, int>{}.obs;  // Track updated like counts
-  final RxSet<int> likingInProgress = <int>{}.obs;  // Prevent rapid taps
+  final RxMap<int, int> postLikeCounts = <int, int>{}.obs;
+  final RxMap<int, int> postShareCounts = <int, int>{}.obs;
+  final RxSet<int> likingInProgress = <int>{}.obs;
+  final RxSet<int> sharingInProgress = <int>{}.obs;
   final RxSet<String> followingUsers = <String>{}.obs;
   
   final ScrollController scrollController = ScrollController();
@@ -109,7 +113,13 @@ class HomeController extends GetxController {
         if (response.body!['status'] == true) {
           final data = response.body!['data'];
           if (data is List) {
-            posts.value = data.map((json) => PostModel.fromJson(json)).toList();
+            posts.value = data.map((json) {
+              final post = PostModel.fromJson(json);
+              if (kDebugMode) {
+                print('DEBUG loadAllPosts: postId=${post.id} is_like=${post.isLike} isLiked=${post.isLiked}');
+              }
+              return post;
+            }).toList();
             errorMessage.value = '';
           } else {
             errorMessage.value = 'Invalid response format';
@@ -224,6 +234,12 @@ class HomeController extends GetxController {
           }
           postLikeCounts[postId] = serverLikeCount;
           
+          // Update the post model's isLike field to sync with server
+          final postIndex = posts.indexWhere((p) => p.id == postId);
+          if (postIndex != -1) {
+            posts[postIndex] = posts[postIndex].copyWith(isLike: likeStatus);
+          }
+          
           print('DEBUG handleLike: Success - liked=$likeStatus, count=$serverLikeCount');
         } else {
           // API returned false status - rollback
@@ -259,7 +275,19 @@ class HomeController extends GetxController {
     HapticFeedback.heavyImpact();
   }
 
-  bool isPostLiked(int postId) => likedPosts.contains(postId);
+  /// Check if a post is liked
+  /// Uses the is_like field from API response (post.isLiked) as primary source
+  /// Falls back to likedPosts set for optimistic updates
+  bool isPostLiked(int postId) {
+    final post = posts.firstWhereOrNull((p) => p.id == postId);
+    if (post != null) {
+      // Use the isLiked getter from PostModel (based on is_like field from API)
+      // This is the source of truth from the API
+      return post.isLiked;
+    }
+    // Fallback to likedPosts set (for optimistic updates during like action)
+    return likedPosts.contains(postId);
+  }
   
   /// Check if like action is in progress for a post
   bool isLiking(int postId) => likingInProgress.contains(postId);
@@ -312,32 +340,58 @@ class HomeController extends GetxController {
     Get.toNamed(AppRoutes.postDetail, arguments: {'postId': postId.toString()});
   }
 
-  void handleShare(int postId) {
+  Future<void> handleShare(int postId) async {
     final appController = Get.find<AppController>();
     final isBn = appController.language == AppLanguage.bn;
-    appController.showNotification(
-      title: isBn ? 'শেয়ার' : 'Share',
-      message: isBn ? 'শেয়ার ফিচার শীঘ্রই আসছে!' : 'Share feature coming soon!',
-    );
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) {
+      Get.snackbar(
+        isBn ? 'ত্রুটি' : 'Error',
+        isBn ? 'সেশন শেষ। আবার লগইন করুন।' : 'Session expired. Please login again.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+    if (sharingInProgress.contains(postId)) return;
+    sharingInProgress.add(postId);
+    try {
+      await PostApiService.sharePost(postId: postId);
+      final post = posts.firstWhereOrNull((p) => p.id == postId);
+      final current = postShareCounts[postId] ?? post?.postShareCount ?? 0;
+      postShareCounts[postId] = current + 1;
+      posts.refresh();
+      Get.snackbar(
+        isBn ? 'শেয়ার হয়েছে' : 'Post shared successfully',
+        '',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.green.withOpacity(0.8),
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      Get.snackbar(
+        isBn ? 'ত্রুটি' : 'Error',
+        e is PostApiException ? e.message : e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      sharingInProgress.remove(postId);
+    }
+  }
+
+  int getShareCount(PostModel post) {
+    if (postShareCounts.containsKey(post.id)) {
+      return postShareCounts[post.id] ?? post.postShareCount;
+    }
+    return post.postShareCount;
   }
 
   void handleSavePost(int postId) {
-    final appController = Get.find<AppController>();
-    final isBn = appController.language == AppLanguage.bn;
-    
-    if (savedPosts.contains(postId)) {
-      savedPosts.remove(postId);
-      appController.showNotification(
-        title: isBn ? 'আনসেভ' : 'Unsaved',
-        message: isBn ? 'পোস্ট আনসেভ করা হয়েছে' : 'Post unsaved',
-      );
-    } else {
-      savedPosts.add(postId);
-      appController.showNotification(
-        title: isBn ? 'সেভ' : 'Saved',
-        message: isBn ? 'পোস্ট সেভ করা হয়েছে' : 'Post saved',
-      );
+    final post = posts.firstWhereOrNull((p) => p.id == postId);
+    if (post == null) return;
+    if (!Get.isRegistered<SavedPostsController>()) {
+      Get.put(SavedPostsController());
     }
+    Get.find<SavedPostsController>().toggleSave(post);
   }
 
   void handleHidePost(int postId) {
@@ -426,7 +480,8 @@ class HomeController extends GetxController {
     reportSubReason.value = subReason;
   }
 
-  bool isPostSaved(int postId) => savedPosts.contains(postId);
+  bool isPostSaved(int postId) =>
+      posts.firstWhereOrNull((p) => p.id == postId)?.saved ?? false;
   bool isFollowing(String author) => followingUsers.contains(author);
 
   NavigationController get _navController {

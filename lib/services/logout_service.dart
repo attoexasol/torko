@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../controllers/comment_controller.dart';
 import '../controllers/post_controller.dart';
+import '../controllers/saved_posts_controller.dart';
 import '../views/profile/profile_controller.dart';
 import '../views/home/home_controller.dart';
 import 'user_info.dart';
@@ -128,11 +129,15 @@ class LogoutService {
       if (Get.isRegistered<HomeController>()) {
         final homeController = Get.find<HomeController>();
         homeController.posts.clear();
-        homeController.savedPosts.clear();
         homeController.hiddenPosts.clear();
         homeController.likedPosts.clear();
         homeController.followingUsers.clear();
         homeController.errorMessage.value = '';
+      }
+
+      // Clear SavedPostsController if registered
+      if (Get.isRegistered<SavedPostsController>()) {
+        Get.find<SavedPostsController>().savedPosts.clear();
       }
       
       // Clear CommentController if registered

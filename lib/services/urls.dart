@@ -19,6 +19,10 @@ class Urls{
     static const delete_post = "$_baseUrL/delete_post" ;
     static const user_own_posts = "$_baseUrL/user/posts" ;
 
+    static const save_post = "$_baseUrL/create/save_post" ;
+    static const get_save_post = "$_baseUrL/get/save_post" ;
+    static const unsave_post = "$_baseUrL/create/unsave_post" ;
+
 
     // Comment API endPoints
     static const get_all_comment = "$_baseUrL/get_all_comment" ;
@@ -26,6 +30,11 @@ class Urls{
     static const create_comment = "$_baseUrL/create_comment" ;
     static const update_comment = "$_baseUrL/update_comment" ;
     static const delete_comment = "$_baseUrL/delete_comment" ;
+
+    // Share post
+    static const share_post = "$_baseUrL/create/share_post" ;
+    static const delete_share_post = "$_baseUrL/delete/share_post" ;
+
 
 
     // Feed page

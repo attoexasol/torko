@@ -25,6 +25,7 @@ class AppRoutes {
   static const String conversation = '/conversation';
   static const String calling = '/calling';
   static const String postDetail = '/postDetail';
+  static const String friends = '/friends';
 }
 
 

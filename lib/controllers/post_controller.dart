@@ -7,7 +7,9 @@ import '../models/post_model.dart';
 import '../services/network_caller.dart';
 import '../services/urls.dart';
 import '../services/user_info.dart';
+import '../services/post_api_service.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 
 class PostController extends GetxController {
   // State
@@ -125,7 +127,13 @@ class PostController extends GetxController {
         if (response.body!['status'] == true) {
           final data = response.body!['data'];
           if (data is List) {
-            posts.value = data.map((json) => PostModel.fromJson(json)).toList();
+            posts.value = data.map((json) {
+              final post = PostModel.fromJson(json);
+              if (kDebugMode) {
+                print('DEBUG loadAllPosts: postId=${post.id} is_like=${post.isLike} isLiked=${post.isLiked}');
+              }
+              return post;
+            }).toList();
             errorMessage.value = '';
           } else {
             errorMessage.value = 'Invalid response format';
@@ -210,7 +218,13 @@ class PostController extends GetxController {
           final data = response.body!['data'];
           if (data is List) {
             // Filter posts by current user's ID
-            final allPosts = data.map((json) => PostModel.fromJson(json)).toList();
+            final allPosts = data.map((json) {
+              final post = PostModel.fromJson(json);
+              if (kDebugMode) {
+                print('DEBUG loadUserPosts: postId=${post.id} is_like=${post.isLike} isLiked=${post.isLiked}');
+              }
+              return post;
+            }).toList();
             print('DEBUG loadUserPosts: Total posts from API = ${allPosts.length}');
             print('DEBUG loadUserPosts: Post userIds = ${allPosts.map((p) => p.userId).toList()}');
             print('DEBUG loadUserPosts: Filtering for userId = $currentUserId');
@@ -540,6 +554,74 @@ class PostController extends GetxController {
     posts.value = [];
     _lastUserId = null;
     errorMessage.value = '';
+  }
+
+  /// Save a post
+  /// 
+  /// [postId] - ID of the post to save
+  /// Updates the post's isSave status optimistically
+  Future<bool> savePost(int postId) async {
+    try {
+      final token = UserInfo.apiToken;
+      if (token == null || token.isEmpty) {
+        if (kDebugMode) {
+          print('❌ [savePost] Token is null or empty');
+        }
+        Get.snackbar(
+          'Error',
+          'Session expired. Please login again.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return false;
+      }
+
+      // Optimistic update: mark as saved immediately
+      final postIndex = posts.indexWhere((post) => post.id == postId);
+      if (postIndex != -1) {
+        final post = posts[postIndex];
+        posts[postIndex] = post.copyWith(isSave: 1);
+        if (kDebugMode) {
+          print('✅ [savePost] Optimistically updated post $postId to saved');
+        }
+      }
+
+      // Call API (returns is_save, 1 on success)
+      final isSave = await PostApiService.savePost(postId: postId);
+      final success = isSave == 1;
+
+      if (success) {
+        if (kDebugMode) {
+          print('✅ [savePost] Post $postId saved successfully');
+        }
+        // Ensure optimistic update is persisted
+        if (postIndex != -1 && posts[postIndex].isSave != 1) {
+          posts[postIndex] = posts[postIndex].copyWith(isSave: 1);
+        }
+        return true;
+      } else {
+        // Revert optimistic update on failure
+        if (postIndex != -1) {
+          final post = posts[postIndex];
+          posts[postIndex] = post.copyWith(isSave: 0);
+          if (kDebugMode) {
+            print('❌ [savePost] Reverted optimistic update for post $postId');
+          }
+        }
+        return false;
+      }
+    } catch (e) {
+      // Revert optimistic update on error
+      final postIndex = posts.indexWhere((post) => post.id == postId);
+      if (postIndex != -1) {
+        final post = posts[postIndex];
+        posts[postIndex] = post.copyWith(isSave: 0);
+      }
+
+      if (kDebugMode) {
+        print('❌ [savePost] Error saving post $postId: $e');
+      }
+      return false;
+    }
   }
 }
 

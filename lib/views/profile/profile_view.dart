@@ -5,6 +5,10 @@ import '../../core/controllers/app_controller.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/theme/app_colors.dart';
 import '../../controllers/post_controller.dart';
+import '../../controllers/profile_timeline_controller.dart';
+import '../../controllers/saved_posts_controller.dart';
+import '../../controllers/friends_controller.dart';
+import '../../models/timeline_item.dart';
 import '../../widgets/post_card.dart';
 import '../../widgets/post_with_comments.dart';
 import '../../views/edit_post/edit_post_view.dart';
@@ -82,6 +86,9 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
   double _lastScrollY = 0;
   String? _lastActiveTab;
   final postController = Get.put(PostController());
+  final savedPostsController = Get.put(SavedPostsController());
+  final timelineController = Get.put(ProfileTimelineController());
+  final friendsController = Get.put(FriendsController());
 
   late AnimationController _tabAnimationController;
   
@@ -94,25 +101,24 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
       vsync: this,
     );
     
-    // Always load posts on init to check profile completion
-    postController.loadUserPosts();
-    
-    // Load posts if post tab is initially active
     if (widget.controller.activeTab.value == 'post') {
       _lastActiveTab = 'post';
+      timelineController.fetchTimeline();
     }
     
-    // Listen to tab changes and reload posts when post tab is activated
     ever(widget.controller.activeTab, (String tab) {
       if (tab == 'post' && _lastActiveTab != 'post') {
-        postController.loadUserPosts(); // Load only current user's posts
+        timelineController.fetchTimeline();
+      } else if (tab == 'saved' && _lastActiveTab != 'saved') {
+        savedPostsController.loadSavedPosts();
+      } else if (tab == 'friends' && _lastActiveTab != 'friends') {
+        // Friends tab selected - data is already loaded in FriendsController
       }
       _lastActiveTab = tab;
     });
     
-    // Listen to posts changes and update hasFirstPost for profile completion
-    ever(postController.posts, (List<PostModel> posts) {
-      widget.controller.updateFirstPostStatus(posts.isNotEmpty);
+    ever(timelineController.timeline, (List<TimelineItem> _) {
+      widget.controller.updateFirstPostStatus(timelineController.timeline.isNotEmpty);
     });
   }
   
@@ -152,14 +158,18 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
           Obx(() {
             final activeTab = widget.controller.activeTab.value;
             if (activeTab == 'post') {
-              return _buildPostCards();
+              return _buildTimelineCards();
             } else if (activeTab == 'poll') {
               return _buildPollCards();
+            } else if (activeTab == 'saved') {
+              return _buildSavedCards();
+            } else if (activeTab == 'friends') {
+              return _buildFriendsCards();
             } else {
               return _buildSavedCards();
             }
           }),
-                const SizedBox(height: 10),
+                SizedBox(height: MediaQuery.of(context).padding.bottom + 100), // Extra space for FAB
               ],
         ),
       );
@@ -716,19 +726,41 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
     return Transform.translate(
       offset: const Offset(0, -50),
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         child: Obx(() {
           // Get dynamic post count from postController
           final postCount = postController.posts.length.toString();
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildStatItem(postCount, 'Posts', isDark),
-              const SizedBox(width: 32),
-              _buildStatItem('0', isBn ? 'প্রতিবেশী' : 'Neighbours', isDark),
-              const SizedBox(width: 32),
-              _buildStatItem('0', 'Following', isDark),
-            ],
+          final friendsCount = friendsController.friends.length.toString();
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              // Use Wrap for small screens, Row for larger screens
+              if (constraints.maxWidth < 360) {
+                return Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 16,
+                  runSpacing: 12,
+                  children: [
+                    _buildStatItem(postCount, 'Posts', isDark),
+                    _buildStatItem('0', isBn ? 'প্রতিবেশী' : 'Neighbours', isDark),
+                    _buildStatItem('0', 'Following', isDark),
+                    _buildStatItem(friendsCount, isBn ? 'বন্ধু' : 'Friends', isDark),
+                  ],
+                );
+              } else {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(child: _buildStatItem(postCount, 'Posts', isDark)),
+                    SizedBox(width: constraints.maxWidth < 400 ? 16 : 24),
+                    Flexible(child: _buildStatItem('0', isBn ? 'প্রতিবেশী' : 'Neighbours', isDark)),
+                    SizedBox(width: constraints.maxWidth < 400 ? 16 : 24),
+                    Flexible(child: _buildStatItem('0', 'Following', isDark)),
+                    SizedBox(width: constraints.maxWidth < 400 ? 16 : 24),
+                    Flexible(child: _buildStatItem(friendsCount, isBn ? 'বন্ধু' : 'Friends', isDark)),
+                  ],
+                );
+              }
+            },
           );
         }),
       ),
@@ -737,6 +769,7 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
   
   Widget _buildStatItem(String value, String label, bool isDark) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           value,
@@ -745,14 +778,19 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
             fontWeight: FontWeight.bold,
             color: isDark ? Colors.white : const Color(0xFF0f1419),
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 4),
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: GoogleFonts.inter(
             fontSize: 13,
             color: isDark ? const Color(0xFF8e8e8e) : const Color(0xFF536471),
           ),
+          textAlign: TextAlign.center,
         ),
       ],
     );
@@ -881,18 +919,24 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
     return LayoutBuilder(
       builder: (context, constraints) {
         final containerWidth = constraints.maxWidth;
-        final tabWidth = containerWidth / 3.2;
+        final isSmallScreen = containerWidth < 360;
+        // Account for padding: containerWidth - 32 (16px each side)
+        final availableWidth = containerWidth - 32;
+        final tabWidth = availableWidth / 4; // 4 tabs now: post, poll, saved, friends
 
         return Obx(() {
           int index = controller.activeTab.value == 'post'
               ? 0
               : controller.activeTab.value == 'poll'
                   ? 1
-                  : 2;
+                  : controller.activeTab.value == 'saved'
+                      ? 2
+                      : 3; // friends
         
         return Container(
-          height: 64,
+          height: isSmallScreen ? 72 : 64,
           padding: const EdgeInsets.all(6),
+          margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF0a2f3d) : const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(16),
@@ -905,7 +949,7 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                 left: tabWidth * index,
                 top: 0,
                 width: tabWidth,
-                height: 52,
+                height: isSmallScreen ? 60 : 52,
                 child: Padding(
                   padding: const EdgeInsets.all(4),
                   child: Container(
@@ -918,9 +962,10 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
               ),
               Row(
                 children: [
-                  Expanded(child: _buildTabButton('post', Icons.grid_on, 'Post')),
-                  Expanded(child: _buildTabButton('poll', Icons.poll, 'Poll')),
-                  Expanded(child: _buildTabButton('saved', Icons.bookmark_outline, 'Saved')),
+                  Expanded(child: _buildTabButton('post', Icons.grid_on, 'Post', isSmallScreen)),
+                  Expanded(child: _buildTabButton('poll', Icons.poll, 'Poll', isSmallScreen)),
+                  Expanded(child: _buildTabButton('saved', Icons.bookmark_outline, 'Saved', isSmallScreen)),
+                  Expanded(child: _buildTabButton('friends', Icons.person_outline, isBn ? 'বন্ধু' : 'Friends', isSmallScreen)),
                 ],
               ),
             ],
@@ -931,34 +976,48 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
     );
   }
   
-  Widget _buildTabButton(String tab, IconData icon, String label) {
+  Widget _buildTabButton(String tab, IconData icon, String label, bool isSmallScreen) {
     final controller = widget.controller;
 
     return Obx(() {
       final isActive = controller.activeTab.value == tab;
-    return GestureDetector(
-      onTap: () {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
           controller.setActiveTab(tab);
-        _tabAnimationController.forward(from: 0);
-      },
-      child: SizedBox(
-        height: 53,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-              Icon(icon,
-                  size: 18,
-                  color: isActive ? Colors.white : const Color(0xFF9D9D9D)),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: GoogleFonts.roboto(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
+          _tabAnimationController.forward(from: 0);
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: isSmallScreen ? 16 : 18,
                 color: isActive ? Colors.white : const Color(0xFF9D9D9D),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  style: GoogleFonts.roboto(
+                    fontSize: isSmallScreen ? 10 : 11,
+                    fontWeight: FontWeight.bold,
+                    color: isActive ? Colors.white : const Color(0xFF9D9D9D),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1061,7 +1120,7 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                       likes: fullPost.postLikeCount,
                       comments: fullPost.postCommentCount,
                       shares: fullPost.postShareCount,
-                      isLiked: false, // TODO: Check if user liked this post
+                      isLiked: fullPost.isLiked, // Use isLiked getter from PostModel
                     );
 
                     Get.to(
@@ -1179,6 +1238,131 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
     });
   }
 
+  Widget _buildTimelineCards() {
+    final isDark = widget.isDark;
+    final isBn = widget.isBn;
+
+    return Obx(() {
+      if (timelineController.loading.value && timelineController.timeline.isEmpty) {
+        return Transform.translate(
+          offset: const Offset(0, -90),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: const Center(child: CircularProgressIndicator()),
+          ),
+        );
+      }
+      if (timelineController.error.value.isNotEmpty) {
+        return Transform.translate(
+          offset: const Offset(0, -90),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 48, color: isDark ? Colors.white70 : Colors.black54),
+                const SizedBox(height: 16),
+                Text(
+                  timelineController.error.value,
+                  style: GoogleFonts.roboto(fontSize: 14, color: isDark ? Colors.white70 : Colors.black54),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => timelineController.fetchTimeline(),
+                  child: Text(isBn ? 'পুনরায় চেষ্টা করুন' : 'Retry'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      if (timelineController.timeline.isEmpty) {
+        return Transform.translate(
+          offset: const Offset(0, -90),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.dynamic_feed, size: 64, color: isDark ? Colors.white54 : Colors.black54),
+                const SizedBox(height: 16),
+                Text(
+                  isBn ? 'কোন পোস্ট নেই' : 'No posts yet',
+                  style: GoogleFonts.roboto(fontSize: 16, color: isDark ? Colors.white70 : Colors.black54),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      return Transform.translate(
+        offset: const Offset(0, -90),
+          child: RefreshIndicator(
+          onRefresh: () => timelineController.fetchTimeline(),
+          child: ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: timelineController.timeline.length,
+            itemBuilder: (context, index) {
+              final item = timelineController.timeline[index];
+              final p = item.post;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: PostCard(
+                  id: p.id.toString(),
+                  userId: p.userId,
+                  author: p.createdBy?.name ?? 'User',
+                  username: '@user',
+                  timestamp: _formatTimestamp(p.createdAt),
+                  content: p.postDescription,
+                  type: p.postImages.isEmpty ? 'text' : (p.postImages.length == 1 ? 'image' : 'multiImage'),
+                  image: p.postImages.isNotEmpty ? _imageUrl(p.postImages.first) : null,
+                  images: p.postImages.length > 1 ? p.postImages.map(_imageUrl).toList() : null,
+                  likes: p.postLikeCount,
+                  comments: p.postCommentCount,
+                  isLiked: p.isLiked,
+                  isSaved: p.saved,
+                  post: p,
+                  isShared: item.isShared,
+                  sharedAt: item.sharedAt,
+                  sharedByUserId: item.sharedByUserId,
+                  onLike: () {},
+                  onComment: () async {
+                    final fp = await postController.getSinglePost(p.id);
+                    if (fp != null) {
+                      final postData = PostData(
+                        id: fp.id.toString(),
+                        author: fp.createdBy?.name ?? 'Unknown',
+                        authorAvatar: null,
+                        timestamp: _formatTimestamp(fp.createdAt),
+                        title: fp.postTitle.isNotEmpty ? fp.postTitle : null,
+                        content: fp.postDescription,
+                        type: fp.postImages.isNotEmpty ? 'multiImage' : 'text',
+                        images: fp.postImages.map((img) => 'https://torko.attoexasolutions.com/$img').toList(),
+                        likes: fp.postLikeCount,
+                        comments: fp.postCommentCount,
+                        shares: fp.postShareCount,
+                        isLiked: fp.isLiked,
+                      );
+                      Get.to(() => PostWithComments(post: postData, onBack: () => Get.back(), onAddComment: (_, __) {}));
+                    }
+                  },
+                  onShare: () {},
+                  onDeleteSharedPost: item.isShared
+                      ? () => timelineController.onDeleteSharePressed(p)
+                      : null,
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    });
+  }
+
   Widget _buildPollCards() {
     final isDark = widget.isDark;
     final isBn = widget.isBn;
@@ -1203,17 +1387,308 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
     final isDark = widget.isDark;
     final isBn = widget.isBn;
 
-    return Transform.translate(
-      offset: const Offset(0, -90),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        child: Text(
-          isBn ? 'সংরক্ষিত পোস্টগুলি এখানে দেখানো হবে' : 'Saved posts will be displayed here',
-          style: GoogleFonts.roboto(
-            fontSize: 16,
-            color: isDark ? Colors.white70 : Colors.black54,
+    return Obx(() {
+      // Loading state
+      if (savedPostsController.loadingSaved && savedPostsController.savedPosts.isEmpty) {
+        return Transform.translate(
+          offset: const Offset(0, -90),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: const Center(
+              child: CircularProgressIndicator(),
+            ),
           ),
-          textAlign: TextAlign.center,
+        );
+      }
+
+      // Error state
+      if (savedPostsController.error.value.isNotEmpty) {
+        return Transform.translate(
+          offset: const Offset(0, -90),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: isDark ? Colors.white70 : Colors.black54,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  savedPostsController.error.value,
+                  style: GoogleFonts.roboto(
+                    fontSize: 14,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => savedPostsController.loadSavedPosts(),
+                  child: Text(isBn ? 'পুনরায় চেষ্টা করুন' : 'Retry'),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // Empty state
+      if (savedPostsController.savedPosts.isEmpty) {
+        return Transform.translate(
+          offset: const Offset(0, -90),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.bookmark_border,
+                  size: 64,
+                  color: isDark ? Colors.white54 : Colors.black54,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  isBn ? 'কোন সংরক্ষিত পোস্ট নেই' : 'No saved posts yet',
+                  style: GoogleFonts.roboto(
+                    fontSize: 16,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                TextButton.icon(
+                  onPressed: () => savedPostsController.loadSavedPosts(),
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: Text(isBn ? 'রিফ্রেশ করুন' : 'Refresh'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.lightPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // List of saved posts
+      return Transform.translate(
+        offset: const Offset(0, -90),
+        child: RefreshIndicator(
+          onRefresh: () => savedPostsController.fetchSaved(),
+          child: ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: savedPostsController.savedPosts.length,
+            itemBuilder: (context, index) {
+              final post = savedPostsController.savedPosts[index];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: PostCard(
+                  id: post.id.toString(),
+                  userId: post.userId,
+                  author: post.createdBy?.name ?? 'User',
+                  username: '@user',
+                  timestamp: _formatTimestamp(post.createdAt),
+                  content: post.postDescription,
+                  type: post.postImages.isEmpty ? 'text' : (post.postImages.length == 1 ? 'image' : 'multiImage'),
+                  image: post.postImages.isNotEmpty ? _imageUrl(post.postImages.first) : null,
+                  images: post.postImages.length > 1 ? post.postImages.map(_imageUrl).toList() : null,
+                  likes: post.postLikeCount,
+                  comments: post.postCommentCount,
+                  isLiked: post.isLiked,
+                  isSaved: post.saved,
+                  post: post,
+                  onLike: () {},
+                  onComment: () async {
+                    final fp = await postController.getSinglePost(post.id);
+                    if (fp != null) {
+                      final postData = PostData(
+                        id: fp.id.toString(),
+                        author: fp.createdBy?.name ?? 'Unknown',
+                        authorAvatar: null,
+                        timestamp: _formatTimestamp(fp.createdAt),
+                        title: fp.postTitle.isNotEmpty ? fp.postTitle : null,
+                        content: fp.postDescription,
+                        type: fp.postImages.isNotEmpty ? 'multiImage' : 'text',
+                        images: fp.postImages.map((img) => 'https://torko.attoexasolutions.com/$img').toList(),
+                        likes: fp.postLikeCount,
+                        comments: fp.postCommentCount,
+                        shares: fp.postShareCount,
+                        isLiked: fp.isLiked,
+                      );
+                      Get.to(() => PostWithComments(post: postData, onBack: () => Get.back(), onAddComment: (_, __) {}));
+                    }
+                  },
+                  onShare: () {},
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    });
+  }
+
+  String _imageUrl(String path) {
+    if (path.startsWith('http')) return path;
+    return 'https://torko.attoexasolutions.com/$path';
+  }
+
+  Widget _buildFriendsCards() {
+    final isDark = widget.isDark;
+    final isBn = widget.isBn;
+
+    return Obx(() {
+      // Empty state
+      if (friendsController.friends.isEmpty) {
+        return Transform.translate(
+          offset: const Offset(0, -90),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.people_outline,
+                  size: 64,
+                  color: isDark ? Colors.white54 : Colors.black54,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  isBn ? 'এখনো কোনো বন্ধু নেই' : 'No friends yet',
+                  style: GoogleFonts.roboto(
+                    fontSize: 16,
+                    color: isDark ? Colors.white70 : Colors.black54,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+
+      // List of friends
+      return Transform.translate(
+        offset: const Offset(0, -90),
+        child: ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: friendsController.friends.length,
+          itemBuilder: (context, index) {
+            final friend = friendsController.friends[index];
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0a2f3d) : Colors.white,
+                border: Border.all(
+                  color: isDark ? const Color(0xFF0d3a4a) : const Color(0xFFe0e0e0),
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  // Avatar
+                  Stack(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: AppColors.lightPrimary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: friend.avatar != null && friend.avatar!.isNotEmpty
+                            ? ClipOval(
+                                child: Image.network(
+                                  friend.avatar!.startsWith('http')
+                                      ? friend.avatar!
+                                      : 'https://torko.attoexasolutions.com/${friend.avatar!}',
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => _buildAvatarInitials(friend.name, 56),
+                                ),
+                              )
+                            : _buildAvatarInitials(friend.name, 56),
+                      ),
+                      if (friend.isOnline)
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF0a2f3d) : Colors.white,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  // Name and details
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          friend.name,
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : const Color(0xFF0f1419),
+                          ),
+                        ),
+                        if (friend.username.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '@${friend.username}',
+                            style: GoogleFonts.notoSansBengali(
+                              fontSize: 13,
+                              color: isDark ? const Color(0xFFB8DED6).withOpacity(0.6) : const Color(0xFF657786),
+                            ),
+                          ),
+                        ],
+                        if (friend.location != null && friend.location!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            friend.location!,
+                            style: GoogleFonts.notoSansBengali(
+                              fontSize: 12,
+                              color: isDark ? const Color(0xFFB8DED6).withOpacity(0.5) : const Color(0xFF9ca3af),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    });
+  }
+
+  Widget _buildAvatarInitials(String name, double size) {
+    return Center(
+      child: Text(
+        name.isNotEmpty ? name[0].toUpperCase() : 'U',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: size * 0.4,
+          fontWeight: FontWeight.bold,
         ),
       ),
     );
