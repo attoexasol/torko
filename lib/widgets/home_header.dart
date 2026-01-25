@@ -8,6 +8,7 @@ import '../core/theme/app_colors.dart';
 import '../controllers/navigation_controller.dart';
 import '../services/logout_service.dart';
 import '../services/user_info.dart';
+import '../views/friends/friends_screen.dart';
 
 class HomeHeader extends StatefulWidget {
   final Function(String)? onNavigate;
@@ -373,6 +374,14 @@ class _AppDrawerState extends State<_AppDrawer> {
           icon: Icons.home_outlined,
           label: isBn ? 'হোম' : 'Home',
           onTap: () => _handleMenuItemClick('home'),
+        ),
+        _MenuItem(
+          icon: Icons.people,
+          label: isBn ? 'বন্ধু' : 'Friends',
+          onTap: () {
+            widget.onClose();
+            Get.to(() => const FriendsScreen());
+          },
         ),
         _MenuItem(
           icon: Icons.people_outline,
