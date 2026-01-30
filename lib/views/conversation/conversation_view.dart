@@ -26,13 +26,12 @@ class _ConversationViewState extends State<ConversationView> {
   @override
   void initState() {
     super.initState();
-    // CRITICAL: Get.put() will reuse existing controller or create new one
-    // This ensures controller persists across rebuilds
-    chatController = Get.put(ChatController(), tag: null);
+    // CRITICAL: Controller is PERMANENT and created in InitialBindings
+    // Use Get.find() to get existing instance - NEVER create new one
+    chatController = Get.find<ChatController>();
     
     if (kDebugMode) {
-      print('🔧 ConversationView.initState: ChatController obtained');
-      print('   Controller instance: ${chatController.hashCode}');
+      debugPrint('[CONV] initState: ChatController obtained (${chatController.hashCode})');
     }
     
     // Listen to scroll position for smart auto-scroll
@@ -60,12 +59,11 @@ class _ConversationViewState extends State<ConversationView> {
 
   Future<void> _initializeChat() async {
     if (kDebugMode) {
-      print('🔧 ConversationView._initializeChat: Initializing chat');
+      debugPrint('[CONV] _initializeChat: initializing');
     }
-    
     final token = UserInfo.apiToken;
     if (kDebugMode) {
-      print('🔧 DM open tokenLen=${token?.length ?? 0}');
+      debugPrint('[CONV] token length=${token?.length ?? 0}');
     }
     
     // Try route arguments first (from inbox navigation)
@@ -92,29 +90,24 @@ class _ConversationViewState extends State<ConversationView> {
         final receiverAvatar = args['profile_image']?.toString() ?? args['receiverAvatar']?.toString();
         
         if (kDebugMode) {
-          print('🔧 ConversationView._initializeChat: Calling chatController.init()');
-          print('   toUserId: $toUserId');
-          print('   receiverName: $receiverName');
+          debugPrint('[CONV] initChat toUserId=$toUserId receiver=$receiverName');
         }
-        
-        await chatController.init(
+        await chatController.initChat(
           toUserId: toUserId,
           receiverName: receiverName,
           receiverAvatar: receiverAvatar,
         );
         
         if (kDebugMode) {
-          print('🔧 ConversationView._initializeChat: Chat initialized, setting up scroll');
-          print('🔧 DM response count=${chatController.messages.length}');
+          debugPrint('[CONV] Chat initialized, messages=${chatController.messages.length}');
         }
-        
         // Scroll to bottom after initial load
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(force: true));
         return;
       } else {
         // Invalid user ID
         if (kDebugMode) {
-          print('❌ ConversationView._initializeChat: Invalid toUserId - showing error');
+          debugPrint('[CONV] Invalid toUserId - showing error');
         }
         chatController.errorMessage.value = 'Invalid user';
         return;
@@ -130,7 +123,7 @@ class _ConversationViewState extends State<ConversationView> {
       final receiverAvatar = conversationData['avatar'];
 
       if (toUserId != null && toUserId is int) {
-        await chatController.init(
+        await chatController.initChat(
           toUserId: toUserId,
           receiverName: receiverName?.toString(),
           receiverAvatar: receiverAvatar?.toString(),

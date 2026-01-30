@@ -91,6 +91,31 @@ class NetworkCaller {
     return postRequest(url: url, body: fullBody, headers: mergedHeaders);
   }
 
+  /// POST for Pusher broadcasting auth. Body: { socket_id, channel_name, api_token }.
+  /// Also sends Authorization: Bearer. Laravel broadcasting auth expects api_token in body
+  /// (returns "Token missing" when only Bearer is sent). Token from UserInfo.
+  static Future<NetworkResponse> postBroadcastingAuth({
+    required String url,
+    required String socketId,
+    required String channelName,
+  }) async {
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) {
+      throw NetworkAuthException('Session expired. Please login again.');
+    }
+    final body = <String, dynamic>{
+      'socket_id': socketId,
+      'channel_name': channelName,
+      'api_token': token,
+    };
+    final headers = <String, String>{
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+    return postRequest(url: url, body: body, headers: headers);
+  }
+
   /// JSON POST
   static Future<NetworkResponse> postRequest({
     required String url,

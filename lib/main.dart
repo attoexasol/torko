@@ -28,6 +28,7 @@ import 'views/calling/calling_view.dart';
 import 'views/post_detail/post_detail_view.dart';
 import 'views/home/home_view.dart';
 import 'views/community/group_detail_screen.dart';
+import 'views/community/create_group_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,6 +73,7 @@ class MyApp extends StatelessWidget {
         GetPage(name: AppRoutes.postDetail, page: () => const PostDetailView()),
         GetPage(name: AppRoutes.dashboard, page: () => const DashboardView()),
         GetPage(name: AppRoutes.groupDetail, page: () => const GroupDetailScreen()),
+        GetPage(name: AppRoutes.createGroup, page: () => const CreateGroupView()),
       ],
       builder: (context, child) {
         final appController = Get.find<AppController>();

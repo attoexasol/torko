@@ -21,7 +21,7 @@ class Urls{
 
     static const save_post = "$_baseUrL/create/save_post" ;
     static const get_save_post = "$_baseUrL/get/save_post" ;
-    static const unsave_post = "$_baseUrL/create/unsave_post" ;
+    static const unsave_post = "$_baseUrL/create/unsave_post";
 
 
     // Comment API endPoints
@@ -42,6 +42,12 @@ class Urls{
 
     // like
     static const like_create = "$_baseUrL/like_create" ;
+
+
+    // Community groups
+    static const create_group = "$_baseUrL/community-groups/create" ;
+    static const get_all_groups = "$_baseUrL/get-all-community-groups";
+    static const get_single_group = "$_baseUrL/community-groups/single";
 
     // Send Message
     static const send_message = "$_baseUrL/messages/send" ;

@@ -29,16 +29,18 @@ class _MessagesViewState extends State<MessagesView> {
       print('🔍 [MessagesView] MessagesView opened');
     }
     
-    // Get or create InboxController (permanent so it persists)
-    inboxController = Get.put(InboxController(), permanent: true);
+    // CRITICAL: Controller is PERMANENT and created in InitialBindings
+    // Use Get.find() to get existing instance - NEVER create new one
+    inboxController = Get.find<InboxController>();
     
-    // Ensure inbox is loaded if empty
-    if (inboxController.threads.isEmpty && !inboxController.loading.value) {
-      if (kDebugMode) {
-        print('🔄 [MessagesView] Calling fetchInbox() from initState');
-      }
-      inboxController.fetchInbox();
+    if (kDebugMode) {
+      print('   InboxController instance: ${inboxController.hashCode}');
+      print('   Controller is PERMANENT - stream listener never dies');
     }
+    
+    // ⚠️ REALTIME RULE: Use loadInboxOnce() to ensure API is called ONLY ONCE
+    // After this, all updates come from Pusher stream only
+    inboxController.loadInboxOnce();
   }
 
   @override

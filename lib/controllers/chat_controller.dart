@@ -8,43 +8,64 @@ import '../services/user_info.dart';
 import '../core/controllers/app_controller.dart';
 import 'inbox_controller.dart';
 
-/// Controller for managing chat/conversation state and real-time messaging
+// ⚠️ REALTIME RULE:
+// DO NOT call API after Pusher events. STREAM-ONLY updates.
+// API only: initChat (loadConversationOnce), sendMessage.
+//
+// ⚠️ PERMANENT CONTROLLER: stream listener attached ONCE in onInit.
 class ChatController extends GetxController {
-  // State
   final RxList<MessageModel> messages = <MessageModel>[].obs;
   final RxBool isSending = false.obs;
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
-  // User IDs
   int? currentUserId;
+  int? activeUserId;
   int? toUserId;
   String? receiverName;
   String? receiverAvatar;
 
-  // Duplicate protection
   final Set<int> receivedMessageIds = <int>{};
-  
-  // Stream subscription
   StreamSubscription<MessageModel>? _pusherSubscription;
-  
-  // CRITICAL: NO polling timer - removed completely
-  // Realtime updates come ONLY from Pusher
+  final Map<int, bool> _conversationLoaded = <int, bool>{};
+
+  @override
+  void onInit() {
+    super.onInit();
+    if (kDebugMode) debugPrint('[CHAT] onInit - attaching stream listener');
+    _attachRealtimeListener();
+  }
+
+  /// Attach Pusher stream listener ONCE. Never call API from handler.
+  void _attachRealtimeListener() {
+    _pusherSubscription?.cancel();
+    _pusherSubscription = null;
+
+    _pusherSubscription = PusherService().incomingMessages.listen(
+      (message) {
+        if (kDebugMode) {
+          debugPrint('[CHAT] REALTIME message | id=${message.id} from=${message.fromUserId} to=${message.toUserId}');
+        }
+        _handleIncomingMessage(message);
+      },
+      onError: (error) {
+        if (kDebugMode) debugPrint('[CHAT] Stream error: $error');
+      },
+      cancelOnError: false,
+    );
+
+    if (kDebugMode) debugPrint('[CHAT] Stream listener attached');
+  }
 
   @override
   void onClose() {
-    _pusherSubscription?.cancel();
-    messages.clear();
-    receivedMessageIds.clear();
+    if (kDebugMode) debugPrint('[CHAT] onClose (permanent, keeping state)');
     super.onClose();
   }
 
-  /// Initialize chat with target user and load conversation history
-  /// 
-  /// [toUserId] - ID of user to chat with
-  /// [receiverName] - Display name of receiver (optional)
-  /// [receiverAvatar] - Avatar URL of receiver (optional)
-  Future<void> init({
+  /// Initialize chat for a specific user - protected against duplicate loads
+  /// This method ensures API is called ONLY ONCE per conversation
+  Future<void> initChat({
     required int toUserId,
     String? receiverName,
     String? receiverAvatar,
@@ -55,46 +76,67 @@ class ChatController extends GetxController {
       return;
     }
 
+    if (activeUserId == toUserId && _conversationLoaded[toUserId] == true) {
+      if (kDebugMode) {
+        debugPrint('[CHAT] initChat skipped - already loaded for user $toUserId');
+      }
+      this.toUserId = toUserId;
+      this.receiverName = receiverName;
+      this.receiverAvatar = receiverAvatar;
+      return;
+    }
+
+    final previousActiveUserId = activeUserId;
     currentUserId = currentUser;
+    activeUserId = toUserId;
     this.toUserId = toUserId;
     this.receiverName = receiverName;
     this.receiverAvatar = receiverAvatar;
 
     errorMessage.value = '';
-    messages.clear();
-    receivedMessageIds.clear();
 
-    // Load conversation history
-    await loadConversation();
+    if (previousActiveUserId != null && previousActiveUserId != toUserId) {
+      messages.clear();
+      receivedMessageIds.clear();
+      if (kDebugMode) {
+        debugPrint('[CHAT] switched conversation $previousActiveUserId -> $toUserId, cleared messages');
+      }
+    }
 
-    // Connect to Pusher and subscribe to real-time events
-    await _connectPusher();
+    // Load conversation ONLY if not already loaded
+    if (_conversationLoaded[toUserId] != true) {
+      await loadConversationOnce(toUserId);
+      _conversationLoaded[toUserId] = true;
+    }
+    
+    // Stream listener is already attached in constructor - no need to reconnect
   }
 
-  /// Load conversation history from API
-  /// 
-  /// CRITICAL: Called ONCE on init
-  /// CRITICAL: Never called again (Pusher handles new messages)
-  /// Merges with existing messages without duplicates
-  Future<void> loadConversation() async {
-    if (toUserId == null) {
-      if (kDebugMode) {
-        print('❌ ChatController.loadConversation: toUserId is null');
-      }
-      return;
+  /// Legacy init method - delegates to initChat for backward compatibility
+  @Deprecated('Use initChat instead')
+  Future<void> init({
+    required int toUserId,
+    String? receiverName,
+    String? receiverAvatar,
+  }) async {
+    await initChat(
+      toUserId: toUserId,
+      receiverName: receiverName,
+      receiverAvatar: receiverAvatar,
+    );
+  }
+
+  /// Load conversation from API - called ONLY ONCE per conversation
+  /// Protected by _conversationLoaded map
+  Future<void> loadConversationOnce(int userId) async {
+    if (kDebugMode) {
+      debugPrint('[CHAT] loadConversationOnce for user $userId');
     }
 
     final token = UserInfo.apiToken;
     if (token == null || token.isEmpty) {
-      if (kDebugMode) {
-        print('❌ ChatController.loadConversation: Token is null or empty');
-      }
       errorMessage.value = 'User not logged in';
       return;
-    }
-
-    if (kDebugMode) {
-      print('🔧 DM open toUserId=$toUserId tokenLen=${token.length}');
     }
 
     isLoading.value = true;
@@ -103,14 +145,9 @@ class ChatController extends GetxController {
     try {
       final history = await MessageApiService.fetchConversation(
         token: token,
-        toUserId: toUserId!,
+        toUserId: userId,
       );
-      
-      if (kDebugMode) {
-        print('🔧 DM response count=${history.length}');
-      }
 
-      // Merge with existing messages (avoid duplicates)
       final existingIds = receivedMessageIds.toSet();
       final newMessages = <MessageModel>[];
       
@@ -121,7 +158,6 @@ class ChatController extends GetxController {
         }
       }
 
-      // Combine existing and new messages, then sort
       final allMessages = [...messages, ...newMessages];
       allMessages.sort((a, b) {
         final timeCompare = a.createdAt.compareTo(b.createdAt);
@@ -130,241 +166,94 @@ class ChatController extends GetxController {
       });
 
       messages.value = allMessages;
-
+      
       if (kDebugMode) {
-        print('DEBUG ChatController.loadConversation: Loaded ${history.length} messages, ${newMessages.length} new, total: ${allMessages.length}');
+        debugPrint('[CHAT] Conversation loaded - ${messages.length} messages');
       }
     } catch (e) {
       errorMessage.value = e is MessageApiException 
           ? e.message 
           : 'Failed to load conversation';
-      
-      if (kDebugMode) {
-        print('DEBUG ChatController.loadConversation: Error - $e');
-      }
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Connect to Pusher and set up event listeners
-  /// 
-  /// CRITICAL: NO fallback polling
-  /// CRITICAL: If Pusher fails, app continues without real-time (graceful degradation)
-  Future<void> _connectPusher() async {
-    if (currentUserId == null) {
-      if (kDebugMode) {
-        print('DEBUG ChatController._connectPusher: ❌ currentUserId is null - cannot connect');
-      }
-      return;
-    }
-
-    try {
-      final pusherService = PusherService();
-      
-      if (kDebugMode) {
-        print('DEBUG ChatController._connectPusher: Connecting to Pusher for user $currentUserId');
-        print('DEBUG ChatController._connectPusher: Pusher isConnected: ${pusherService.isConnected}');
-      }
-      
-      // Connect to Pusher if not already connected
-      if (!pusherService.isConnected) {
-        if (kDebugMode) {
-          print('DEBUG ChatController._connectPusher: Pusher not connected - calling connect()');
-        }
-        await pusherService.connect(currentUserId: currentUserId!);
-      } else {
-        if (kDebugMode) {
-          print('DEBUG ChatController._connectPusher: Pusher already connected');
-        }
-      }
-
-      // CRITICAL: Cancel previous subscription if exists
-      if (_pusherSubscription != null) {
-        if (kDebugMode) {
-          print('DEBUG ChatController._connectPusher: Cancelling previous subscription');
-        }
-        await _pusherSubscription?.cancel();
-        _pusherSubscription = null;
-      }
-
-      // Listen to Pusher incoming messages (MessageModel stream)
-      if (kDebugMode) {
-        print('DEBUG ChatController._connectPusher: Setting up message listener');
-        print('   Using incomingMessages stream (MessageModel objects)');
-      }
-      
-      _pusherSubscription = pusherService.incomingMessages.listen(
-        (message) {
-      if (kDebugMode) {
-        print('═══════════════════════════════════════════════════════════');
-        print('📨 [MESSAGE RECEIVED] ✅ MESSAGE RECEIVED IN ChatController LISTENER');
-        print('   Message ID: ${message.id}');
-        print('   From User ID: ${message.fromUserId}');
-        print('   To User ID: ${message.toUserId}');
-        print('   Content: ${message.messageContent.length > 50 ? message.messageContent.substring(0, 50) + "..." : message.messageContent}');
-        print('═══════════════════════════════════════════════════════════');
-      }
-          _handleIncomingMessage(message);
-        },
-        onError: (error) {
-          if (kDebugMode) {
-            print('DEBUG ChatController._connectPusher: ❌ Stream error: $error');
-          }
-        },
-        onDone: () {
-          if (kDebugMode) {
-            print('DEBUG ChatController._connectPusher: ⚠️ Stream closed');
-          }
-        },
-        cancelOnError: false, // Keep listening even on error
-      );
-
-      if (kDebugMode) {
-        print('DEBUG ChatController._connectPusher: ✅ Pusher connected and listening for user $currentUserId, conversation with user $toUserId');
-      }
-      
-      // CRITICAL: NO fallback polling - removed completely
-      // Realtime updates come ONLY from Pusher
-    } catch (e, stackTrace) {
-      if (kDebugMode) {
-        print('DEBUG ChatController._connectPusher: ❌ Pusher connection error - $e');
-        print('DEBUG ChatController._connectPusher: Stack trace: $stackTrace');
-      }
-      // CRITICAL: Do NOT start polling - graceful degradation
-      // User can manually refresh if needed
-    }
+  /// Legacy method - delegates to loadConversationOnce
+  @Deprecated('Use loadConversationOnce instead')
+  Future<void> loadConversation() async {
+    if (toUserId == null) return;
+    await loadConversationOnce(toUserId!);
   }
 
-  /// Handle incoming message from Pusher
-  /// 
-  /// CRITICAL: Filters messages to show ONLY messages for this conversation
-  /// Message is shown if:
-  /// - FROM other user TO current user (incoming)
-  /// - FROM current user TO other user (outgoing)
+  /// Handle incoming message - INCREMENTAL UPDATE ONLY, NO API CALLS
+  /// ⚠️ CRITICAL: This method MUST NEVER call loadConversation() or any API
+  /// This is called from the permanent stream listener attached in constructor
   void _handleIncomingMessage(MessageModel message) {
     try {
-      if (kDebugMode) {
-        print('🔍 Processing incoming message');
-        print('   Message ID: ${message.id}');
-        print('   From User ID: ${message.fromUserId}');
-        print('   To User ID: ${message.toUserId}');
-        print('   Current User ID: $currentUserId');
-        print('   Other User ID (toUserId): $toUserId');
-      }
-        
-      // CRITICAL: Check if this message is for THIS conversation
-      // Message must be between currentUserId and toUserId
-      if (toUserId == null || currentUserId == null) {
-        if (kDebugMode) {
-          print('❌ Conversation not initialized (toUserId: $toUserId, currentUserId: $currentUserId)');
-        }
+      if (activeUserId == null || currentUserId == null) {
+        // No active conversation - message will be handled by InboxController
         return;
       }
         
-      // Message is for this conversation if:
-      // 1. FROM other user TO current user (incoming message)
-      // 2. FROM current user TO other user (outgoing message we sent)
-      final isIncomingMessage = message.fromUserId == toUserId && message.toUserId == currentUserId;
-      final isOutgoingMessage = message.fromUserId == currentUserId && message.toUserId == toUserId;
+      // Filter: message must be for the active conversation
+      final isIncomingMessage = message.fromUserId == activeUserId && message.toUserId == currentUserId;
+      final isOutgoingMessage = message.fromUserId == currentUserId && message.toUserId == activeUserId;
       final isForThisConversation = isIncomingMessage || isOutgoingMessage;
       
-      if (kDebugMode) {
-        print('   isIncomingMessage: $isIncomingMessage (fromUserId==toUserId && toUserId==currentUserId)');
-        print('   isOutgoingMessage: $isOutgoingMessage (fromUserId==currentUserId && toUserId==toUserId)');
-        print('   isForThisConversation: $isForThisConversation');
-      }
-      
       if (!isForThisConversation) {
-        if (kDebugMode) {
-          print('❌ Message NOT for this conversation - IGNORING');
-          print('   This message is for a different conversation');
-        }
+        // Message is for a different conversation - ignore
         return;
       }
       
-      if (kDebugMode) {
-        print('✅ Message IS for this conversation');
-        print('   Type: ${isIncomingMessage ? "INCOMING" : "OUTGOING"}');
-      }
-      
-      // Duplicate protection
       if (receivedMessageIds.contains(message.id)) {
         if (kDebugMode) {
-          print('⏭️  Duplicate message - already received (id: ${message.id})');
+          debugPrint('[CHAT] Duplicate ignored: id=${message.id}');
         }
         return;
       }
 
       receivedMessageIds.add(message.id);
-      
-      // Add message in sorted position (by createdAt asc)
-      _addMessageSorted(message);
 
-      if (kDebugMode) {
-        print('🎉 [UI UPDATED] ✅✅✅ MESSAGE ADDED SUCCESSFULLY ✅✅✅');
-        print('   Message ID: ${message.id}');
-        print('   Type: ${isIncomingMessage ? "INCOMING" : "OUTGOING"}');
-        print('   Total messages: ${messages.length}');
-        print('   ✅ UI should rebuild now via Obx');
+      if (!messages.any((m) => m.id == message.id)) {
+        _addMessageSorted(message);
+        messages.refresh();
+        if (kDebugMode) {
+          debugPrint('[CHAT] REALTIME message added | id=${message.id} total=${messages.length}');
+        }
       }
 
-      // Notify InboxController to update conversation preview
+      // Notify inbox
       _notifyInboxUpdate(message);
-    } catch (e, stackTrace) {
+    } catch (e) {
       if (kDebugMode) {
-        print('DEBUG ChatController._handleIncomingMessage: ❌ Error handling message - $e');
-        print('DEBUG ChatController._handleIncomingMessage: Stack trace: $stackTrace');
+        debugPrint('[CHAT] Error handling message: $e');
       }
     }
   }
 
-  /// Add message to list in sorted order (by createdAt asc, then id asc)
-  /// 
-  /// CRITICAL: Creates new list to ensure Obx rebuilds UI properly
   void _addMessageSorted(MessageModel message) {
-    if (kDebugMode) {
-      print('🔄 [MESSAGE ADDED] Adding message to list');
-      print('   Message ID: ${message.id}');
-      print('   Current messages.length: ${messages.length}');
-    }
-    
-    // Find insertion index (sorted by createdAt asc, then id asc)
-    int insertIndex = messages.length; // Default to end if newer than all
+    int insertIndex = messages.length;
     
     for (int i = 0; i < messages.length; i++) {
       final existing = messages[i];
       final comparison = message.createdAt.compareTo(existing.createdAt);
       if (comparison < 0) {
-        // message is older, insert before existing
         insertIndex = i;
         break;
       } else if (comparison == 0) {
-        // Same timestamp, compare IDs
         if (message.id < existing.id) {
-          // message has smaller ID, insert before existing
           insertIndex = i;
           break;
         }
       }
     }
 
-    // CRITICAL FIX: Create new list to ensure Obx detects change and rebuilds UI
-    // RxList.insert() sometimes doesn't trigger Obx rebuilds reliably
     final newMessages = List<MessageModel>.from(messages);
     newMessages.insert(insertIndex, message);
-    messages.value = newMessages; // This explicitly triggers Obx rebuild
-    
-    if (kDebugMode) {
-      print('✅ [MESSAGE ADDED] ✅ Message added to list');
-      print('   Inserted at index: $insertIndex');
-      print('   New messages.length: ${messages.length}');
-      print('   ✅ Obx will detect change and rebuild UI');
-      print('═══════════════════════════════════════════════════════════');
-    }
+    messages.value = newMessages;
   }
 
-  /// Notify InboxController to update conversation preview
   void _notifyInboxUpdate(MessageModel message) {
     try {
       if (Get.isRegistered<InboxController>()) {
@@ -373,36 +262,12 @@ class ChatController extends GetxController {
       }
     } catch (e) {
       if (kDebugMode) {
-        print('DEBUG ChatController: Error notifying inbox: $e');
+        debugPrint('[CHAT] Error notifying inbox: $e');
       }
     }
   }
 
-  /// Handle incoming message from real-time (hook for Pusher integration)
-  /// 
-  /// TODO: Backend must broadcast Pusher event to channel "private-user.{userId}" or similar
-  /// Flutter should subscribe using key+cluster only (no secret in Flutter)
-  void onIncomingMessage(MessageModel message) {
-    if (receivedMessageIds.contains(message.id)) {
-      return; // Duplicate
-    }
-
-    receivedMessageIds.add(message.id);
-    _addMessageSorted(message);
-    _notifyInboxUpdate(message);
-  }
-
-  /// Send a message
-  /// 
-  /// [content] - Message content
-  /// 
-  /// Returns true on success, false on failure
   Future<bool> sendMessage(String content) async {
-    if (kDebugMode) {
-      print('DEBUG ChatController.sendMessage: Starting - content: "$content"');
-      print('DEBUG ChatController.sendMessage: toUserId: $toUserId, currentUserId: $currentUserId');
-    }
-    
     if (content.trim().isEmpty) {
       errorMessage.value = 'Message cannot be empty';
       return false;
@@ -419,7 +284,6 @@ class ChatController extends GetxController {
       return false;
     }
 
-    // Prevent sending to self
     if (toUserId == currentUserId) {
       errorMessage.value = 'Cannot send message to yourself';
       return false;
@@ -428,53 +292,43 @@ class ChatController extends GetxController {
     isSending.value = true;
     errorMessage.value = '';
 
-    // Create temporary message for optimistic update
     final tempMessage = MessageModel.temporary(
       fromUserId: currentUserId!,
       toUserId: toUserId!,
       messageContent: content.trim(),
     );
 
-    // Add temporary message to end of list
     messages.add(tempMessage);
     receivedMessageIds.add(tempMessage.id);
+    messages.refresh();
 
     try {
-      // Send via REST API
       final sentMessage = await MessageApiService.sendMessage(
         token: token,
         toUserId: toUserId!,
         content: content.trim(),
       );
 
-      // Replace temporary message with confirmed message
       final index = messages.indexWhere((m) => m.id == tempMessage.id);
       if (index != -1) {
         messages[index] = sentMessage;
       } else {
-        // If not found, add as new
         messages.add(sentMessage);
       }
 
-      // Update received IDs
       receivedMessageIds.remove(tempMessage.id);
       receivedMessageIds.add(sentMessage.id);
+      messages.refresh();
 
       isSending.value = false;
-      
-      if (kDebugMode) {
-        print('DEBUG ChatController.sendMessage: Success - message ID: ${sentMessage.id}, messages.length: ${messages.length}');
-      }
-
-      // Notify InboxController to update conversation preview
       _notifyInboxUpdate(sentMessage);
       
       return true;
     } catch (e) {
-      // Remove failed message
       final index = messages.indexWhere((m) => m.id == tempMessage.id);
       if (index != -1) {
         messages.removeAt(index);
+        messages.refresh();
       }
 
       errorMessage.value = e is MessageApiException 
@@ -483,7 +337,6 @@ class ChatController extends GetxController {
       
       isSending.value = false;
       
-      // Show error to user
       final appController = Get.find<AppController>();
       Get.snackbar(
         appController.language == AppLanguage.bn ? 'ত্রুটি' : 'Error',
@@ -495,16 +348,31 @@ class ChatController extends GetxController {
     }
   }
 
-  /// Clear chat state
-  /// 
-  /// CRITICAL: Called on screen dispose
+  /// Clear chat state - only called on logout or explicit reset
+  /// Does NOT cancel stream subscription (controller is permanent)
   void clearChat() {
-    _pusherSubscription?.cancel();
-    _pusherSubscription = null;
+    if (kDebugMode) {
+      debugPrint('[CHAT] clearChat - clearing state, keeping stream listener');
+    }
+    // DO NOT cancel subscription - controller is permanent
+    activeUserId = null;
+    toUserId = null;
+    receiverName = null;
+    receiverAvatar = null;
     messages.clear();
     receivedMessageIds.clear();
+    _conversationLoaded.clear();
     errorMessage.value = '';
     isSending.value = false;
     isLoading.value = false;
+  }
+  
+  /// Reset conversation state for a specific user (switching conversations)
+  void resetConversation() {
+    activeUserId = null;
+    toUserId = null;
+    receiverName = null;
+    receiverAvatar = null;
+    // Keep messages and loaded state - user might come back
   }
 }

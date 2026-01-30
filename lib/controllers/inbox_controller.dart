@@ -12,99 +12,202 @@ import '../services/pusher_service.dart';
 import '../services/user_info.dart';
 import '../core/routes/app_routes.dart';
 
-/// Controller for inbox/conversation list
-/// Groups messages by otherUserId to show ONE conversation per user (like Messenger)
+// ⚠️ REALTIME RULE:
+// DO NOT call API after Pusher events.
+// This controller uses STREAM-ONLY updates.
+// API calls happen ONLY:
+//   1) Once when screen first opens (loadInboxOnce)
+//   2) Manual pull-to-refresh (refresh)
+//   3) Error retry button
+//
+// ⚠️ PERMANENT CONTROLLER:
+// This controller is PERMANENT and lives for entire app lifecycle.
+// Stream listener is attached ONCE in onInit() and never dies.
 class InboxController extends GetxController {
-  // Inbox threads (grouped conversations)
   final RxList<InboxThreadModel> threads = <InboxThreadModel>[].obs;
   final RxBool loading = false.obs;
   final RxString error = ''.obs;
 
-  // Search functionality
   final TextEditingController searchEC = TextEditingController();
-  final RxBool isSearchMode = false.obs; // true after search submitted OR when search text not empty
+  final RxBool isSearchMode = false.obs;
   final RxBool searching = false.obs;
   final RxString searchError = ''.obs;
   final RxList<SearchMessageResultModel> searchResults = <SearchMessageResultModel>[].obs;
 
-  // Pusher subscription for real-time updates
-  StreamSubscription<Map<String, dynamic>>? _pusherSubscription;
+  StreamSubscription<MessageModel>? _pusherSubscription;
+  
+  // One-time loader flag to prevent multiple API calls
+  bool _loadedOnce = false;
 
   @override
   void onInit() {
     super.onInit();
     if (kDebugMode) {
-      print('🔍 [InboxController] onInit called');
+      debugPrint('[INBOX] onInit - attaching stream listener');
+      debugPrint('[INBOX] Instance ID: ${hashCode}');
+    }
+    // DO NOT call fetchInbox() here - use loadInboxOnce() from view instead
+    // Attach stream listener ONCE - it will never die (permanent controller)
+    _connectPusher();
+  }
+  
+  /// Safe one-time loader - prevents duplicate API calls
+  /// Call this from MessagesView.initState() ONCE
+  void loadInboxOnce() {
+    if (_loadedOnce) {
+      if (kDebugMode) {
+        debugPrint('[INBOX] loadInboxOnce skipped - already loaded');
+      }
+      return;
+    }
+    _loadedOnce = true;
+    if (kDebugMode) {
+      debugPrint('[INBOX] loadInboxOnce - calling fetchInbox()');
     }
     fetchInbox();
-    _connectPusher();
+  }
+
+  void resetLoadedFlag() {
+    _loadedOnce = false;
+    if (kDebugMode) {
+      debugPrint('[INBOX] resetLoadedFlag - will reload on next loadInboxOnce()');
+    }
   }
 
   @override
   void onClose() {
-    _pusherSubscription?.cancel();
-    searchEC.dispose();
+    if (kDebugMode) {
+      debugPrint('[INBOX] onClose (permanent controller, keeping state)');
+    }
     super.onClose();
   }
 
-  /// Connect to Pusher for real-time inbox updates
-  Future<void> _connectPusher() async {
-    final currentUserId = UserInfo.userId;
-    if (currentUserId == null) return;
+  /// Listen to Pusher stream - NEVER calls connect()
+  void _connectPusher() {
+    final pusherService = PusherService();
 
-    try {
-      final pusherService = PusherService();
-      
-      if (!pusherService.isConnected) {
-        await pusherService.connect(currentUserId: currentUserId);
-      }
+    _pusherSubscription?.cancel();
+    _pusherSubscription = null;
 
-      _pusherSubscription = pusherService.onEventStream.listen((eventData) {
-        _handlePusherEvent(eventData);
-      });
+    _pusherSubscription = pusherService.incomingMessages.listen(
+      (message) {
+        if (kDebugMode) {
+          debugPrint('[INBOX] REALTIME message | id=${message.id}');
+        }
+        _handleIncomingMessage(message);
+      },
+      onError: (error) {
+        if (kDebugMode) {
+          debugPrint('[INBOX] Stream error: $error');
+        }
+      },
+      cancelOnError: false,
+    );
 
-      if (kDebugMode) {
-        print('DEBUG InboxController: Connected to Pusher for real-time updates');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('DEBUG InboxController: Pusher connection error - $e');
-      }
-    }
-  }
-
-  /// Handle incoming Pusher events
-  void _handlePusherEvent(Map<String, dynamic> eventData) {
-    try {
-      final eventName = eventData['eventName'] as String?;
-      final data = eventData['data'] as Map<String, dynamic>?;
-
-      if (data == null) return;
-
-      if (eventName != null && 
-          (eventName.contains('message') || eventName.contains('Message'))) {
-        // Refresh inbox when new message arrives
-        fetchInbox();
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('DEBUG InboxController: Error handling Pusher event: $e');
-      }
-    }
-  }
-
-  /// Fetch inbox and group messages by otherUserId
-  Future<void> fetchInbox() async {
     if (kDebugMode) {
-      print('═══════════════════════════════════════════════════════════');
-      print('🔍 [fetchInbox] fetchInbox() called');
+      debugPrint('[INBOX] Listening to Pusher stream');
     }
-    
+  }
+
+  /// Handle incoming message - INCREMENTAL UPDATE ONLY, NO API CALLS
+  /// ⚠️ CRITICAL: This method MUST NEVER call fetchInbox() or any API
+  void _handleIncomingMessage(MessageModel message) {
+    try {
+      final currentUserId = UserInfo.userId;
+      if (currentUserId == null) return;
+
+      final otherUserId = message.fromUserId == currentUserId 
+          ? message.toUserId 
+          : message.fromUserId;
+
+      final threadIndex = threads.indexWhere((t) => t.otherUserId == otherUserId);
+      
+      if (threadIndex >= 0) {
+        // Update existing thread INCREMENTALLY
+        final existingThread = threads[threadIndex];
+        
+        final lastRow = MessageRowModel(
+          id: message.id,
+          fromUserId: message.fromUserId,
+          toUserId: message.toUserId,
+          content: message.messageContent,
+          isRead: message.isRead,
+          createdAt: message.createdAt,
+          sender: message.sender,
+          receiver: message.receiver,
+        );
+        
+        int newUnreadCount = existingThread.unreadCount;
+        if (message.toUserId == currentUserId && message.isRead == 0) {
+          newUnreadCount = existingThread.unreadCount + 1;
+        } else if (message.fromUserId == currentUserId) {
+          newUnreadCount = existingThread.unreadCount;
+        }
+        
+        final updatedThread = InboxThreadModel(
+          otherUserId: existingThread.otherUserId,
+          otherName: existingThread.otherName,
+          otherAvatar: existingThread.otherAvatar,
+          lastMessage: message.messageContent,
+          lastTime: message.createdAt,
+          unreadCount: newUnreadCount,
+          lastRow: lastRow,
+        );
+        
+        threads[threadIndex] = updatedThread;
+        final updated = threads.removeAt(threadIndex);
+        threads.insert(0, updated);
+        threads.refresh();
+
+        if (kDebugMode) {
+          debugPrint('[INBOX] REALTIME thread updated | unread=$newUnreadCount');
+        }
+      } else {
+        // New conversation - create thread locally if we have user data
+        if (message.sender != null && message.receiver != null) {
+          final otherUser = message.fromUserId == currentUserId 
+              ? message.receiver! 
+              : message.sender!;
+          
+          final lastRow = MessageRowModel(
+            id: message.id,
+            fromUserId: message.fromUserId,
+            toUserId: message.toUserId,
+            content: message.messageContent,
+            isRead: message.isRead,
+            createdAt: message.createdAt,
+            sender: message.sender,
+            receiver: message.receiver,
+          );
+          
+          final newThread = InboxThreadModel(
+            otherUserId: otherUser.id,
+            otherName: otherUser.fullname,
+            otherAvatar: otherUser.profileImage,
+            lastMessage: message.messageContent,
+            lastTime: message.createdAt,
+            unreadCount: message.toUserId == currentUserId && message.isRead == 0 ? 1 : 0,
+            lastRow: lastRow,
+          );
+          
+          threads.insert(0, newThread);
+          threads.refresh();
+
+          if (kDebugMode) {
+            debugPrint('[INBOX] REALTIME new thread created locally');
+          }
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('[INBOX] Error handling message: $e');
+      }
+    }
+  }
+
+  Future<void> fetchInbox() async {
     final token = UserInfo.apiToken;
     if (token == null || token.isEmpty) {
-      if (kDebugMode) {
-        print('❌ [fetchInbox] Token is null or empty');
-      }
       error.value = 'User not logged in';
       loading.value = false;
       return;
@@ -112,46 +215,25 @@ class InboxController extends GetxController {
 
     final currentUserId = UserInfo.userId;
     if (currentUserId == null) {
-      if (kDebugMode) {
-        print('❌ [fetchInbox] UserId is null');
-      }
       error.value = 'User ID not found';
       loading.value = false;
       return;
-    }
-
-    if (kDebugMode) {
-      print('✅ [fetchInbox] Token found (length: ${token.length})');
-      print('✅ [fetchInbox] CurrentUserId: $currentUserId');
     }
 
     loading.value = true;
     error.value = '';
 
     try {
-      if (kDebugMode) {
-        print('🔄 [fetchInbox] Calling MessageApiService.fetchInboxRows()...');
-      }
-      
       final rawRows = await MessageApiService.fetchInboxRows(token: token);
       
-      if (kDebugMode) {
-        print('✅ [fetchInbox] API returned ${rawRows.length} raw message rows');
-      }
-      
-      // Group by otherUserId and count unreads
       final Map<int, List<MessageRowModel>> rowsByOtherUser = {};
       final Map<int, UserMiniModel> userInfoMap = {};
       
-      // First pass: group all rows by otherUserId
       for (var row in rawRows) {
         final otherUserId = row.getOtherUserId(currentUserId);
         final otherUser = row.getOtherUser(currentUserId);
         
         if (otherUser == null || otherUserId == 0) {
-          if (kDebugMode) {
-            print('⚠️ [fetchInbox] Skipping row ${row.id}: invalid otherUser');
-          }
           continue;
         }
         
@@ -163,7 +245,6 @@ class InboxController extends GetxController {
         rowsByOtherUser[otherUserId]!.add(row);
       }
       
-      // Second pass: create threads with proper unread counts
       final Map<int, InboxThreadModel> threadMap = {};
       
       for (var entry in rowsByOtherUser.entries) {
@@ -171,11 +252,9 @@ class InboxController extends GetxController {
         final rows = entry.value;
         final otherUser = userInfoMap[otherUserId]!;
         
-        // Sort rows by createdAt DESC to get latest
         rows.sort((a, b) => b.createdAt.compareTo(a.createdAt));
         final latestRow = rows.first;
         
-        // Count unread messages (messages sent TO current user that are unread)
         int unreadCount = 0;
         for (var row in rows) {
           if (row.toUserId == currentUserId && row.isRead == 0) {
@@ -194,54 +273,30 @@ class InboxController extends GetxController {
         );
       }
       
-      // Convert to list and sort by lastTime DESC (newest first)
       final threadList = threadMap.values.toList();
       threadList.sort((a, b) => b.lastTime.compareTo(a.lastTime));
       
       threads.assignAll(threadList);
-      
-      if (kDebugMode) {
-        print('✅ [fetchInbox] Grouped into ${threads.length} unique threads');
-        print('🔧 Inbox threads=${threads.length}');
-        for (var thread in threads.take(5)) {
-          print('   - User ${thread.otherUserId} (${thread.otherName}): "${thread.lastMessage}" (${thread.unreadCount} unread)');
-        }
-        print('═══════════════════════════════════════════════════════════');
-      }
-    } catch (e, stackTrace) {
+    } catch (e) {
       error.value = e is MessageApiException 
           ? e.message 
           : 'Failed to load conversations';
-      
-      if (kDebugMode) {
-        print('❌ [fetchInbox] Error: $e');
-        print('   Stack trace: $stackTrace');
-        print('═══════════════════════════════════════════════════════════');
-      }
     } finally {
       loading.value = false;
     }
   }
 
-  /// Pull to refresh
   Future<void> refresh() async {
     await fetchInbox();
   }
 
-  /// Navigate to conversation from inbox thread
-  /// Uses standardized argument format: to_user_id, fullname, profile_image
   void openThreadFromInbox(InboxThreadModel thread) {
-    if (kDebugMode) {
-      print('🔍 [InboxController] Opening conversation with user ${thread.otherUserId}');
-    }
-    
     Get.toNamed(
       AppRoutes.conversation,
       arguments: {
         'to_user_id': thread.otherUserId,
         'fullname': thread.otherName,
         'profile_image': thread.otherAvatar,
-        // Legacy support
         'toUserId': thread.otherUserId,
         'receiverName': thread.otherName,
         'receiverAvatar': thread.otherAvatar,
@@ -249,7 +304,6 @@ class InboxController extends GetxController {
     );
   }
 
-  /// Submit search query
   Future<void> onSubmitSearch() async {
     final keyword = searchEC.text.trim();
     
@@ -258,7 +312,6 @@ class InboxController extends GetxController {
       return;
     }
 
-    // Prevent double request while searching
     if (searching.value) {
       return;
     }
@@ -275,10 +328,6 @@ class InboxController extends GetxController {
     }
 
     try {
-      if (kDebugMode) {
-        print('🔍 [InboxController] Searching messages with keyword: "$keyword"');
-      }
-
       final results = await MessageApiService.searchMessages(
         token: token,
         keyword: keyword,
@@ -286,26 +335,17 @@ class InboxController extends GetxController {
 
       searchResults.assignAll(results);
       searchError.value = '';
-
-      if (kDebugMode) {
-        print('✅ [InboxController] Search completed: ${results.length} results');
-      }
     } catch (e) {
       searchError.value = e is MessageApiException 
           ? e.message 
           : 'Failed to search messages';
       
       searchResults.clear();
-
-      if (kDebugMode) {
-        print('❌ [InboxController] Search error: $e');
-      }
     } finally {
       searching.value = false;
     }
   }
 
-  /// Clear search and return to inbox
   void clearSearch() {
     searchEC.clear();
     isSearchMode.value = false;
@@ -313,20 +353,13 @@ class InboxController extends GetxController {
     searchError.value = '';
   }
 
-  /// Navigate to conversation from search result
-  /// Uses standardized argument format: to_user_id, fullname, profile_image
   void openThreadFromSearch(SearchMessageResultModel item) {
-    if (kDebugMode) {
-      print('🔍 [InboxController] Opening conversation from search with user ${item.user.id}');
-    }
-    
     Get.toNamed(
       AppRoutes.conversation,
       arguments: {
         'to_user_id': item.user.id,
         'fullname': item.user.fullname,
         'profile_image': item.user.profileImage,
-        // Legacy support
         'toUserId': item.user.id,
         'receiverName': item.user.fullname,
         'receiverAvatar': item.user.profileImage,
@@ -334,19 +367,8 @@ class InboxController extends GetxController {
     );
   }
 
-  /// Update conversation list from incoming message (real-time)
-  /// Called by ChatController when a new message is sent/received
+  /// Update conversation from message - delegates to _handleIncomingMessage
   void updateConversationFromMessage(MessageModel message) {
-    final currentUserId = UserInfo.userId;
-    if (currentUserId == null) return;
-
-    // Determine the other user in the conversation
-    final otherUserId = message.fromUserId == currentUserId 
-        ? message.toUserId 
-        : message.fromUserId;
-
-    // Refresh inbox to get updated data
-    // This ensures we have the latest message and correct unread counts
-    fetchInbox();
+    _handleIncomingMessage(message);
   }
 }

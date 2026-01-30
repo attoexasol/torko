@@ -116,13 +116,11 @@ class NavigationController extends GetxController {
     if (screen == 'messages') {
       appController.resetMessageNotifications();
       
-      // Refresh inbox when messages screen is selected
-      if (Get.isRegistered<InboxController>()) {
-        final inboxController = Get.find<InboxController>();
-        if (kDebugMode) {
-          print('🔄 [NavigationController] Refreshing inbox on messages screen select');
-        }
-        inboxController.fetchInbox();
+      // ⚠️ REALTIME RULE: DO NOT call fetchInbox() here
+      // InboxController uses stream-only updates after initial load
+      // The MessagesView will call loadInboxOnce() in initState if needed
+      if (kDebugMode) {
+        print('[NAV] Messages screen selected - inbox updates via Pusher stream only');
       }
     }
     
@@ -196,13 +194,11 @@ class NavigationController extends GetxController {
   void handleMessagesTap() {
     appController.resetMessageNotifications();
     
-    // Refresh inbox when messages tab is tapped
-    if (Get.isRegistered<InboxController>()) {
-      final inboxController = Get.find<InboxController>();
-      if (kDebugMode) {
-        print('🔄 [NavigationController] Refreshing inbox on messages tap');
-      }
-      inboxController.fetchInbox();
+    // ⚠️ REALTIME RULE: DO NOT call fetchInbox() here
+    // InboxController uses stream-only updates after initial load
+    // The MessagesView will call loadInboxOnce() in initState if needed
+    if (kDebugMode) {
+      print('[NAV] Messages tab tapped - inbox updates via Pusher stream only');
     }
     
     navigateTo('messages');

@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../core/routes/app_routes.dart';
 import '../../services/network_caller.dart';
 import '../../services/urls.dart';
 import '../../services/user_info.dart';
+import '../../services/pusher_service.dart';
 
 class LoginController extends GetxController {
   // State variables
@@ -193,6 +195,26 @@ class LoginController extends GetxController {
           }
           
           await UserInfo.setVerified(true);
+
+          // Ensure previous Pusher connection is disconnected, then init for new user
+          final currentUserId = UserInfo.userId;
+          if (currentUserId != null) {
+            try {
+              await PusherService().disconnect();
+              if (kDebugMode) {
+                debugPrint('[LOGIN] Pusher disconnected before init');
+              }
+              await PusherService().init(userId: currentUserId);
+              if (kDebugMode) {
+                debugPrint('[LOGIN] Pusher initialized for userId=$currentUserId');
+              }
+            } catch (e) {
+              if (kDebugMode) {
+                debugPrint('[LOGIN] Pusher init failed (non-critical): $e');
+              }
+              // Don't block navigation
+            }
+          }
 
           // Navigate to profile data screen
           Get.offAllNamed(AppRoutes.profileData);
