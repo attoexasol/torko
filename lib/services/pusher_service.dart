@@ -1,277 +1,321 @@
-import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:pusher_channels_flutter/pusher_channels_flutter.dart';
+
 import '../models/message_model.dart';
 import '../services/network_caller.dart';
 import '../services/urls.dart';
 import '../services/user_info.dart';
 
-/// Singleton PusherService – real-time messaging lifecycle.
-/// Protocol: private channel "private-user.{userId}", event "message.sent",
-/// auth via POST /api/broadcasting/auth (Bearer + body socket_id, channel_name).
+/// PUSHER SERVICE (FIXED + PRODUCTION-SAFE)
+///
+/// Goals:
+/// ✅ Singleton (1 connection only)
+/// ✅ Subscribe exactly once per login/user
+/// ✅ No duplicate subscriptions / no duplicate event forwarding
+/// ✅ Safe reconnect + safe user switch
+/// ✅ Robust event parsing (Laravel style / top-level)
+/// ✅ Main-thread delivery for GetX UI
+///
+/// IMPORTANT:
+/// - Call init(userId) ONCE after login (e.g., AppController after token set)
+/// - Call disconnect() on logout
 class PusherService {
+  // =========================
+  // Singleton
+  // =========================
   static final PusherService _instance = PusherService._internal();
   factory PusherService() => _instance;
   PusherService._internal();
 
-  PusherChannelsFlutter? _pusher;
-  PusherChannel? _channel;
-  String? _currentChannelName;
-
-  StreamController<MessageModel> _controller =
-      StreamController<MessageModel>.broadcast();
-
-  bool _initialized = false;
-  bool _connected = false;
-  int? _currentUserId;
-
-  bool _initializing = false;
-  bool _disconnecting = false;
-
+  // =========================
+  // CONFIG
+  // =========================
   static const String _pusherKey = '9df09725d514e737df9a';
   static const String _pusherCluster = 'ap2';
+  static const String _messageEventName = 'message.sent';
 
-  /// Channel name per protocol: Laravel PrivateChannel('user.{id}') → private-user.{id}
   static String channelNameForUser(int userId) => 'private-user.$userId';
 
-  Stream<MessageModel> get stream => _controller.stream;
-  Stream<MessageModel> get incomingMessages => stream;
-  Stream<MessageModel> get messagesStream => stream;
+  // =========================
+  // Internal State
+  // =========================
+  PusherChannelsFlutter? _pusher;
 
+  String? _currentChannel;
+  int? _currentUserId;
+
+  bool _connecting = false;
+  bool _initialized = false; // pusher.init done at least once
+  bool _connected = false;
+  bool _subscribed = false;
+
+  /// Prevent duplicate delivery (Pusher reconnect / same event received twice)
+  final Set<int> _deliveredMessageIds = <int>{};
+
+  // =========================
+  // PUBLIC GETTERS
+  // =========================
   bool get isConnected => _connected;
+  bool get isSubscribed => _subscribed;
   int? get currentUserId => _currentUserId;
-  String? get currentChannelName => _currentChannelName;
+  String? get currentChannel => _currentChannel;
 
-  /// Debug helper: print connection state and subscribed channel.
+  // =========================
+  // CALLBACKS
+  // =========================
+  Function(MessageModel)? onMessageReceived; // Chat
+  Function(MessageModel)? onInboxMessage; // Inbox
+
+  // =========================
+  // DEBUG
+  // =========================
   void debugPrintConnectionState() {
     if (!kDebugMode) return;
-    debugPrint('[PUSHER] debug state: connected=$_connected userId=$_currentUserId '
-        'channel=$_currentChannelName initializing=$_initializing disconnecting=$_disconnecting');
+    debugPrint(
+      '[PUSHER STATE] init=$_initialized connected=$_connected subscribed=$_subscribed '
+      'user=$_currentUserId channel=$_currentChannel connecting=$_connecting',
+    );
   }
 
+  // =========================
+  // INIT (CALL ONCE AFTER LOGIN)
+  // =========================
   Future<void> init({required int userId}) async {
-    if (_initializing) {
-      if (kDebugMode) debugPrint('[PUSHER] init skipped: already initializing');
-      return;
-    }
-    if (_connected && _currentUserId == userId) {
-      if (kDebugMode) debugPrint('[PUSHER] init skipped: already connected for user $userId');
+    if (_connecting) {
+      if (kDebugMode) debugPrint('[PUSHER] init skipped (already connecting)');
       return;
     }
 
-    _initializing = true;
-    if (kDebugMode) debugPrint('[PUSHER] init start for userId=$userId');
+    // Already connected & subscribed to same user
+    if (_connected && _subscribed && _currentUserId == userId) {
+      debugPrintConnectionState();
+      return;
+    }
+
+    _connecting = true;
 
     try {
-      if (_connected || _initialized) {
-        if (kDebugMode) debugPrint('[PUSHER] init: disconnecting previous (userId=$_currentUserId)');
+      // If switching user or stale state -> full reset
+      if (_currentUserId != null && _currentUserId != userId) {
         await disconnect();
       }
 
       _currentUserId = userId;
-      _pusher = PusherChannelsFlutter.getInstance();
+      _currentChannel = channelNameForUser(userId);
 
-      await _pusher!.init(
-        apiKey: _pusherKey,
-        cluster: _pusherCluster,
-        onAuthorizer: _onAuthorizer,
-        onConnectionStateChange: (currentState, previousState) {
-          final stateStr = currentState.toString();
-          final u = stateStr.toUpperCase();
-          final isConn = u.contains('CONNECTED') && !u.contains('CONNECTING');
-          final isDisc = u.contains('DISCONNECTED') || u.contains('FAILED');
+      _pusher ??= PusherChannelsFlutter.getInstance();
 
-          if (isConn) {
-            _connected = true;
-            if (kDebugMode) debugPrint('[PUSHER] connection state: CONNECTED (userId=$_currentUserId)');
-            _subscribe(userId);
-          } else {
-            _connected = false;
+      // Init only once per app lifecycle (plugin init can be expensive)
+      if (!_initialized) {
+        await _pusher!.init(
+          apiKey: _pusherKey,
+          cluster: _pusherCluster,
+          onAuthorizer: _authorizeChannel,
+          onConnectionStateChange: _onConnectionStateChange,
+          onEvent: _onEvent,
+          onError: (message, code, error) {
             if (kDebugMode) {
-              if (isDisc) debugPrint('[PUSHER] connection state: DISCONNECTED/FAILED ($stateStr)');
-              else debugPrint('[PUSHER] connection state: $stateStr');
+              debugPrint('[PUSHER] ERROR($code): $message | $error');
             }
-          }
-        },
-        onError: (message, code, error) {
-          if (kDebugMode) debugPrint('[PUSHER] error: $message (code: $code)');
-        },
-        onSubscriptionSucceeded: (channelName, data) {
-          if (kDebugMode) debugPrint('[PUSHER] subscribe success: $channelName');
-        },
-        onEvent: (event) {
-          if (event.eventName != 'message.sent') return;
-          if (kDebugMode) debugPrint('[PUSHER] event received: message.sent');
-          _handleEvent(event);
-        },
-        onSubscriptionError: (message, error) {
-          if (kDebugMode) debugPrint('[PUSHER] subscribe error: $message');
-        },
-      );
+          },
+        );
+        _initialized = true;
+      }
 
-      await _pusher!.connect();
-      if (kDebugMode) debugPrint('[PUSHER] connect() called');
-      await Future.delayed(const Duration(seconds: 1));
-
-      _initialized = true;
-      if (kDebugMode) debugPrint('[PUSHER] init end for userId=$userId');
-    } catch (e) {
-      _initialized = false;
-      _connected = false;
-      _currentUserId = null;
-      _currentChannelName = null;
-      if (kDebugMode) debugPrint('[PUSHER] init error: $e');
-      rethrow;
+      // Connect (safe to call if already connected, but we guard anyway)
+      if (!_connected) {
+        await _pusher!.connect();
+        if (kDebugMode) debugPrint('[PUSHER] connect() called');
+      } else {
+        // If connected but not subscribed (edge case), force subscribe
+        await _ensureSubscribed();
+      }
     } finally {
-      _initializing = false;
+      _connecting = false;
     }
   }
 
-  Future<void> _subscribe(int userId) async {
-    _currentChannelName = channelNameForUser(userId);
-    if (kDebugMode) debugPrint('[PUSHER] subscribing to $_currentChannelName');
+  // =========================
+  // CONNECTION STATE
+  // =========================
+  void _onConnectionStateChange(dynamic currentState, dynamic previousState) {
+    final state = currentState.toString().toUpperCase();
+
+    if (state.contains('CONNECTED')) {
+      _connected = true;
+
+      if (kDebugMode) debugPrint('[PUSHER] CONNECTED');
+
+      // Subscribe once connection is up
+      _ensureSubscribed();
+      return;
+    }
+
+    if (state.contains('DISCONNECTED') || state.contains('FAILED')) {
+      _connected = false;
+      _subscribed = false;
+
+      if (kDebugMode) debugPrint('[PUSHER] DISCONNECTED/FAILED');
+
+      return;
+    }
+  }
+
+  // =========================
+  // SUBSCRIBE (IDEMPOTENT)
+  // =========================
+  Future<void> _ensureSubscribed() async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+
+    final channel = channelNameForUser(userId);
+
+    // already subscribed to the same channel
+    if (_subscribed && _currentChannel == channel) {
+      return;
+    }
+
+    // if subscribed to some other channel (shouldn't happen often), unsubscribe first
+    if (_currentChannel != null && _currentChannel != channel) {
+      try {
+        await _pusher?.unsubscribe(channelName: _currentChannel!);
+      } catch (_) {}
+      _subscribed = false;
+    }
+
+    _currentChannel = channel;
+
     try {
-      _channel = await _pusher!.subscribe(channelName: _currentChannelName!);
-      if (kDebugMode) debugPrint('[PUSHER] subscribed to $_currentChannelName');
+      await _pusher?.subscribe(channelName: channel);
+      _subscribed = true;
+
+      if (kDebugMode) debugPrint('[PUSHER] SUBSCRIBED → $channel');
     } catch (e) {
-      _currentChannelName = null;
-      if (kDebugMode) debugPrint('[PUSHER] subscribe error: $e');
-      rethrow;
+      _subscribed = false;
+      if (kDebugMode) debugPrint('[PUSHER] SUBSCRIBE ERROR: $e');
     }
   }
 
-  Future<Map<String, dynamic>> _onAuthorizer(
+  // =========================
+  // AUTHORIZATION
+  // =========================
+  Future<Map<String, dynamic>> _authorizeChannel(
     String channelName,
     String socketId,
     dynamic options,
   ) async {
-    if (kDebugMode) {
-      debugPrint('[PUSHER] auth request channel=$channelName socketId=${socketId.length > 12 ? '${socketId.substring(0, 12)}...' : socketId}');
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) {
+      throw Exception('Token missing');
     }
+
+    final response = await NetworkCaller.postBroadcastingAuth(
+      url: Urls.pusher_auth,
+      socketId: socketId,
+      channelName: channelName,
+    );
+
+    if (!response.isSuccess || response.body == null) {
+      throw Exception('Pusher auth failed');
+    }
+
+    final Map<String, dynamic> body = Map<String, dynamic>.from(response.body!);
+    final auth = body['auth'];
+
+    if (auth == null) {
+      throw Exception('Invalid auth response');
+    }
+
+    return {'auth': auth};
+  }
+
+  // =========================
+  // EVENT ROUTER
+  // =========================
+  void _onEvent(PusherEvent event) {
+    if (event.eventName != _messageEventName) return;
+    _handleIncomingEvent(event);
+  }
+
+  // =========================
+  // EVENT HANDLER (ROBUST)
+  // =========================
+  void _handleIncomingEvent(PusherEvent event) {
     try {
-      final token = UserInfo.apiToken;
-      if (token == null || token.isEmpty) {
-        if (kDebugMode) debugPrint('[PUSHER] auth failed: no token');
-        throw Exception('No API token');
+      final dynamic decoded = jsonDecode(event.data as String);
+
+      if (decoded is! Map) return;
+
+      final Map<String, dynamic> data = Map<String, dynamic>.from(decoded);
+
+      // Laravel broadcast often wraps inside { message: {...} }
+      final dynamic inner = data['message'];
+      final Map<String, dynamic> raw = inner is Map
+          ? Map<String, dynamic>.from(inner)
+          : data;
+
+      final message = MessageModel.fromJson(raw);
+
+      // Dedupe at service level (helps when reconnect duplicates happen)
+      if (_deliveredMessageIds.contains(message.id)) {
+        if (kDebugMode)
+          debugPrint('[PUSHER] duplicate dropped id=${message.id}');
+        return;
       }
-      final response = await NetworkCaller.postBroadcastingAuth(
-        url: Urls.pusher_auth,
-        socketId: socketId,
-        channelName: channelName,
-      );
-      if (!response.isSuccess) {
-        if (kDebugMode) debugPrint('[PUSHER] auth response status: ${response.statusCode} ${response.errorMessage}');
-        throw Exception('Auth failed: ${response.errorMessage ?? 'Unknown'}');
-      }
-      final body = response.body;
-      if (body == null) {
-        if (kDebugMode) debugPrint('[PUSHER] auth response: null body');
-        throw Exception('Invalid auth response: null body');
-      }
-      final auth = body['auth'] as String?;
-      if (auth == null || auth.isEmpty) {
-        if (kDebugMode) debugPrint('[PUSHER] auth response: missing auth field');
-        throw Exception('Invalid auth response: missing auth field');
-      }
-      if (kDebugMode) debugPrint('[PUSHER] auth success: $channelName');
-      return {'auth': auth};
+      _deliveredMessageIds.add(message.id);
+
+      // Deliver on UI frame to avoid GetX update during build
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        try {
+          onMessageReceived?.call(message);
+          onInboxMessage?.call(message);
+
+          if (kDebugMode) {
+            debugPrint('[PUSHER] MESSAGE FORWARDED id=${message.id}');
+          }
+        } catch (e) {
+          if (kDebugMode) debugPrint('[PUSHER] callback error: $e');
+        }
+      });
     } catch (e) {
-      if (kDebugMode) debugPrint('[PUSHER] auth failed: $e');
-      rethrow;
+      if (kDebugMode) debugPrint('[PUSHER] EVENT PARSE ERROR: $e');
     }
   }
 
-  void _handleEvent(PusherEvent event) {
-    try {
-      Map<String, dynamic> raw;
-      if (event.data is String) {
-        raw = jsonDecode(event.data as String) as Map<String, dynamic>;
-      } else if (event.data is Map) {
-        raw = Map<String, dynamic>.from(event.data as Map);
-      } else {
-        if (kDebugMode) debugPrint('[PUSHER] parse error: invalid event data type ${event.data.runtimeType}');
-        return;
-      }
-
-      // Protocol: flat JSON. Unwrap data/message only if root lacks id/from_user_id.
-      Map<String, dynamic> payload = raw;
-      if (!raw.containsKey('id') || !raw.containsKey('from_user_id')) {
-        if (raw.containsKey('data') && raw['data'] is Map) {
-          payload = Map<String, dynamic>.from(raw['data'] as Map);
-        } else if (raw.containsKey('message') && raw['message'] is Map) {
-          payload = Map<String, dynamic>.from(raw['message'] as Map);
-        }
-      }
-      if (!payload.containsKey('id') || !payload.containsKey('from_user_id')) {
-        if (kDebugMode) debugPrint('[PUSHER] parse error: payload missing id/from_user_id raw=$raw');
-        return;
-      }
-
-      final message = MessageModel.fromJson(payload);
-      _controller.add(message);
-      if (kDebugMode) {
-        debugPrint('[PUSHER] event received | id=${message.id} from=${message.fromUserId} to=${message.toUserId}');
-      }
-    } catch (e, st) {
-      if (kDebugMode) {
-        debugPrint('[PUSHER] payload parse error: $e');
-        debugPrint('[PUSHER] raw event.data: ${event.data}');
-        debugPrint('[PUSHER] stack: $st');
-      }
-    }
+  // =========================
+  // RESET DEDUPE CACHE (OPTIONAL)
+  // =========================
+  void clearDeliveredCache() {
+    _deliveredMessageIds.clear();
   }
 
+  // =========================
+  // DISCONNECT (LOGOUT)
+  // =========================
   Future<void> disconnect() async {
-    if (_disconnecting) {
-      if (kDebugMode) debugPrint('[PUSHER] disconnect skipped: already disconnecting');
-      return;
-    }
-    if (!_initialized && _channel == null && _pusher == null && _currentChannelName == null) {
-      if (kDebugMode) debugPrint('[PUSHER] disconnect skipped: already disconnected');
-      return;
-    }
-
-    _disconnecting = true;
-    final prevUserId = _currentUserId;
-    if (kDebugMode) debugPrint('[PUSHER] disconnecting (userId=$prevUserId)');
-
     try {
-      if (_currentChannelName != null && _pusher != null) {
+      if (_currentChannel != null) {
         try {
-          if (kDebugMode) debugPrint('[PUSHER] unsubscribing from $_currentChannelName');
-          await _pusher!.unsubscribe(channelName: _currentChannelName!);
-          if (kDebugMode) debugPrint('[PUSHER] unsubscribed from $_currentChannelName');
-        } catch (e) {
-          if (kDebugMode) debugPrint('[PUSHER] unsubscribe error: $e');
-        }
-        _channel = null;
-        _currentChannelName = null;
+          await _pusher?.unsubscribe(channelName: _currentChannel!);
+        } catch (_) {}
       }
-      if (_pusher != null) {
-        try {
-          await _pusher!.disconnect();
-        } catch (e) {
-          if (kDebugMode) debugPrint('[PUSHER] disconnect error: $e');
-        }
-        _pusher = null;
-      }
-      _initialized = false;
-      _connected = false;
-      _currentUserId = null;
-      _currentChannelName = null;
-      if (kDebugMode) debugPrint('[PUSHER] disconnected (was userId=$prevUserId)');
-    } finally {
-      _disconnecting = false;
-    }
-  }
 
-  void dispose() {
-    _controller.close();
-    disconnect();
-    _initialized = false;
-    _connected = false;
-    _currentUserId = null;
-    _currentChannelName = null;
+      try {
+        await _pusher?.disconnect();
+      } catch (_) {}
+    } finally {
+      _connected = false;
+      _subscribed = false;
+
+      _currentUserId = null;
+      _currentChannel = null;
+
+      _deliveredMessageIds.clear();
+
+      if (kDebugMode) debugPrint('[PUSHER] DISCONNECTED CLEAN');
+    }
   }
 }

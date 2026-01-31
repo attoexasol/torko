@@ -10,7 +10,7 @@ class LoginView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-  final appController = Get.find<AppController>();
+    final appController = Get.find<AppController>();
     final controller = Get.put(LoginController());
 
     return Obx(() {
@@ -28,7 +28,8 @@ class LoginView extends StatelessWidget {
               LayoutBuilder(
                 builder: (context, constraints) {
                   return SingleChildScrollView(
-                    keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: EdgeInsets.only(
                       bottom: controller.cookiesAccepted.value ? 24 : 160,
                     ),
@@ -37,9 +38,21 @@ class LoginView extends StatelessWidget {
                         minHeight: constraints.maxHeight,
                       ),
                       child: IntrinsicHeight(
-                        child: Obx(() => controller.step.value == 'phone'
-                            ? _buildPhoneStep(isDark, language, appController, controller)
-                            : _buildOtpStep(isDark, language, appController, controller)),
+                        child: Obx(
+                          () => controller.step.value == 'phone'
+                              ? _buildPhoneStep(
+                                  isDark,
+                                  language,
+                                  appController,
+                                  controller,
+                                )
+                              : _buildOtpStep(
+                                  isDark,
+                                  language,
+                                  appController,
+                                  controller,
+                                ),
+                        ),
                       ),
                     ),
                   );
@@ -53,7 +66,12 @@ class LoginView extends StatelessWidget {
                   right: 0,
                   child: Card(
                     margin: EdgeInsets.zero,
-                    child: _buildCookieNotice(isDark, language, appController, controller),
+                    child: _buildCookieNotice(
+                      isDark,
+                      language,
+                      appController,
+                      controller,
+                    ),
                   ),
                 ),
             ],
@@ -63,7 +81,12 @@ class LoginView extends StatelessWidget {
     });
   }
 
-  Widget _buildPhoneStep(bool isDark, AppLanguage language, AppController appController, LoginController controller) {
+  Widget _buildPhoneStep(
+    bool isDark,
+    AppLanguage language,
+    AppController appController,
+    LoginController controller,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -260,7 +283,8 @@ class LoginView extends StatelessWidget {
                               decoration: InputDecoration(
                                 hintText: '01XXX-XXXXXX',
                                 hintStyle: TextStyle(
-                                  color: (isDark ? Colors.white : Colors.black).withOpacity(0.3),
+                                  color: (isDark ? Colors.white : Colors.black)
+                                      .withOpacity(0.3),
                                 ),
 
                                 filled: false,
@@ -279,23 +303,25 @@ class LoginView extends StatelessWidget {
                                 LengthLimitingTextInputFormatter(12),
                               ],
                               onChanged: controller.onPhoneChanged,
-                                        ),
+                            ),
                           ),
-                          Obx(() => controller.isPhoneValid
-                              ? Container(
-                              width: 22,
-                              height: 22,
-                              decoration: const BoxDecoration(
-                                color: Colors.green,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                                )
-                              : const SizedBox.shrink()),
+                          Obx(
+                            () => controller.isPhoneValid
+                                ? Container(
+                                    width: 22,
+                                    height: 22,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.green,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 14,
+                                    ),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
                         ],
                       ),
                     ),
@@ -305,19 +331,21 @@ class LoginView extends StatelessWidget {
 
               // Error or Example Text
               const SizedBox(height: 4),
-              Obx(() => Text(
-                controller.showPhoneError.value
-                    ? appController.t('invalidPhone')
-                    : appController.t('phoneExample'),
-                style: TextStyle(
-                  color: controller.showPhoneError.value
-                      ? Colors.red
-                      : (isDark
-                      ? const Color(0xFF9B9B9B)
-                      : const Color(0xFF6B6B6B)),
-                  fontSize: 12,
+              Obx(
+                () => Text(
+                  controller.showPhoneError.value
+                      ? appController.t('invalidPhone')
+                      : appController.t('phoneExample'),
+                  style: TextStyle(
+                    color: controller.showPhoneError.value
+                        ? Colors.red
+                        : (isDark
+                              ? const Color(0xFF9B9B9B)
+                              : const Color(0xFF6B6B6B)),
+                    fontSize: 12,
+                  ),
                 ),
-              )),
+              ),
               const SizedBox(height: 24),
 
               // Terms Checkbox
@@ -326,33 +354,35 @@ class LoginView extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Obx(() => Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        color: controller.termsAccepted.value
-                            ? AppColors.lightPrimary
-                            : (isDark
-                            ? const Color(0xFF0a2f3d)
-                            : const Color(0xFFFAFAF8)),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(
+                    Obx(
+                      () => Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
                           color: controller.termsAccepted.value
                               ? AppColors.lightPrimary
                               : (isDark
-                              ? const Color(0xFF0d3a4a)
-                              : Colors.black.withOpacity(0.2)),
-                          width: 2,
+                                    ? const Color(0xFF0a2f3d)
+                                    : const Color(0xFFFAFAF8)),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: controller.termsAccepted.value
+                                ? AppColors.lightPrimary
+                                : (isDark
+                                      ? const Color(0xFF0d3a4a)
+                                      : Colors.black.withOpacity(0.2)),
+                            width: 2,
+                          ),
                         ),
+                        child: controller.termsAccepted.value
+                            ? const Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 14,
+                              )
+                            : null,
                       ),
-                      child: controller.termsAccepted.value
-                          ? const Icon(
-                        Icons.check,
-                        color: Colors.white,
-                        size: 14,
-                      )
-                          : null,
-                    )),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text.rich(
@@ -365,38 +395,38 @@ class LoginView extends StatelessWidget {
                           ),
                           children: language == AppLanguage.bn
                               ? [
-                            const TextSpan(text: 'আমি '),
-                            TextSpan(
-                              text: 'শর্তাবলী',
-                              style: TextStyle(
-                                color: AppColors.lightPrimary,
-                              ),
-                            ),
-                            const TextSpan(text: ' এবং '),
-                            TextSpan(
-                              text: 'গোপনীয়তা নীতিতে',
-                              style: TextStyle(
-                                color: AppColors.lightPrimary,
-                              ),
-                            ),
-                            const TextSpan(text: ' সম্মত আছি'),
-                          ]
+                                  const TextSpan(text: 'আমি '),
+                                  TextSpan(
+                                    text: 'শর্তাবলী',
+                                    style: TextStyle(
+                                      color: AppColors.lightPrimary,
+                                    ),
+                                  ),
+                                  const TextSpan(text: ' এবং '),
+                                  TextSpan(
+                                    text: 'গোপনীয়তা নীতিতে',
+                                    style: TextStyle(
+                                      color: AppColors.lightPrimary,
+                                    ),
+                                  ),
+                                  const TextSpan(text: ' সম্মত আছি'),
+                                ]
                               : [
-                            const TextSpan(text: 'I agree to the '),
-                            TextSpan(
-                              text: 'Terms and Conditions',
-                              style: TextStyle(
-                                color: AppColors.lightPrimary,
-                              ),
-                            ),
-                            const TextSpan(text: ' and '),
-                            TextSpan(
-                              text: 'Privacy Policy',
-                              style: TextStyle(
-                                color: AppColors.lightPrimary,
-                              ),
-                            ),
-                          ],
+                                  const TextSpan(text: 'I agree to the '),
+                                  TextSpan(
+                                    text: 'Terms and Conditions',
+                                    style: TextStyle(
+                                      color: AppColors.lightPrimary,
+                                    ),
+                                  ),
+                                  const TextSpan(text: ' and '),
+                                  TextSpan(
+                                    text: 'Privacy Policy',
+                                    style: TextStyle(
+                                      color: AppColors.lightPrimary,
+                                    ),
+                                  ),
+                                ],
                         ),
                       ),
                     ),
@@ -406,57 +436,59 @@ class LoginView extends StatelessWidget {
               const SizedBox(height: 24),
 
               // Continue Button
-              Obx(() => GestureDetector(
-                onTap: controller.canSubmitPhone
-                    ? controller.handlePhoneSubmit
-                    : null,
-                child: Container(
-                  width: double.infinity,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.lightPrimary.withOpacity(
-                      controller.canSubmitPhone ? 1.0 : 0.4,
-                    ),
-                    borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 6,
-                        offset: const Offset(0, 4),
+              Obx(
+                () => GestureDetector(
+                  onTap: controller.canSubmitPhone
+                      ? controller.handlePhoneSubmit
+                      : null,
+                  child: Container(
+                    width: double.infinity,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.lightPrimary.withOpacity(
+                        controller.canSubmitPhone ? 1.0 : 0.4,
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (controller.isLoading.value)
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Color(0xFFF5F5F5),
-                            strokeWidth: 2,
-                          ),
-                        )
-                      else ...[
-                      Text(
-                        appController.t('continue'),
-                        style: const TextStyle(
-                          color: Color(0xFFF5F5F5),
-                          fontSize: 16,
+                      borderRadius: BorderRadius.circular(28),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 6,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Icon(
-                        Icons.arrow_forward,
-                        color: Color(0xFFF5F5F5),
-                        size: 20,
-                      ),
                       ],
-                    ],
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (controller.isLoading.value)
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Color(0xFFF5F5F5),
+                              strokeWidth: 2,
+                            ),
+                          )
+                        else ...[
+                          Text(
+                            appController.t('continue'),
+                            style: const TextStyle(
+                              color: Color(0xFFF5F5F5),
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Icon(
+                            Icons.arrow_forward,
+                            color: Color(0xFFF5F5F5),
+                            size: 20,
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
-              )),
+              ),
             ],
           ),
         ),
@@ -464,7 +496,12 @@ class LoginView extends StatelessWidget {
     );
   }
 
-  Widget _buildOtpStep(bool isDark, AppLanguage language, AppController appController, LoginController controller) {
+  Widget _buildOtpStep(
+    bool isDark,
+    AppLanguage language,
+    AppController appController,
+    LoginController controller,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -516,7 +553,9 @@ class LoginView extends StatelessWidget {
                   ),
                   child: Icon(
                     isDark ? Icons.wb_sunny : Icons.nightlight_round,
-                    color: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF2C2C2E),
+                    color: isDark
+                        ? const Color(0xFFF5F5F5)
+                        : const Color(0xFF2C2C2E),
                     size: 20,
                   ),
                 ),
@@ -545,39 +584,48 @@ class LoginView extends StatelessWidget {
               ),
               const SizedBox(height: 8),
 
-              Obx(() => Text(
-                '+88 ${controller.phoneNumber.value} ${appController.t('otpSentTo')}',
-                style: TextStyle(
-                  color: isDark
-                      ? const Color(0xFF9B9B9B)
-                      : const Color(0xFF6B6B6B),
-                  fontSize: 16,
+              Obx(
+                () => Text(
+                  '+88 ${controller.phoneNumber.value} ${appController.t('otpSentTo')}',
+                  style: TextStyle(
+                    color: isDark
+                        ? const Color(0xFF9B9B9B)
+                        : const Color(0xFF6B6B6B),
+                    fontSize: 16,
+                  ),
                 ),
-              )),
+              ),
               const SizedBox(height: 32),
 
               // OTP Input
               Center(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                      ...List.generate(3, (i) => _buildOtpBox(i, isDark, controller)),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text('-',
-                        style: TextStyle(
-                          color: isDark
-                              ? const Color(0xFF9B9B9B)
-                              : const Color(0xFF6B6B6B),
-                          fontSize: 18,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ...List.generate(
+                        3,
+                        (i) => _buildOtpBox(i, isDark, controller),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          '-',
+                          style: TextStyle(
+                            color: isDark
+                                ? const Color(0xFF9B9B9B)
+                                : const Color(0xFF6B6B6B),
+                            fontSize: 18,
+                          ),
                         ),
                       ),
-                    ),
-                      ...List.generate(3, (i) => _buildOtpBox(i + 3, isDark, controller)),
-                  ],
+                      ...List.generate(
+                        3,
+                        (i) => _buildOtpBox(i + 3, isDark, controller),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -597,110 +645,120 @@ class LoginView extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Obx(() => GestureDetector(
-                      onTap: controller.canResend.value && !controller.isLoading.value
-                          ? controller.handleResendOTP
-                          : null,
-                      child: Text(
-                        controller.canResend.value
-                            ? appController.t('resendOTP')
-                            : '${appController.t('resendOTP')} (${controller.resendTimer.value ~/ 60}:${(controller.resendTimer.value % 60).toString().padLeft(2, '0')})',
-                        style: TextStyle(
-                          color: controller.canResend.value && !controller.isLoading.value
-                              ? AppColors.lightPrimary
-                              : (isDark
-                              ? const Color(0xFF9B9B9B)
-                              : const Color(0xFF6B6B6B)),
-                          fontSize: 14,
+                    Obx(
+                      () => GestureDetector(
+                        onTap:
+                            controller.canResend.value &&
+                                !controller.isLoading.value
+                            ? controller.handleResendOTP
+                            : null,
+                        child: Text(
+                          controller.canResend.value
+                              ? appController.t('resendOTP')
+                              : '${appController.t('resendOTP')} (${controller.resendTimer.value ~/ 60}:${(controller.resendTimer.value % 60).toString().padLeft(2, '0')})',
+                          style: TextStyle(
+                            color:
+                                controller.canResend.value &&
+                                    !controller.isLoading.value
+                                ? AppColors.lightPrimary
+                                : (isDark
+                                      ? const Color(0xFF9B9B9B)
+                                      : const Color(0xFF6B6B6B)),
+                            fontSize: 14,
+                          ),
                         ),
                       ),
-                    )),
+                    ),
                   ],
                 ),
               ),
 
-              Obx(() => controller.showOtpResentConfirm.value
-                  ? Container(
-                  margin: const EdgeInsets.only(top: 16),
-                  child: Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                            color: AppColors.lightSecondary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check,
-                            color: Color(0xFF1A1A1A),
-                            size: 12,
+              Obx(
+                () => controller.showOtpResentConfirm.value
+                    ? Container(
+                        margin: const EdgeInsets.only(top: 16),
+                        child: Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 18,
+                                height: 18,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.lightSecondary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.check,
+                                  color: Color(0xFF1A1A1A),
+                                  size: 12,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                appController.t('otpResent'),
+                                style: TextStyle(
+                                  color: isDark
+                                      ? AppColors.lightSecondary
+                                      : const Color(0xFF7BC3B8),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          appController.t('otpResent'),
-                          style: TextStyle(
-                            color: isDark
-                                ? AppColors.lightSecondary
-                                : const Color(0xFF7BC3B8),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              )
-                  : const SizedBox.shrink()),
+                      )
+                    : const SizedBox.shrink(),
+              ),
               const SizedBox(height: 24),
 
               // Continue Button
-              Obx(() => GestureDetector(
-                onTap: controller.canSubmitOtp
-                    ? controller.handleOTPComplete
-                    : null,
-                child: Container(
-                  width: double.infinity,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: AppColors.lightPrimary.withOpacity(
-                      controller.canSubmitOtp ? 1.0 : 0.4,
+              Obx(
+                () => GestureDetector(
+                  onTap: controller.canSubmitOtp
+                      ? controller.handleOTPComplete
+                      : null,
+                  child: Container(
+                    width: double.infinity,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: AppColors.lightPrimary.withOpacity(
+                        controller.canSubmitOtp ? 1.0 : 0.4,
+                      ),
+                      borderRadius: BorderRadius.circular(28),
                     ),
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      if (controller.isLoading.value)
-                        const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Color(0xFFF5F5F5),
-                            strokeWidth: 2,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (controller.isLoading.value)
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Color(0xFFF5F5F5),
+                              strokeWidth: 2,
+                            ),
+                          )
+                        else ...[
+                          Text(
+                            appController.t('continue'),
+                            style: const TextStyle(
+                              color: Color(0xFFF5F5F5),
+                              fontSize: 16,
+                            ),
                           ),
-                        )
-                      else ...[
-                      Text(
-                        appController.t('continue'),
-                        style: const TextStyle(
-                          color: Color(0xFFF5F5F5),
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Icon(
-                        Icons.arrow_forward,
-                        color: Color(0xFFF5F5F5),
-                        size: 20,
-                      ),
+                          const SizedBox(width: 12),
+                          const Icon(
+                            Icons.arrow_forward,
+                            color: Color(0xFFF5F5F5),
+                            size: 20,
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              )),
+              ),
             ],
           ),
         ),
@@ -724,37 +782,42 @@ class LoginView extends StatelessWidget {
         ),
       ),
       child: Center(
-      child: TextField(
+        child: TextField(
           controller: controller.otpControllers[index],
           focusNode: controller.otpFocusNodes[index],
-        textAlign: TextAlign.center,
+          textAlign: TextAlign.center,
           textAlignVertical: TextAlignVertical.center,
-        keyboardType: TextInputType.number,
-        maxLength: 1,
+          keyboardType: TextInputType.number,
+          maxLength: 1,
           style: const TextStyle(
             color: Colors.white,
             fontSize: 22,
             fontWeight: FontWeight.bold,
-        ),
+          ),
           cursorColor: Colors.white,
-        decoration: const InputDecoration(
-          counterText: '',
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
-          errorBorder: InputBorder.none,
+          decoration: const InputDecoration(
+            counterText: '',
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
             contentPadding: EdgeInsets.zero,
             isDense: true,
-        ),
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          ),
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           onChanged: (_) => controller.onOtpChanged(index),
         ),
       ),
     );
   }
 
-  Widget _buildCookieNotice(bool isDark, AppLanguage language, AppController appController, LoginController controller) {
+  Widget _buildCookieNotice(
+    bool isDark,
+    AppLanguage language,
+    AppController appController,
+    LoginController controller,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

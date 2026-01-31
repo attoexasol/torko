@@ -62,7 +62,7 @@ class _MessagesViewState extends State<MessagesView> {
           children: [
             // Main content
             RefreshIndicator(
-              onRefresh: () => inboxController.refresh(),
+              onRefresh: () => inboxController.refreshInbox(),
               child: CustomScrollView(
                 slivers: [
                   // App Bar

@@ -308,7 +308,8 @@ class _ConversationViewState extends State<ConversationView> {
             // CRITICAL: Only message list uses Obx for granular reactivity
             Expanded(
               child: Obx(() {
-                // CRITICAL: Access messages.length explicitly to ensure Obx tracks changes
+                // Explicit dependency so new Pusher messages trigger rebuild immediately
+                final _ = chatController.messagesVersion.value;
                 final messageCount = chatController.messages.length;
                 final isLoading = chatController.isLoading.value;
                 final errorMsg = chatController.errorMessage.value;

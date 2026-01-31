@@ -6,56 +6,82 @@ import '../../services/network_caller.dart';
 import '../../services/urls.dart';
 import '../../services/user_info.dart';
 import '../../services/pusher_service.dart';
+import '../../controllers/chat_controller.dart';
+import '../../controllers/inbox_controller.dart';
 
 class LoginController extends GetxController {
-  // State variables
-  final RxString step = 'phone'.obs; // 'phone' or 'otp'
+  // =========================
+  // UI STATE
+  // =========================
+
+  final RxString step = 'phone'.obs; // phone | otp
   final RxString phoneNumber = ''.obs;
   final RxString otp = ''.obs;
-  final RxInt resendTimer = 0.obs;
-  final RxBool canResend = true.obs;
+
   final RxBool cookiesAccepted = false.obs;
-  final RxBool showPhoneError = false.obs;
   final RxBool termsAccepted = false.obs;
+  final RxBool showPhoneError = false.obs;
   final RxBool showOtpResentConfirm = false.obs;
 
-  // Loading states
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
-  // TextEditingControllers
+  // =========================
+  // RESEND OTP TIMER
+  // =========================
+
+  final RxInt resendTimer = 0.obs;
+  final RxBool canResend = true.obs;
+
+  // =========================
+  // INPUT CONTROLLERS
+  // =========================
+
   final TextEditingController phoneController = TextEditingController();
+
   final List<TextEditingController> otpControllers = List.generate(
     6,
     (_) => TextEditingController(),
   );
+
   final List<FocusNode> otpFocusNodes = List.generate(6, (_) => FocusNode());
+
+  // =========================
+  // INIT
+  // =========================
 
   @override
   void onInit() {
     super.onInit();
-    // Ensure we start on phone step
     step.value = 'phone';
   }
 
   @override
   void onClose() {
     phoneController.dispose();
-    for (var controller in otpControllers) {
-      controller.dispose();
+
+    for (final c in otpControllers) {
+      c.dispose();
     }
-    for (var node in otpFocusNodes) {
-      node.dispose();
+
+    for (final n in otpFocusNodes) {
+      n.dispose();
     }
+
     super.onClose();
   }
 
+  // =========================
+  // PHONE VALIDATION
+  // =========================
+
   bool isValidPhoneNumber(String phone) {
     final digits = phone.replaceAll(RegExp(r'\D'), '');
+
     if (digits.length != 11) return false;
     if (!digits.startsWith('0')) return false;
 
-    final validPrefixes = [
+    const validPrefixes = [
       '017',
       '018',
       '013',
@@ -65,179 +91,221 @@ class LoginController extends GetxController {
       '015',
       '019',
     ];
-    final prefix = digits.substring(0, 3);
 
-    return validPrefixes.contains(prefix);
+    return validPrefixes.contains(digits.substring(0, 3));
   }
 
-  /// Get clean phone number (digits only)
-  String get cleanPhoneNumber => phoneNumber.value.replaceAll(RegExp(r'\D'), '');
+  String get cleanPhone => phoneNumber.value.replaceAll(RegExp(r'\D'), '');
 
-  /// Handle phone submit - calls create_users API
+  bool get isPhoneValid => isValidPhoneNumber(phoneNumber.value);
+
+  bool get canSubmitPhone =>
+      isPhoneValid && termsAccepted.value && !isLoading.value;
+
+  bool get canSubmitOtp =>
+      otpControllers.every((c) => c.text.isNotEmpty) && !isLoading.value;
+
+  // =========================
+  // PHONE INPUT FORMAT
+  // =========================
+
+  void onPhoneChanged(String value) {
+    final digitsOnly = value.replaceAll('-', '');
+
+    if (digitsOnly.length > 5) {
+      phoneController.text =
+          '${digitsOnly.substring(0, 5)}-${digitsOnly.substring(5)}';
+
+      phoneController.selection = TextSelection.fromPosition(
+        TextPosition(offset: phoneController.text.length),
+      );
+    }
+
+    phoneNumber.value = phoneController.text;
+
+    if (showPhoneError.value) showPhoneError.value = false;
+    if (errorMessage.value.isNotEmpty) errorMessage.value = '';
+  }
+
+  // =========================
+  // PHONE SUBMIT
+  // =========================
+
   Future<void> handlePhoneSubmit() async {
-    // Validate phone number
     if (!isValidPhoneNumber(phoneNumber.value)) {
       showPhoneError.value = true;
-      _showErrorSnackbar('Invalid phone number');
+      _showError('Invalid phone number');
       return;
     }
 
     if (!termsAccepted.value) {
-      _showErrorSnackbar('Please accept the terms and conditions');
+      _showError('Please accept the terms and conditions');
       return;
     }
 
     isLoading.value = true;
-    errorMessage.value = '';
 
     try {
       final response = await NetworkCaller.postRequest(
         url: Urls.create_users,
-        body: {'phone': cleanPhoneNumber},
+        body: {'phone': cleanPhone},
       );
 
-      if (response.isSuccess && response.body != null) {
-        final data = response.body!;
-
-        if (data['status'] == true && data['data'] != null) {
-          final responseData = data['data'];
-
-          final otpCode = responseData['otp_code'];
-          final apiToken = responseData['token'];
-          
-          // Save user ID if returned
-          final userId = responseData['id'] ?? responseData['user_id'];
-          if (userId != null) {
-            if (userId is int) {
-              await UserInfo.setUserId(userId);
-            } else if (userId is String) {
-              await UserInfo.setUserId(int.tryParse(userId) ?? 0);
-            }
-          }
-
-          // Save token + OTP
-          await UserInfo.saveToken(apiToken?.toString() ?? '');
-          await UserInfo.saveOtp(otpCode);
-          await UserInfo.setPhone(cleanPhoneNumber);
-
-          // Navigate to OTP screen
-          step.value = 'otp';
-
-          // Show snackbar with OTP
-          Get.snackbar(
-            "OTP Sent",
-            "Your OTP is: $otpCode",
-            backgroundColor: Colors.green.shade100,
-            colorText: Colors.green.shade800,
-            duration: const Duration(seconds: 5),
-            snackPosition: SnackPosition.TOP,
-          );
-
-          resendTimer.value = 0;
-          canResend.value = true;
-          showPhoneError.value = false;
-        } else {
-          _showErrorSnackbar(data['message'] ?? 'Failed to create user');
-        }
-      } else {
-        _showErrorSnackbar(response.errorMessage ?? 'Failed to create user');
+      if (!response.isSuccess || response.body == null) {
+        _showError('Failed to send OTP');
+        return;
       }
+
+      final data = response.body!;
+
+      if (data['status'] != true) {
+        _showError(data['message'] ?? 'OTP request failed');
+        return;
+      }
+
+      final payload = data['data'];
+
+      final otpCode = payload['otp_code'];
+      final token = payload['token'];
+      final userId = payload['id'] ?? payload['user_id'];
+
+      if (token != null) {
+        await UserInfo.saveToken(token.toString());
+      }
+
+      if (userId != null) {
+        await UserInfo.setUserId(int.parse(userId.toString()));
+      }
+
+      await UserInfo.setPhone(cleanPhone);
+
+      step.value = 'otp';
+
+      Get.snackbar(
+        'OTP Sent',
+        'Your OTP is: $otpCode',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green.shade100,
+        colorText: Colors.green.shade800,
+      );
+
+      resendTimer.value = 0;
+      canResend.value = true;
     } catch (e) {
-      _showErrorSnackbar('Network error: ${e.toString()}');
+      _showError('Network error');
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Handle OTP verification - calls verify_otp API
+  // =========================
+  // OTP INPUT
+  // =========================
+
+  void onOtpChanged(int index) {
+    if (otpControllers[index].text.isNotEmpty && index < 5) {
+      otpFocusNodes[index + 1].requestFocus();
+    }
+
+    if (otpControllers.every((c) => c.text.isNotEmpty)) {
+      handleOTPComplete();
+    }
+
+    if (errorMessage.value.isNotEmpty) {
+      errorMessage.value = '';
+    }
+  }
+
+  // =========================
+  // OTP VERIFY
+  // =========================
+
   Future<void> handleOTPComplete() async {
-    final fullOtp = otpControllers.map((c) => c.text).join();
+    final fullOtp = otpControllers.map((e) => e.text).join();
+
     if (fullOtp.length != 6) return;
 
     final token = UserInfo.getToken();
+
     if (token == null || token.isEmpty) {
-      _showErrorSnackbar('Session expired. Please try again.');
+      _showError('Session expired');
       step.value = 'phone';
       return;
     }
 
     isLoading.value = true;
-    errorMessage.value = '';
 
     try {
       final response = await NetworkCaller.postRequest(
         url: Urls.verify_otp,
-        body: {
-          'api_token': token,
-          'otp_code': int.tryParse(fullOtp) ?? 0,
-        },
+        body: {'api_token': token, 'otp_code': int.parse(fullOtp)},
       );
 
-      if (response.isSuccess && response.body != null) {
-        final data = response.body!;
-
-        if (data['status'] == true) {
-          // Save verification response
-          final responseData = data['data'];
-          final newToken = responseData?['api_token'];
-          if (newToken != null) {
-            await UserInfo.saveToken(newToken);
-          }
-          
-          // Save user ID from response
-          final userId = responseData?['id'] ?? responseData?['user_id'];
-          if (userId != null) {
-            if (userId is int) {
-              await UserInfo.setUserId(userId);
-            } else if (userId is String) {
-              await UserInfo.setUserId(int.tryParse(userId) ?? 0);
-            }
-          }
-          
-          await UserInfo.setVerified(true);
-
-          // Ensure previous Pusher connection is disconnected, then init for new user
-          final currentUserId = UserInfo.userId;
-          if (currentUserId != null) {
-            try {
-              await PusherService().disconnect();
-              if (kDebugMode) {
-                debugPrint('[LOGIN] Pusher disconnected before init');
-              }
-              await PusherService().init(userId: currentUserId);
-              if (kDebugMode) {
-                debugPrint('[LOGIN] Pusher initialized for userId=$currentUserId');
-              }
-            } catch (e) {
-              if (kDebugMode) {
-                debugPrint('[LOGIN] Pusher init failed (non-critical): $e');
-              }
-              // Don't block navigation
-            }
-          }
-
-          // Navigate to profile data screen
-          Get.offAllNamed(AppRoutes.profileData);
-        } else {
-          errorMessage.value = data['message'] ?? 'OTP verification failed';
-          _showErrorSnackbar(errorMessage.value);
-          _clearOtpFields();
-        }
-      } else {
-        errorMessage.value = response.errorMessage ?? 'OTP verification failed';
-        _showErrorSnackbar(errorMessage.value);
-        _clearOtpFields();
+      if (!response.isSuccess || response.body == null) {
+        _showError('OTP verification failed');
+        _clearOtp();
+        return;
       }
+
+      final data = response.body!;
+
+      if (data['status'] != true) {
+        _showError(data['message'] ?? 'Invalid OTP');
+        _clearOtp();
+        return;
+      }
+
+      final payload = data['data'];
+
+      final newToken = payload?['api_token'];
+      final userId = payload?['id'] ?? payload?['user_id'];
+
+      if (newToken != null) {
+        await UserInfo.saveToken(newToken);
+      }
+
+      if (userId != null) {
+        await UserInfo.setUserId(int.parse(userId.toString()));
+      }
+
+      await UserInfo.setVerified(true);
+
+      // ===============================
+      // INIT REALTIME SYSTEM
+      // ===============================
+
+      final currentUserId = UserInfo.userId;
+
+      if (currentUserId != null) {
+        if (!Get.isRegistered<InboxController>()) {
+          Get.put(InboxController(), permanent: true);
+        }
+
+        if (!Get.isRegistered<ChatController>()) {
+          Get.put(ChatController(), permanent: true);
+        }
+
+        await PusherService().disconnect();
+        await PusherService().init(userId: currentUserId);
+
+        if (kDebugMode) {
+          debugPrint('[LOGIN] Realtime initialized for userId=$currentUserId');
+        }
+      }
+
+      Get.offAllNamed(AppRoutes.profileData);
     } catch (e) {
-      errorMessage.value = 'Network error: ${e.toString()}';
-      _showErrorSnackbar(errorMessage.value);
-      _clearOtpFields();
+      _showError('Network error');
+      _clearOtp();
     } finally {
       isLoading.value = false;
     }
   }
 
-  /// Resend OTP - calls same create_users API
+  // =========================
+  // RESEND OTP
+  // =========================
+
   Future<void> handleResendOTP() async {
     if (!canResend.value) return;
 
@@ -246,53 +314,50 @@ class LoginController extends GetxController {
     try {
       final response = await NetworkCaller.postRequest(
         url: Urls.create_users,
-        body: {'phone': cleanPhoneNumber},
+        body: {'phone': cleanPhone},
       );
 
-      if (response.isSuccess && response.body != null) {
-        final data = response.body!;
-
-        if (data['status'] == true && data['data'] != null) {
-          final responseData = data['data'];
-
-          final otpCode = responseData['otp_code'];
-          final apiToken = responseData['token'];
-
-          await UserInfo.saveToken(apiToken?.toString() ?? '');
-          await UserInfo.saveOtp(otpCode);
-
-          // Start resend timer
-          resendTimer.value = 60;
-          canResend.value = false;
-          otp.value = '';
-          _clearOtpFields();
-          showOtpResentConfirm.value = true;
-
-          // Start countdown timer
-          _startResendTimer();
-
-          // Show new OTP in snackbar
-          Get.snackbar(
-            'OTP Resent',
-            'Your OTP is: $otpCode',
-            backgroundColor: Colors.green.shade100,
-            colorText: Colors.green.shade800,
-            duration: const Duration(seconds: 5),
-            snackPosition: SnackPosition.TOP,
-          );
-
-          // Hide confirmation after 3 seconds
-          Future.delayed(const Duration(seconds: 3), () {
-            showOtpResentConfirm.value = false;
-          });
-        } else {
-          _showErrorSnackbar(data['message'] ?? 'Failed to resend OTP');
-        }
-      } else {
-        _showErrorSnackbar(response.errorMessage ?? 'Failed to resend OTP');
+      if (!response.isSuccess || response.body == null) {
+        _showError('Failed to resend OTP');
+        return;
       }
-    } catch (e) {
-      _showErrorSnackbar('Network error: ${e.toString()}');
+
+      final data = response.body!;
+
+      if (data['status'] != true) {
+        _showError(data['message'] ?? 'Resend failed');
+        return;
+      }
+
+      final payload = data['data'];
+
+      final otpCode = payload['otp_code'];
+      final token = payload['token'];
+
+      if (token != null) {
+        await UserInfo.saveToken(token.toString());
+      }
+
+      showOtpResentConfirm.value = true;
+
+      resendTimer.value = 60;
+      canResend.value = false;
+
+      _startResendTimer();
+
+      _clearOtp();
+
+      Get.snackbar(
+        'OTP Resent',
+        'Your OTP is: $otpCode',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.green.shade100,
+        colorText: Colors.green.shade800,
+      );
+
+      Future.delayed(const Duration(seconds: 3), () {
+        showOtpResentConfirm.value = false;
+      });
     } finally {
       isLoading.value = false;
     }
@@ -301,6 +366,7 @@ class LoginController extends GetxController {
   void _startResendTimer() {
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 1));
+
       if (resendTimer.value > 0) {
         resendTimer.value--;
         return true;
@@ -311,33 +377,15 @@ class LoginController extends GetxController {
     });
   }
 
-  void _clearOtpFields() {
-    for (var controller in otpControllers) {
-      controller.clear();
+  // =========================
+  // HELPERS
+  // =========================
+
+  void _clearOtp() {
+    for (final c in otpControllers) {
+      c.clear();
     }
-    if (otpFocusNodes.isNotEmpty) {
-      otpFocusNodes[0].requestFocus();
-    }
-  }
-
-  void _showErrorSnackbar(String message) {
-    Get.snackbar(
-      'Error',
-      message,
-      backgroundColor: Colors.red.shade100,
-      colorText: Colors.red.shade800,
-      duration: const Duration(seconds: 3),
-      snackPosition: SnackPosition.TOP,
-    );
-  }
-
-  void goBack() {
-    Get.back();
-  }
-
-  void goBackToPhone() {
-    step.value = 'phone';
-    _clearOtpFields();
+    otpFocusNodes.first.requestFocus();
   }
 
   void toggleTermsAccepted() {
@@ -348,31 +396,22 @@ class LoginController extends GetxController {
     cookiesAccepted.value = true;
   }
 
-  void onPhoneChanged(String value) {
-    final digitsOnly = value.replaceAll('-', '');
-    if (digitsOnly.length > 5) {
-      phoneController.text =
-          '${digitsOnly.substring(0, 5)}-${digitsOnly.substring(5)}';
-      phoneController.selection = TextSelection.fromPosition(
-        TextPosition(offset: phoneController.text.length),
-      );
-    }
-    phoneNumber.value = phoneController.text;
-    if (showPhoneError.value) showPhoneError.value = false;
-    if (errorMessage.value.isNotEmpty) errorMessage.value = '';
+  void goBack() {
+    Get.back();
   }
 
-  void onOtpChanged(int index) {
-    if (otpControllers[index].text.isNotEmpty && index < 5) {
-      otpFocusNodes[index + 1].requestFocus();
-    }
-    if (otpControllers.every((c) => c.text.isNotEmpty)) {
-      handleOTPComplete();
-    }
-    if (errorMessage.value.isNotEmpty) errorMessage.value = '';
+  void goBackToPhone() {
+    step.value = 'phone';
+    _clearOtp();
   }
 
-  bool get isPhoneValid => isValidPhoneNumber(phoneNumber.value);
-  bool get canSubmitPhone => isPhoneValid && termsAccepted.value && !isLoading.value;
-  bool get canSubmitOtp => otpControllers.every((c) => c.text.isNotEmpty) && !isLoading.value;
+  void _showError(String msg) {
+    Get.snackbar(
+      'Error',
+      msg,
+      snackPosition: SnackPosition.TOP,
+      backgroundColor: Colors.red.shade100,
+      colorText: Colors.red.shade800,
+    );
+  }
 }
