@@ -104,23 +104,12 @@ class _LocalCommunityViewState extends State<LocalCommunityView> {
                 ],
               ),
             ),
-            Obx(
-              () => controller.activeTab.value == CommunityTab.stages
-                  ? Positioned(
-                      right: 20,
-                      top: MediaQuery.of(context).size.height * 0.5,
-                      child: _buildStageFloatingButton(isBn),
-                    )
-                  : Positioned(
-                      right: 20,
-                      top: MediaQuery.of(context).size.height * 0.4,
-                      child: _buildFloatingAddButton(isBn),
-                    ),
-            ),
             Positioned(
               right: 20,
               bottom: 100,
-              child: _buildHelpButton(),
+              child: SafeArea(
+                child: _buildFloatingAddButton(isBn),
+              ),
             ),
             Positioned(
               bottom: 0,
@@ -135,38 +124,6 @@ class _LocalCommunityViewState extends State<LocalCommunityView> {
         ),
       );
     });
-  }
-
-  Widget _buildStageFloatingButton(bool isBn) {
-    return GestureDetector(
-      onTap: () {
-        Get.snackbar(
-          isBn ? 'শীঘ্রই আসছে' : 'Coming Soon',
-          isBn ? 'স্টেজ তৈরি ফিচার শীঘ্রই আসছে' : 'Create stage feature coming soon',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      },
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: const Color(0xFFd97757),
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFd97757).withValues(alpha: 0.4),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.radio,
-          color: Colors.white,
-          size: 28,
-        ),
-      ),
-    );
   }
 
   Widget _buildFloatingAddButton(bool isBn) {
@@ -200,35 +157,4 @@ class _LocalCommunityViewState extends State<LocalCommunityView> {
     );
   }
 
-  Widget _buildHelpButton() {
-    return GestureDetector(
-      onTap: () {
-        Get.snackbar(
-          'Help',
-          'Help feature coming soon',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      },
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black12,
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.help_outline,
-          color: Color(0xFF052029),
-          size: 20,
-        ),
-      ),
-    );
-  }
 }
