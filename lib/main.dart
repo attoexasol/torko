@@ -16,9 +16,9 @@ import 'views/notifications/notifications_view.dart';
 import 'views/profile/profile_view.dart';
 import 'views/explore/explore_view.dart';
 import 'views/messages/messages_view.dart';
-import 'views/community/community_view.dart';
-import 'views/local_community/local_community_view.dart';
-import 'views/stage_room/stage_room_view.dart';
+import 'modules/community/community_binding.dart';
+import 'modules/community/community_routes.dart';
+import 'modules/community/screens/community_view.dart';
 import 'views/settings/settings_view.dart';
 import 'views/account_settings/account_settings_view.dart';
 import 'views/privacy_settings/privacy_settings_view.dart';
@@ -61,9 +61,17 @@ class MyApp extends StatelessWidget {
         GetPage(name: AppRoutes.profile, page: () => const ProfileView()),
         GetPage(name: AppRoutes.explore, page: () => const ExploreView()),
         GetPage(name: AppRoutes.messages, page: () => const MessagesView()),
-        GetPage(name: AppRoutes.community, page: () => const CommunityView()),
-        GetPage(name: AppRoutes.localCommunity, page: () => const LocalCommunityView()),
-        GetPage(name: AppRoutes.stageRoom, page: () => const StageRoomView()),
+        GetPage(
+          name: AppRoutes.community,
+          page: () => const CommunityView(),
+          binding: CommunityBinding(),
+        ),
+        GetPage(
+          name: AppRoutes.localCommunity,
+          page: () => const CommunityView(),
+          binding: CommunityBinding(),
+        ),
+        ...CommunityRoutes.pages,
         GetPage(name: AppRoutes.settings, page: () => const SettingsView()),
         GetPage(name: AppRoutes.accountSettings, page: () => const AccountSettingsView()),
         GetPage(name: AppRoutes.privacySettings, page: () => const PrivacySettingsView()),

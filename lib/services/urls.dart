@@ -48,6 +48,8 @@ class Urls{
     static const create_group = "$_baseUrL/community-groups/create" ;
     static const get_all_groups = "$_baseUrL/get-all-community-groups";
     static const get_single_group = "$_baseUrL/community-groups/single";
+    static const Update_Group = "$_baseUrL/community-groups/update";     // POST Method
+    static const delete_Group = "$_baseUrL/community-group/delete";     // POST Method
 
     // Send Message
     static const send_message = "$_baseUrL/messages/send" ;

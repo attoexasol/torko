@@ -298,7 +298,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           bottom: 0,
           left: 0,
           right: 0,
-          child: BottomNav(activeScreen: 'community'),
+          child: BottomNav(activeScreen: 'localCommunity'),
         ),
       ],
     );

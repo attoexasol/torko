@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../controllers/local_community_controller.dart';
 import '../../core/theme/app_colors.dart';
+import '../../modules/community/controllers/community_controller.dart';
 
 class CommunityTabs extends StatelessWidget {
   final CommunityTab activeTab;
