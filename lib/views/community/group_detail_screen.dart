@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/controllers/app_controller.dart';
+import '../../controllers/community_groups_controller.dart';
 import '../../controllers/group_detail_controller.dart';
 import '../../models/community_group_model.dart';
 import '../../widgets/bottom_nav.dart';
+import 'groups/dialogs/group_delete_dialog.dart';
+import 'groups/dialogs/group_edit_sheet.dart';
 
 const String _baseImageUrl = 'https://torko.attoexasolutions.com/';
 
@@ -106,6 +109,7 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
         : '';
 
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         Positioned(
           top: 0,
@@ -258,35 +262,42 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           ),
         ),
         Positioned(
-          top: 40,
-          left: 16,
-          child: _buildOverlayButton(
-            icon: Icons.arrow_back,
-            onTap: () => Get.back(),
-            isDark: isDark,
-          ),
-        ),
-        Positioned(
-          top: 40,
-          right: 16,
-          child: Row(
-            children: [
-              _buildOverlayButton(
-                icon: Icons.share_outlined,
-                onTap: () {
-                  Get.snackbar('Share', 'Share feature coming soon', snackPosition: SnackPosition.BOTTOM);
-                },
-                isDark: isDark,
+          top: 0,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildOverlayButton(
+                    icon: Icons.arrow_back,
+                    onTap: () => Get.back(),
+                    isDark: isDark,
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildOverlayButton(
+                        icon: Icons.share_outlined,
+                        onTap: () {
+                          Get.snackbar('Share', 'Share feature coming soon', snackPosition: SnackPosition.BOTTOM);
+                        },
+                        isDark: isDark,
+                      ),
+                      const SizedBox(width: 8),
+                      _buildOverlayButton(
+                        icon: Icons.more_vert,
+                        onTap: () => _showGroupMenu(context, group, isDark, isBn),
+                        isDark: isDark,
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              _buildOverlayButton(
-                icon: Icons.chat_bubble_outline,
-                onTap: () {
-                  Get.snackbar('Message', 'Message feature coming soon', snackPosition: SnackPosition.BOTTOM);
-                },
-                isDark: isDark,
-              ),
-            ],
+            ),
           ),
         ),
         Positioned(
@@ -596,28 +607,94 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
+  void _showGroupMenu(
+    BuildContext context,
+    CommunityGroupModel group,
+    bool isDark,
+    bool isBn,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0a2f3d) : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit_outlined, color: Color(0xFFd97757)),
+                title: Text(
+                  isBn ? 'গ্রুপ সম্পাদনা' : 'Edit Group',
+                  style: GoogleFonts.notoSansBengali(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  GroupEditSheet.show(group);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: Text(
+                  isBn ? 'গ্রুপ মুছে ফেলুন' : 'Delete Group',
+                  style: GoogleFonts.notoSansBengali(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.red,
+                  ),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  GroupDeleteDialog.show(
+                    onConfirm: () async {
+                      await Get.find<CommunityGroupsController>().deleteGroupFromUI(group.id);
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildOverlayButton({
     required IconData icon,
     required VoidCallback onTap,
     required bool isDark,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.95),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.black12, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.25),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Icon(icon, color: Colors.black87, size: 22),
         ),
-        child: Icon(icon, color: Colors.black87, size: 22),
       ),
     );
   }

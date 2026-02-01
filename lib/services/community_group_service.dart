@@ -85,4 +85,60 @@ class CommunityGroupService {
     }
     return CommunityGroupModel.fromJson(Map<String, dynamic>.from(data as Map));
   }
+
+  /// POST community-groups/update. Body: api_token (auto), group_id, name, bio, visibility, location, image?.
+  static Future<CommunityGroupModel> updateGroup({
+    required int groupId,
+    required String name,
+    required String bio,
+    required String visibility,
+    required String location,
+    String? imageDataUri,
+  }) async {
+    final body = <String, dynamic>{
+      'group_id': groupId,
+      'name': name,
+      'bio': bio,
+      'visibility': visibility,
+      'location': location,
+    };
+    if (imageDataUri != null && imageDataUri.isNotEmpty) body['image'] = imageDataUri;
+
+    if (kDebugMode) {
+      debugPrint('[CommunityGroupService] updateGroup groupId=$groupId keys=${body.keys.toList()}');
+    }
+    final res = await NetworkCaller.postAuth(url: Urls.Update_Group, body: body);
+    if (kDebugMode) {
+      debugPrint('[CommunityGroupService] updateGroup status=${res.body?['status']} message=${res.body?['message']}');
+    }
+    if (!res.isSuccess || res.body == null) {
+      throw Exception(res.body?['message']?.toString() ?? res.errorMessage ?? 'Update group failed');
+    }
+    if (res.body!['status'] != true) {
+      throw Exception(res.body!['message']?.toString() ?? 'Update group failed');
+    }
+    final data = res.body!['data'];
+    if (data == null || data is! Map) {
+      throw Exception(res.body!['message']?.toString() ?? 'Invalid update response');
+    }
+    return CommunityGroupModel.fromJson(Map<String, dynamic>.from(data as Map));
+  }
+
+  /// POST community-group/delete. Body: api_token (auto), group_id.
+  static Future<void> deleteGroup(int groupId) async {
+    final body = <String, dynamic>{'group_id': groupId};
+    if (kDebugMode) {
+      debugPrint('[CommunityGroupService] deleteGroup groupId=$groupId');
+    }
+    final res = await NetworkCaller.postAuth(url: Urls.delete_Group, body: body);
+    if (kDebugMode) {
+      debugPrint('[CommunityGroupService] deleteGroup status=${res.body?['status']} message=${res.body?['message']}');
+    }
+    if (!res.isSuccess || res.body == null) {
+      throw Exception(res.body?['message']?.toString() ?? res.errorMessage ?? 'Delete group failed');
+    }
+    if (res.body!['status'] != true) {
+      throw Exception(res.body!['message']?.toString() ?? 'Delete group failed');
+    }
+  }
 }

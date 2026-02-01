@@ -7,10 +7,13 @@ import '../core/routes/app_routes.dart';
 import '../core/theme/app_colors.dart';
 import '../models/community_group_model.dart';
 import '../services/community_group_service.dart';
+import 'group_detail_controller.dart';
 
 class CommunityGroupsController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxBool isCreating = false.obs;
+  final RxBool isUpdating = false.obs;
+  final RxBool isDeleting = false.obs;
   final RxString error = ''.obs;
   final RxList<CommunityGroupModel> groups = <CommunityGroupModel>[].obs;
 
@@ -138,7 +141,7 @@ class CommunityGroupsController extends GetxController {
     if (s.contains('422') || s.contains('400') || s.contains('validation')) {
       return s.isEmpty ? 'Invalid input. Please check the form.' : s;
     }
-    return s.isEmpty ? 'Please try again.' : s;
+    return s.isEmpty ? 'Something went wrong. Please try again.' : s;
   }
 
   void _showSuccess(String groupName, int groupId) {
@@ -200,5 +203,128 @@ class CommunityGroupsController extends GetxController {
     final c = group.coverImage;
     if (c == null || c.isEmpty) return '';
     return c.startsWith('http') ? c : '$_baseImageUrl$c';
+  }
+
+  /// Update group via API. Replaces item in list, updates detail controller, shows snackbar, closes sheet.
+  Future<void> updateGroupFromUI(
+    CommunityGroupModel old,
+    {
+    required String name,
+    required String bio,
+    required String visibility,
+    String? location,
+    String? imageDataUri,
+  }) async {
+    isUpdating.value = true;
+    error.value = '';
+    try {
+      final updated = await CommunityGroupService.updateGroup(
+        groupId: old.id,
+        name: name,
+        bio: bio,
+        visibility: visibility,
+        location: location ?? old.location ?? '',
+        imageDataUri: imageDataUri,
+      );
+      final idx = groups.indexWhere((g) => g.id == old.id);
+      if (idx >= 0) {
+        groups[idx] = updated;
+      }
+      if (Get.isRegistered<GroupDetailController>()) {
+        final dc = Get.find<GroupDetailController>();
+        if (dc.group.value?.id == old.id) {
+          dc.group.value = updated;
+        }
+      }
+      Get.back();
+      _showUpdateSuccessSnackbar();
+    } catch (e) {
+      final msg = _mapErrorMessage(e);
+      error.value = msg;
+      _showUpdateErrorSnackbar(msg);
+      rethrow;
+    } finally {
+      isUpdating.value = false;
+    }
+  }
+
+  /// Delete group via API. Removes from list, navigates back if on detail, shows snackbar.
+  Future<void> deleteGroupFromUI(int groupId) async {
+    isDeleting.value = true;
+    error.value = '';
+    try {
+      await CommunityGroupService.deleteGroup(groupId);
+      groups.removeWhere((g) => g.id == groupId);
+      Get.back();
+      Get.back();
+      _showDeleteSuccessSnackbar();
+    } catch (e) {
+      final msg = _mapErrorMessage(e);
+      error.value = msg;
+      _showDeleteErrorSnackbar(msg);
+      rethrow;
+    } finally {
+      isDeleting.value = false;
+    }
+  }
+
+  void _showUpdateSuccessSnackbar() {
+    final isBn = Get.isRegistered<AppController>() &&
+        Get.find<AppController>().language == AppLanguage.bn;
+    Get.snackbar(
+      isBn ? '✅ আপডেট হয়েছে' : '✅ Group updated',
+      isBn ? 'গ্রুপ সফলভাবে আপডেট হয়েছে' : 'Group updated successfully',
+      snackPosition: SnackPosition.TOP,
+      margin: const EdgeInsets.all(16),
+      borderRadius: 14,
+      backgroundColor: const Color(0xFF2E7D32),
+      colorText: Colors.white,
+      duration: const Duration(seconds: 2),
+    );
+  }
+
+  void _showUpdateErrorSnackbar(String msg) {
+    final isBn = Get.isRegistered<AppController>() &&
+        Get.find<AppController>().language == AppLanguage.bn;
+    Get.snackbar(
+      isBn ? '⚠️ আপডেট হয়নি' : '⚠️ Update failed',
+      msg,
+      snackPosition: SnackPosition.TOP,
+      margin: const EdgeInsets.all(16),
+      borderRadius: 14,
+      backgroundColor: AppColors.lightDestructive,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 3),
+    );
+  }
+
+  void _showDeleteSuccessSnackbar() {
+    final isBn = Get.isRegistered<AppController>() &&
+        Get.find<AppController>().language == AppLanguage.bn;
+    Get.snackbar(
+      isBn ? '✅ মুছে ফেলা হয়েছে' : '✅ Group deleted',
+      isBn ? 'গ্রুপ সফলভাবে মুছে ফেলা হয়েছে' : 'Group deleted successfully',
+      snackPosition: SnackPosition.TOP,
+      margin: const EdgeInsets.all(16),
+      borderRadius: 14,
+      backgroundColor: const Color(0xFF2E7D32),
+      colorText: Colors.white,
+      duration: const Duration(seconds: 2),
+    );
+  }
+
+  void _showDeleteErrorSnackbar(String msg) {
+    final isBn = Get.isRegistered<AppController>() &&
+        Get.find<AppController>().language == AppLanguage.bn;
+    Get.snackbar(
+      isBn ? '⚠️ মুছে ফেলা যায়নি' : '⚠️ Delete failed',
+      msg,
+      snackPosition: SnackPosition.TOP,
+      margin: const EdgeInsets.all(16),
+      borderRadius: 14,
+      backgroundColor: AppColors.lightDestructive,
+      colorText: Colors.white,
+      duration: const Duration(seconds: 3),
+    );
   }
 }
