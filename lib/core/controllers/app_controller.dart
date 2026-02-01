@@ -69,18 +69,29 @@ class AppController extends GetxController {
     _profileImageUrl.value = url ?? '';
   }
 
+  // User Fullname (reactive - for instant updates across app when changed in Account Settings)
+  final RxString _userFullname = ''.obs;
+  String get userFullname => _userFullname.value.isNotEmpty ? _userFullname.value : (UserInfo.fullname ?? '');
+  void updateUserFullname(String? name) {
+    _userFullname.value = name ?? UserInfo.fullname ?? '';
+  }
+
   @override
   void onInit() {
     super.onInit();
     _loadLanguage();
     _loadTheme();
-    _loadProfileImage();
+    _loadUserProfile();
   }
 
-  void _loadProfileImage() {
+  void _loadUserProfile() {
     final imageUrl = UserInfo.profileImage;
     if (imageUrl != null && imageUrl.isNotEmpty) {
       _profileImageUrl.value = imageUrl;
+    }
+    final name = UserInfo.fullname;
+    if (name != null && name.isNotEmpty) {
+      _userFullname.value = name;
     }
   }
 

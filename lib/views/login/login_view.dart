@@ -789,12 +789,12 @@ class LoginView extends StatelessWidget {
           textAlignVertical: TextAlignVertical.center,
           keyboardType: TextInputType.number,
           maxLength: 1,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: isDark ? Colors.white : const Color(0xFF2C2C2E),
             fontSize: 22,
             fontWeight: FontWeight.bold,
           ),
-          cursorColor: Colors.white,
+          cursorColor: isDark ? Colors.white : const Color(0xFF2C2C2E),
           decoration: const InputDecoration(
             counterText: '',
             border: InputBorder.none,

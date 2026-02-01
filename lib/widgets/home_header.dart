@@ -361,11 +361,14 @@ class _AppDrawerState extends State<_AppDrawer> {
       final isDark = appController.isDarkMode;
       final language = appController.language;
       final isBn = language == AppLanguage.bn;
-      // Access profileImageUrl to make this widget reactive to profile image changes
+      // Access profileImageUrl and userFullname to make this widget reactive to profile changes
       final _ = appController.profileImageUrl;
+      final __ = appController.userFullname;
 
-      // Get user info dynamically from UserInfo
-      final userName = UserInfo.fullname ?? (isBn ? 'আপনার নাম' : 'Your Name');
+      // Get user info - uses appController.userFullname for instant updates when changed in Account Settings
+      final userName = appController.userFullname.isNotEmpty
+          ? appController.userFullname
+          : (UserInfo.fullname ?? (isBn ? 'আপনার নাম' : 'Your Name'));
       final username = UserInfo.username ?? '@username';
 
       // Menu items - matches React exactly

@@ -51,6 +51,18 @@ class Urls{
     static const Update_Group = "$_baseUrL/community-groups/update";     // POST Method
     static const delete_Group = "$_baseUrL/community-group/delete";     // POST Method
 
+    static const create_Group_post = "$_baseUrL/group-posts/create";     // POST Method
+    static const update_Group_post_post = "$_baseUrL/update_post" ;
+    static const delete_Group_post_post = "$_baseUrL/delete_post" ;
+
+
+    static const Approve_Member = "$_baseUrL/group/member/status" ;
+    static const Get_All_Group_Members = "$_baseUrL/group/member/get-all-members" ;    // GET
+    static const Leave_Group = "$_baseUrL/group/member/leave" ;
+    static const Delete_Group_Member = "$_baseUrL/group/member/delete" ;
+
+
+
     // Send Message
     static const send_message = "$_baseUrL/messages/send" ;
     static const get_Message_API = "$_baseUrL/messages" ;

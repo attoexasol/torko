@@ -18,10 +18,15 @@ class StageRoomView extends StatelessWidget {
       Get.isRegistered<AppController>() &&
       Get.find<AppController>().language == AppLanguage.bn;
 
+  bool get _isDark =>
+      Get.isRegistered<AppController>() &&
+      Get.find<AppController>().isDarkMode;
+
   @override
   Widget build(BuildContext context) {
+    final bgColor = _isDark ? const Color(0xFF052029) : Colors.white;
     return Scaffold(
-      backgroundColor: const Color(0xFF052029),
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -58,13 +63,14 @@ class StageRoomView extends StatelessWidget {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final iconColor = _isDark ? Colors.white : const Color(0xFF1A1A1A);
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 8, 12),
       child: Row(
         children: [
           IconButton(
             onPressed: () => Get.back(),
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: Icon(Icons.arrow_back, color: iconColor),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -93,13 +99,13 @@ class StageRoomView extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          const Icon(Icons.people_outline, color: Colors.white, size: 18),
+          Icon(Icons.people_outline, color: iconColor, size: 18),
           const SizedBox(width: 4),
           Text(
             '4',
             style: GoogleFonts.notoSansBengali(
               fontSize: 14,
-              color: Colors.white,
+              color: iconColor,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -112,7 +118,7 @@ class StageRoomView extends StatelessWidget {
                 snackPosition: SnackPosition.BOTTOM,
               );
             },
-            icon: const Icon(Icons.share, color: Colors.white),
+            icon: Icon(Icons.share, color: iconColor),
           ),
         ],
       ),
@@ -120,6 +126,12 @@ class StageRoomView extends StatelessWidget {
   }
 
   Widget _buildStageInfo() {
+    final titleColor = _isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final descColor = _isDark
+        ? const Color(0xFFB8DED6).withValues(alpha: 0.8)
+        : const Color(0xFF6B7280);
+    final categoryBg = _isDark ? const Color(0xFF0d3a4a) : const Color(0xFFFEF6F4);
+    final categoryTextColor = _isDark ? const Color(0xFFB8DED6) : const Color(0xFFd97757);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -142,7 +154,7 @@ class StageRoomView extends StatelessWidget {
                 style: GoogleFonts.notoSansBengali(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
-                  color: Colors.white,
+                  color: titleColor,
                 ),
               ),
               if (stage.description.isNotEmpty) ...[
@@ -151,7 +163,7 @@ class StageRoomView extends StatelessWidget {
                   stage.description,
                   style: GoogleFonts.notoSansBengali(
                     fontSize: 14,
-                    color: const Color(0xFFB8DED6).withValues(alpha: 0.8),
+                    color: descColor,
                   ),
                 ),
               ],
@@ -159,14 +171,14 @@ class StageRoomView extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0d3a4a),
+                  color: categoryBg,
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
                   stage.category.toLowerCase(),
                   style: GoogleFonts.notoSansBengali(
                     fontSize: 12,
-                    color: const Color(0xFFB8DED6),
+                    color: categoryTextColor,
                   ),
                 ),
               ),
@@ -179,6 +191,8 @@ class StageRoomView extends StatelessWidget {
 
   Widget _buildSpeakersSection() {
     final initial = stage.hostName.isNotEmpty ? stage.hostName[0].toUpperCase() : 'Y';
+    final textColor = _isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final borderColor = _isDark ? const Color(0xFF0a2f3d) : const Color(0xFFE5E7EB);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -187,7 +201,7 @@ class StageRoomView extends StatelessWidget {
           style: GoogleFonts.notoSansBengali(
             fontSize: 15,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: textColor,
           ),
         ),
         const SizedBox(height: 12),
@@ -223,7 +237,7 @@ class StageRoomView extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.amber,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF0a2f3d), width: 2),
+                      border: Border.all(color: borderColor, width: 2),
                     ),
                     child: const Icon(Icons.star, color: Colors.white, size: 14),
                   ),
@@ -237,7 +251,7 @@ class StageRoomView extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.green,
                       shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF0a2f3d), width: 2),
+                      border: Border.all(color: borderColor, width: 2),
                     ),
                     child: const Icon(Icons.volume_up, color: Colors.white, size: 14),
                   ),
@@ -250,7 +264,7 @@ class StageRoomView extends StatelessWidget {
               style: GoogleFonts.notoSansBengali(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
-                color: Colors.white,
+                color: textColor,
               ),
             ),
           ],
@@ -265,6 +279,7 @@ class StageRoomView extends StatelessWidget {
       (_isBn ? 'তানভীর রহমান' : 'Tanvir Rahman', 'T', true),
       (_isBn ? 'নুসরাত জাহান' : 'Nusrat Jahan', 'N', false),
     ];
+    final textColor = _isDark ? Colors.white : const Color(0xFF1A1A1A);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -273,7 +288,7 @@ class StageRoomView extends StatelessWidget {
           style: GoogleFonts.notoSansBengali(
             fontSize: 15,
             fontWeight: FontWeight.w600,
-            color: Colors.white,
+            color: textColor,
           ),
         ),
         const SizedBox(height: 12),
@@ -285,11 +300,16 @@ class StageRoomView extends StatelessWidget {
   }
 
   Widget _buildListenerTile(String name, String initial, bool handRaised) {
+    final cardBg = _isDark ? const Color(0xFF0d3a4a) : const Color(0xFFF5F5F5);
+    final nameColor = _isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final subColor = _isDark
+        ? const Color(0xFFB8DED6).withValues(alpha: 0.8)
+        : const Color(0xFF6B7280);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0d3a4a),
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -322,7 +342,7 @@ class StageRoomView extends StatelessWidget {
                   style: GoogleFonts.notoSansBengali(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                    color: nameColor,
                   ),
                 ),
                 if (handRaised) ...[
@@ -335,7 +355,7 @@ class StageRoomView extends StatelessWidget {
                         _isBn ? 'হাত তুলেছে' : 'Hand raised',
                         style: GoogleFonts.notoSansBengali(
                           fontSize: 12,
-                          color: const Color(0xFFB8DED6).withValues(alpha: 0.8),
+                          color: subColor,
                         ),
                       ),
                     ],
@@ -369,11 +389,16 @@ class StageRoomView extends StatelessWidget {
   }
 
   Widget _buildBottomBar(BuildContext context) {
+    final barBg = _isDark ? const Color(0xFF0a2f3d) : Colors.white;
+    final muteBg = _isDark ? const Color(0xFF0d3a4a) : const Color(0xFFF5F5F5);
+    final muteBorder = _isDark ? Colors.transparent : const Color(0xFFE5E7EB);
+    final muteColor = _isDark ? Colors.white : const Color(0xFF1A1A1A);
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 12, 18, 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0a2f3d),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: barBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: _isDark ? null : [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8, offset: const Offset(0, -2))],
       ),
       child: Row(
         children: [
@@ -388,20 +413,21 @@ class StageRoomView extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFF0d3a4a),
+                color: muteBg,
                 borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: muteBorder, width: 1),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.mic, color: Colors.white, size: 20),
+                  Icon(Icons.mic, color: muteColor, size: 20),
                   const SizedBox(width: 8),
                   Text(
                     _isBn ? 'মিউট' : 'Mute',
                     style: GoogleFonts.notoSansBengali(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                      color: muteColor,
                     ),
                   ),
                 ],

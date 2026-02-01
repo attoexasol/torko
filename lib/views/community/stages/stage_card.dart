@@ -16,8 +16,22 @@ class StageCard extends StatelessWidget {
     required this.onTap,
   });
 
+  static Color _lightCategoryBg(String category) {
+    final c = category.toLowerCase();
+    if (c.contains('technology') || c.contains('প্রযুক্তি')) {
+      return const Color(0xFFD4EDE6);
+    }
+    return const Color(0xFFFFE4D6);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final titleColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final hostColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final secondaryColor = isDark ? const Color(0xFF9D9D9D) : const Color(0xFF6B7280);
+    final categoryBg = isDark ? const Color(0xFFB8DED6) : _lightCategoryBg(stage.category);
+    final categoryTextColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -41,7 +55,7 @@ class StageCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFB8DED6),
+                      color: categoryBg,
                       borderRadius: BorderRadius.circular(13),
                     ),
                     child: Text(
@@ -49,7 +63,7 @@ class StageCard extends StatelessWidget {
                       style: GoogleFonts.notoSansBengali(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
-                        color: Colors.white,
+                        color: categoryTextColor,
                       ),
                     ),
                   ),
@@ -91,7 +105,7 @@ class StageCard extends StatelessWidget {
               style: GoogleFonts.notoSansBengali(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: titleColor,
               ),
             ),
             const SizedBox(height: 12),
@@ -108,39 +122,32 @@ class StageCard extends StatelessWidget {
                         style: GoogleFonts.notoSansBengali(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: Colors.white,
+                          color: hostColor,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 12,
-                            color: isDark ? const Color(0xFF9D9D9D) : const Color(0xFF9D9D9D),
-                          ),
+                          Icon(Icons.access_time, size: 12, color: secondaryColor),
                           const SizedBox(width: 4),
                           Text(
                             '${stage.listenersCount} ${isBn ? 'শ্রোতা' : 'listeners'}',
                             style: GoogleFonts.notoSansBengali(
                               fontSize: 12,
-                              color: const Color(0xFF9D9D9D),
+                              color: secondaryColor,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
                             '⊙',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? const Color(0xFF9D9D9D) : const Color(0xFF9D9D9D),
-                            ),
+                            style: TextStyle(fontSize: 12, color: secondaryColor),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             stage.durationText,
                             style: GoogleFonts.notoSansBengali(
                               fontSize: 12,
-                              color: const Color(0xFF9D9D9D),
+                              color: secondaryColor,
                             ),
                           ),
                         ],

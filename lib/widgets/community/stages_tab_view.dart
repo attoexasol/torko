@@ -27,6 +27,15 @@ class StagesTabView extends StatelessWidget {
   }
 
   Widget _buildStageCard(BuildContext context, Map<String, dynamic> stage) {
+    final cardBg = isDark ? const Color(0xFF0a2f3d) : Colors.white;
+    final titleColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final hostColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+    final secondaryColor = isDark ? const Color(0xFF9D9D9D) : const Color(0xFF6B7280);
+    final categoryBg = isDark
+        ? Color(int.tryParse(stage['categoryColor'].toString().replaceFirst('#', '0xFF')) ?? 0xFFB8DED6)
+        : _getLightCategoryBg(stage['category']?.toString() ?? '');
+    final categoryTextColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+
     return GestureDetector(
       onTap: () {
         StageJoinDialog.show(context, stage);
@@ -35,7 +44,7 @@ class StagesTabView extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF0a2f3d) : Colors.white,
+          color: cardBg,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isDark ? const Color(0xFF0d3a4a) : const Color(0xFFEBEBEB),
@@ -51,7 +60,7 @@ class StagesTabView extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Color(int.parse(stage['categoryColor'].toString().replaceFirst('#', '0xFF'))),
+                    color: categoryBg,
                     borderRadius: BorderRadius.circular(13),
                   ),
                   child: Text(
@@ -59,7 +68,7 @@ class StagesTabView extends StatelessWidget {
                     style: GoogleFonts.notoSansBengali(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
-                      color: Colors.white,
+                      color: categoryTextColor,
                     ),
                   ),
                 ),
@@ -101,7 +110,7 @@ class StagesTabView extends StatelessWidget {
               style: GoogleFonts.notoSansBengali(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: titleColor,
               ),
             ),
             const SizedBox(height: 12),
@@ -135,39 +144,32 @@ class StagesTabView extends StatelessWidget {
                         style: GoogleFonts.notoSansBengali(
                           fontSize: 14,
                           fontWeight: FontWeight.w500,
-                          color: Colors.white,
+                          color: hostColor,
                         ),
                       ),
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 12,
-                            color: isDark ? const Color(0xFF9D9D9D) : const Color(0xFF9D9D9D),
-                          ),
+                          Icon(Icons.access_time, size: 12, color: secondaryColor),
                           const SizedBox(width: 4),
                           Text(
                             '${stage['joinedCount']} ${isBn ? 'শ্রোতা' : 'listeners'}',
                             style: GoogleFonts.notoSansBengali(
                               fontSize: 12,
-                              color: isDark ? const Color(0xFF9D9D9D) : const Color(0xFF9D9D9D),
+                              color: secondaryColor,
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
                             '⊙',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? const Color(0xFF9D9D9D) : const Color(0xFF9D9D9D),
-                            ),
+                            style: TextStyle(fontSize: 12, color: secondaryColor),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             stage['duration'].toString(),
                             style: GoogleFonts.notoSansBengali(
                               fontSize: 12,
-                              color: isDark ? const Color(0xFF9D9D9D) : const Color(0xFF9D9D9D),
+                              color: secondaryColor,
                             ),
                           ),
                         ],
@@ -210,5 +212,14 @@ class StagesTabView extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Light theme: light teal for Technology, light peach for Business/Literature/other.
+  static Color _getLightCategoryBg(String category) {
+    final c = category.toLowerCase();
+    if (c.contains('প্রযুক্তি') || c.contains('technology')) {
+      return const Color(0xFFD4EDE6); // light teal
+    }
+    return const Color(0xFFFFE4D6); // light peach
   }
 }

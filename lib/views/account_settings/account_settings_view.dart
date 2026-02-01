@@ -51,6 +51,7 @@ class AccountSettingsView extends StatelessWidget {
                             controller: controller.usernameController,
                             isDark: isDark,
                             isEditing: controller.isEditing.value,
+                            readOnly: true,
                           ),
                           const SizedBox(height: 24),
 
@@ -300,6 +301,7 @@ class AccountSettingsView extends StatelessWidget {
     required bool isEditing,
     IconData? prefixIcon,
     int maxLines = 1,
+    bool readOnly = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,7 +323,8 @@ class AccountSettingsView extends StatelessWidget {
           ),
           child: TextField(
             controller: controller,
-            enabled: isEditing,
+            enabled: isEditing && !readOnly,
+            readOnly: readOnly,
             maxLines: maxLines,
             style: GoogleFonts.inter(
               fontSize: 15,

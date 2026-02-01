@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class CommunityGroupModel {
   final int id;
   final String name;
@@ -147,16 +149,10 @@ class CommunityGroupPostModel {
   });
 
   factory CommunityGroupPostModel.fromJson(Map<String, dynamic> json) {
-    final imgs = json['post_images'];
-    List<String> images = [];
-    if (imgs is List) {
-      images = imgs.map((e) => e.toString()).toList();
-    } else if (imgs is String) {
-      images = [imgs];
-    }
+    final images = _parsePostImages(json['post_images']);
     return CommunityGroupPostModel(
-      groupPostId: (json['group_post_id'] as num).toInt(),
-      postId: (json['post_id'] as num).toInt(),
+      groupPostId: _toInt(json['group_post_id'] ?? json['id']),
+      postId: _toInt(json['post_id'] ?? json['id']),
       approvedByAdmin: json['approved_by_admin']?.toString() ?? 'pending',
       createdAt: json['created_at']?.toString() ?? '',
       postTitle: json['post_title']?.toString() ?? '',
@@ -168,5 +164,29 @@ class CommunityGroupPostModel {
             )
           : null,
     );
+  }
+
+  static List<String> _parsePostImages(dynamic v) {
+    if (v == null) return [];
+    if (v is List) return v.map((e) => e.toString()).toList();
+    if (v is String) {
+      if (v.isEmpty) return [];
+      try {
+        final decoded = jsonDecode(v.replaceAll(r'\/', '/'));
+        if (decoded is List) return List<String>.from(decoded.map((e) => e.toString()));
+        return [v];
+      } catch (_) {
+        return [v];
+      }
+    }
+    return [];
+  }
+
+  static int _toInt(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v) ?? 0;
+    return 0;
   }
 }

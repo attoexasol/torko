@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/controllers/app_controller.dart';
 import 'stage_models.dart';
 import 'stage_controller.dart';
 
@@ -30,7 +31,8 @@ class StageJoinDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const isDark = true;
+    final isDark = Get.isRegistered<AppController>() &&
+        Get.find<AppController>().isDarkMode;
     final maxW = MediaQuery.of(context).size.width;
     final dialogWidth = (maxW * 0.9).clamp(280.0, 420.0);
 
@@ -47,7 +49,7 @@ class StageJoinDialog extends StatelessWidget {
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               decoration: BoxDecoration(
-                color: const Color(0xFF0a2f3d),
+                color: isDark ? const Color(0xFF0a2f3d) : Colors.white,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
@@ -64,7 +66,7 @@ class StageJoinDialog extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _buildHeader(),
+                      _buildHeader(isDark),
                       _buildBody(isDark),
                     ],
                   ),
@@ -77,17 +79,21 @@ class StageJoinDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
-    return Stack(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
-          child: Column(
+  Widget _buildHeader(bool isDark) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFd97757),
+      ),
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                children: [
-                  _buildLiveBadge(),
+                  children: [
+                    _buildLiveBadge(isDark),
                   const Spacer(),
                   GestureDetector(
                     onTap: () => Get.back(),
@@ -98,21 +104,26 @@ class StageJoinDialog extends StatelessWidget {
                         color: Colors.white.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close, color: Colors.white, size: 20),
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.black87,
+                        size: 20,
+                      ),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              if (stage.category.isNotEmpty) _buildCategoryPill(),
+              if (stage.category.isNotEmpty) _buildCategoryPill(isDark),
             ],
           ),
         ),
       ],
+    ),
     );
   }
 
-  Widget _buildLiveBadge() {
+  Widget _buildLiveBadge(bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -141,27 +152,34 @@ class StageJoinDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildCategoryPill() {
+  Widget _buildCategoryPill(bool isDark) {
+    final bg = Colors.white.withValues(alpha: 0.3);
+    final textColor = Colors.black87;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF0d3a4a),
+        color: bg,
         borderRadius: BorderRadius.circular(999),
+        border: isDark ? null : Border.all(color: const Color(0xFFE5E7EB)),
       ),
       child: Text(
         stage.category,
         style: GoogleFonts.notoSansBengali(
           fontSize: 11,
           fontWeight: FontWeight.w500,
-          color: const Color(0xFFB8DED6),
+          color: textColor,
         ),
       ),
     );
   }
 
   Widget _buildBody(bool isDark) {
+    final titleColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+      decoration: BoxDecoration(
+        color: isDark ? null : Colors.white,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -170,7 +188,7 @@ class StageJoinDialog extends StatelessWidget {
             style: GoogleFonts.notoSansBengali(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: titleColor,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -209,10 +227,12 @@ class StageJoinDialog extends StatelessWidget {
 
   Widget _buildHostRow(bool isDark) {
     final initial = stage.hostName.isNotEmpty ? stage.hostName[0].toUpperCase() : 'H';
+    final cardBg = isDark ? const Color(0xFF0d3a4a) : const Color(0xFFF5F5F5);
+    final nameColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0d3a4a),
+        color: cardBg,
         borderRadius: BorderRadius.circular(15),
       ),
       child: Row(
@@ -245,7 +265,7 @@ class StageJoinDialog extends StatelessWidget {
                   style: GoogleFonts.notoSansBengali(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: nameColor,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -270,10 +290,12 @@ class StageJoinDialog extends StatelessWidget {
     required bool isDark,
     bool showIcon = false,
   }) {
+    final cardBg = isDark ? const Color(0xFF0d3a4a) : const Color(0xFFF5F5F5);
+    final valueColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0d3a4a),
+        color: cardBg,
         borderRadius: BorderRadius.circular(15),
       ),
       child: Column(
@@ -304,7 +326,7 @@ class StageJoinDialog extends StatelessWidget {
             style: GoogleFonts.notoSansBengali(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: valueColor,
             ),
           ),
         ],
@@ -313,10 +335,14 @@ class StageJoinDialog extends StatelessWidget {
   }
 
   Widget _buildDescriptionBox(bool isDark) {
+    final boxBg = isDark ? const Color(0xFF052029) : const Color(0xFFEBEBEB);
+    final textColor = isDark
+        ? const Color(0xFFB8DED6).withValues(alpha: 0.8)
+        : const Color(0xFF555e67);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF052029),
+        color: boxBg,
         borderRadius: BorderRadius.circular(13),
       ),
       child: Text(
@@ -325,7 +351,7 @@ class StageJoinDialog extends StatelessWidget {
             : 'By joining this stage, you can participate in live audio conversation with the host and other listeners. Your microphone will be muted by default.',
         style: GoogleFonts.notoSansBengali(
           fontSize: 13,
-          color: const Color(0xFFB8DED6).withValues(alpha: 0.8),
+          color: textColor,
           height: 1.5,
         ),
       ),
@@ -333,6 +359,9 @@ class StageJoinDialog extends StatelessWidget {
   }
 
   Widget _buildButtons(bool isDark) {
+    final cancelBg = isDark ? const Color(0xFF0d3a4a) : Colors.transparent;
+    final cancelBorder = isDark ? const Color(0xFF0d3a4a) : const Color(0xFFD0D0D0);
+    final cancelColor = isDark ? const Color(0xFFB8DED6) : const Color(0xFF555e67);
     return Row(
       children: [
         Expanded(
@@ -341,9 +370,9 @@ class StageJoinDialog extends StatelessWidget {
             child: Container(
               height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFF0d3a4a),
+                color: cancelBg,
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: const Color(0xFF0d3a4a)),
+                border: Border.all(color: cancelBorder, width: 1.5),
               ),
               child: Center(
                 child: Text(
@@ -351,7 +380,7 @@ class StageJoinDialog extends StatelessWidget {
                   style: GoogleFonts.notoSansBengali(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFFB8DED6),
+                    color: cancelColor,
                   ),
                 ),
               ),

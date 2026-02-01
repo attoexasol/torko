@@ -5,9 +5,14 @@ import '../../core/controllers/app_controller.dart';
 import '../../controllers/community_groups_controller.dart';
 import '../../controllers/group_detail_controller.dart';
 import '../../models/community_group_model.dart';
+import '../../services/group_member_service.dart';
 import '../../widgets/bottom_nav.dart';
+import '../../widgets/group/group_members_sheet.dart';
 import 'groups/dialogs/group_delete_dialog.dart';
 import 'groups/dialogs/group_edit_sheet.dart';
+import 'groups/posts/create_group_post_screen.dart';
+import 'groups/posts/group_post_delete_dialog.dart';
+import 'groups/posts/group_post_options_sheet.dart';
 
 const String _baseImageUrl = 'https://torko.attoexasolutions.com/';
 
@@ -252,6 +257,37 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   ),
                   const SizedBox(height: 16),
                   if (_activeTab == 'post') ...[
+                    GestureDetector(
+                      onTap: () {
+                        Get.to(() => CreateGroupPostScreen(
+                              groupId: group.id,
+                              groupName: group.name,
+                            ));
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFd97757).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFd97757).withValues(alpha: 0.5)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.add, color: const Color(0xFFd97757), size: 22),
+                            const SizedBox(width: 12),
+                            Text(
+                              isBn ? 'পোস্ট তৈরি' : 'Create Post',
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFFd97757),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     ...(group.posts ?? []).map((p) => _buildPostCard(p, isDark, isBn)),
                   ],
                   if (_activeTab == 'about') _buildAboutContent(group, isDark, isBn),
@@ -407,13 +443,35 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      name,
-                      style: GoogleFonts.notoSansBengali(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          name,
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        if (post.approvedByAdmin == 'pending') ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade800,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              isBn ? 'অপেক্ষমান' : 'Pending',
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -428,12 +486,26 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
                   ],
                 ),
               ),
-              Icon(
-                Icons.more_vert,
-                color: isDark
-                    ? const Color(0xFFB8DED6).withValues(alpha: 0.6)
-                    : const Color(0xFF9D9D9D),
-                size: 20,
+              GestureDetector(
+                onTap: () {
+                  GroupPostOptionsSheet.show(
+                    post: post,
+                    onDelete: (p) {
+                      GroupPostDeleteDialog.show(
+                        onConfirm: () async {
+                          await Get.find<GroupDetailController>().deleteGroupPostUI(postId: p.postId);
+                        },
+                      );
+                    },
+                  );
+                },
+                child: Icon(
+                  Icons.more_vert,
+                  color: isDark
+                      ? const Color(0xFFB8DED6).withValues(alpha: 0.6)
+                      : const Color(0xFF9D9D9D),
+                  size: 20,
+                ),
               ),
             ],
           ),
@@ -607,12 +679,16 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
     );
   }
 
+  bool _isAdminForGroup(CommunityGroupModel group) =>
+      group.role?.toLowerCase() == 'admin';
+
   void _showGroupMenu(
     BuildContext context,
     CommunityGroupModel group,
     bool isDark,
     bool isBn,
   ) {
+    final isAdmin = _isAdminForGroup(group);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -627,45 +703,112 @@ class _GroupDetailScreenState extends State<GroupDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: const Icon(Icons.edit_outlined, color: Color(0xFFd97757)),
-                title: Text(
-                  isBn ? 'গ্রুপ সম্পাদনা' : 'Edit Group',
-                  style: GoogleFonts.notoSansBengali(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: isDark ? Colors.white : Colors.black87,
+              if (isAdmin) ...[
+                ListTile(
+                  leading: const Icon(Icons.people_outline, color: Color(0xFFd97757)),
+                  title: Text(
+                    isBn ? 'সদস্য' : 'Members',
+                    style: GoogleFonts.notoSansBengali(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
                   ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    GroupMembersSheet.show(groupId: group.id, isAdmin: true);
+                  },
                 ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  GroupEditSheet.show(group);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: Text(
-                  isBn ? 'গ্রুপ মুছে ফেলুন' : 'Delete Group',
-                  style: GoogleFonts.notoSansBengali(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.red,
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined, color: Color(0xFFd97757)),
+                  title: Text(
+                    isBn ? 'গ্রুপ সম্পাদনা' : 'Edit Group',
+                    style: GoogleFonts.notoSansBengali(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
                   ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    GroupEditSheet.show(group);
+                  },
                 ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  GroupDeleteDialog.show(
-                    onConfirm: () async {
-                      await Get.find<CommunityGroupsController>().deleteGroupFromUI(group.id);
-                    },
-                  );
-                },
-              ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline, color: Colors.red),
+                  title: Text(
+                    isBn ? 'গ্রুপ মুছে ফেলুন' : 'Delete Group',
+                    style: GoogleFonts.notoSansBengali(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.red,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    GroupDeleteDialog.show(
+                      onConfirm: () async {
+                        await Get.find<CommunityGroupsController>().deleteGroupFromUI(group.id);
+                      },
+                    );
+                  },
+                ),
+              ] else
+                ListTile(
+                  leading: Icon(
+                    Icons.exit_to_app,
+                    color: Colors.orange.shade700,
+                  ),
+                  title: Text(
+                    isBn ? 'গ্রুপ ত্যাগ করুন' : 'Leave Group',
+                    style: GoogleFonts.notoSansBengali(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.orange.shade700,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _handleLeaveGroup(group.id, isBn, isDark);
+                  },
+                ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _handleLeaveGroup(int groupId, bool isBn, bool isDark) async {
+    try {
+      await GroupMemberService.leaveGroup(groupId: groupId);
+      Get.snackbar(
+        '✅',
+        isBn ? 'গ্রুপ ত্যাগ করেছেন' : 'Left group successfully',
+        snackPosition: SnackPosition.TOP,
+        margin: const EdgeInsets.all(16),
+        borderRadius: 14,
+        backgroundColor: const Color(0xFF2E7D32),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+      Get.back();
+      if (Get.isRegistered<CommunityGroupsController>()) {
+        Get.find<CommunityGroupsController>().loadGroups();
+      }
+    } catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      Get.snackbar(
+        isBn ? 'গ্রুপ ত্যাগ ব্যর্থ' : 'Leave failed',
+        msg.isNotEmpty ? msg : 'Something went wrong. Please try again.',
+        snackPosition: SnackPosition.TOP,
+        margin: const EdgeInsets.all(16),
+        borderRadius: 14,
+        backgroundColor: const Color(0xFFD32F2F),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+    }
   }
 
   Widget _buildOverlayButton({

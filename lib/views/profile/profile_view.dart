@@ -459,20 +459,27 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
   
   Widget _buildNameSection(bool isDark) {
     final controller = widget.controller;
+    final appController = widget.appController;
 
     return Transform.translate(
       offset: const Offset(0, -50),
       child: Padding(
         padding: const EdgeInsets.only(top: 0, bottom: 8),
-        child: Obx(() => Text(
-              controller.name.value,
+        child: Obx(() {
+          // Use appController.userFullname for instant update when changed in Account Settings
+          final displayName = appController.userFullname.isNotEmpty
+              ? appController.userFullname
+              : controller.name.value;
+          return Text(
+              displayName,
               style: GoogleFonts.inter(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: isDark ? Colors.white : const Color(0xFF0f1419),
               ),
               textAlign: TextAlign.center,
-            )),
+            );
+        }),
       ),
     );
   }
@@ -726,41 +733,18 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
     return Transform.translate(
       offset: const Offset(0, -50),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 24),
         child: Obx(() {
-          // Get dynamic post count from postController
           final postCount = postController.posts.length.toString();
           final friendsCount = friendsController.friends.length.toString();
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              // Use Wrap for small screens, Row for larger screens
-              if (constraints.maxWidth < 360) {
-                return Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 16,
-                  runSpacing: 12,
-                  children: [
-                    _buildStatItem(postCount, 'Posts', isDark),
-                    _buildStatItem('0', isBn ? 'প্রতিবেশী' : 'Neighbours', isDark),
-                    _buildStatItem('0', 'Following', isDark),
-                    _buildStatItem(friendsCount, isBn ? 'বন্ধু' : 'Friends', isDark),
-                  ],
-                );
-              } else {
-                return Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Flexible(child: _buildStatItem(postCount, 'Posts', isDark)),
-                    SizedBox(width: constraints.maxWidth < 400 ? 16 : 24),
-                    Flexible(child: _buildStatItem('0', isBn ? 'প্রতিবেশী' : 'Neighbours', isDark)),
-                    SizedBox(width: constraints.maxWidth < 400 ? 16 : 24),
-                    Flexible(child: _buildStatItem('0', 'Following', isDark)),
-                    SizedBox(width: constraints.maxWidth < 400 ? 16 : 24),
-                    Flexible(child: _buildStatItem(friendsCount, isBn ? 'বন্ধু' : 'Friends', isDark)),
-                  ],
-                );
-              }
-            },
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(child: Center(child: _buildStatItem(postCount, 'Posts', isDark))),
+              Expanded(child: Center(child: _buildStatItem('0', isBn ? 'প্রতিবেশী' : 'Neighbours', isDark))),
+              Expanded(child: Center(child: _buildStatItem('0', 'Following', isDark))),
+              Expanded(child: Center(child: _buildStatItem(friendsCount, isBn ? 'বন্ধু' : 'Friends', isDark))),
+            ],
           );
         }),
       ),
@@ -782,15 +766,17 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 4),
-        Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            color: isDark ? const Color(0xFF8e8e8e) : const Color(0xFF536471),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            maxLines: 1,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: isDark ? const Color(0xFF8e8e8e) : const Color(0xFF536471),
+            ),
+            textAlign: TextAlign.center,
           ),
-          textAlign: TextAlign.center,
         ),
       ],
     );
@@ -914,64 +900,27 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
   }
   
   Widget _buildTabs(bool isDark, bool isBn) {
-    final controller = widget.controller;
-
     return LayoutBuilder(
       builder: (context, constraints) {
-        final containerWidth = constraints.maxWidth;
-        final isSmallScreen = containerWidth < 360;
-        // Account for padding: containerWidth - 32 (16px each side)
-        final availableWidth = containerWidth - 32;
-        final tabWidth = availableWidth / 4; // 4 tabs now: post, poll, saved, friends
-
-        return Obx(() {
-          int index = controller.activeTab.value == 'post'
-              ? 0
-              : controller.activeTab.value == 'poll'
-                  ? 1
-                  : controller.activeTab.value == 'saved'
-                      ? 2
-                      : 3; // friends
-        
+        final isSmallScreen = constraints.maxWidth < 360;
+        final barHeight = isSmallScreen ? 72.0 : 64.0;
         return Container(
-          height: isSmallScreen ? 72 : 64,
+          height: barHeight,
           padding: const EdgeInsets.all(6),
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF0a2f3d) : const Color(0xFFF5F5F5),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Stack(
+          child: Row(
             children: [
-              AnimatedPositioned(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
-                left: tabWidth * index,
-                top: 0,
-                width: tabWidth,
-                height: isSmallScreen ? 60 : 52,
-                child: Padding(
-                  padding: const EdgeInsets.all(4),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.lightPrimary,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              Row(
-                children: [
-                  Expanded(child: _buildTabButton('post', Icons.grid_on, 'Post', isSmallScreen)),
-                  Expanded(child: _buildTabButton('poll', Icons.poll, 'Poll', isSmallScreen)),
-                  Expanded(child: _buildTabButton('saved', Icons.bookmark_outline, 'Saved', isSmallScreen)),
-                  Expanded(child: _buildTabButton('friends', Icons.person_outline, isBn ? 'বন্ধু' : 'Friends', isSmallScreen)),
-                ],
-              ),
+              Expanded(child: _buildTabButton('post', Icons.grid_on, 'Post', isSmallScreen)),
+              Expanded(child: _buildTabButton('poll', Icons.poll, 'Poll', isSmallScreen)),
+              Expanded(child: _buildTabButton('saved', Icons.bookmark_outline, 'Saved', isSmallScreen)),
+              Expanded(child: _buildTabButton('friends', Icons.person_outline, isBn ? 'বন্ধু' : 'Friends', isSmallScreen)),
             ],
           ),
         );
-        });
       },
     );
   }
@@ -981,46 +930,55 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
 
     return Obx(() {
       final isActive = controller.activeTab.value == tab;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          controller.setActiveTab(tab);
-          _tabAnimationController.forward(from: 0);
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: isSmallScreen ? 16 : 18,
-                color: isActive ? Colors.white : const Color(0xFF9D9D9D),
-              ),
-              const SizedBox(height: 4),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  style: GoogleFonts.roboto(
-                    fontSize: isSmallScreen ? 10 : 11,
-                    fontWeight: FontWeight.bold,
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            controller.setActiveTab(tab);
+            _tabAnimationController.forward(from: 0);
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: isActive ? AppColors.lightPrimary : Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    icon,
+                    size: isSmallScreen ? 16 : 18,
                     color: isActive ? Colors.white : const Color(0xFF9D9D9D),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
+                  const SizedBox(height: 4),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      style: GoogleFonts.roboto(
+                        fontSize: isSmallScreen ? 10 : 11,
+                        fontWeight: FontWeight.bold,
+                        color: isActive ? Colors.white : const Color(0xFF9D9D9D),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
-    );
+      );
     });
   }
   

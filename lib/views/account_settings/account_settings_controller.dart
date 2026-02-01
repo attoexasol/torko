@@ -172,7 +172,7 @@ class AccountSettingsController extends GetxController {
 
       // Add fields that have values
       if (newName.isNotEmpty) body['fullname'] = newName;
-      if (newUsername.isNotEmpty) body['username'] = newUsername;
+      // Username is read-only - do not send to API
       if (newEmail.isNotEmpty) body['email'] = newEmail;
       if (newPhone.isNotEmpty) body['phone'] = newPhone;
       if (newBio.isNotEmpty) body['bio'] = newBio;
@@ -189,6 +189,9 @@ class AccountSettingsController extends GetxController {
         if (data['status'] == true && data['data'] != null) {
           // Save to UserInfo from API response
           await UserInfo.saveUserProfile(data['data']);
+
+          // Instant update across app (header, drawer, etc.)
+          appController.updateUserFullname(data['data']['fullname'] ?? newName);
 
           // Update saved values from response
           _savedName = data['data']['fullname'] ?? newName;

@@ -201,7 +201,7 @@ class StageJoinDialog extends StatelessWidget {
               style: GoogleFonts.notoSansBengali(
                 fontSize: 21,
                 fontWeight: FontWeight.w700,
-                color: Colors.white,
+                color: isDark ? Colors.white : const Color(0xFF1A1A1A),
               ),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -246,7 +246,7 @@ class StageJoinDialog extends StatelessWidget {
                           style: GoogleFonts.notoSansBengali(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: isDark ? Colors.white : const Color(0xFF1A1A1A),
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -430,7 +430,7 @@ class StageJoinDialog extends StatelessWidget {
             style: GoogleFonts.notoSansBengali(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: Colors.white,
+              color: isDark ? Colors.white : const Color(0xFF1A1A1A),
             ),
           ),
         ],
