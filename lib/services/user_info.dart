@@ -295,7 +295,8 @@ class UserInfo {
         await setUserId(int.tryParse(id) ?? 0);
       }
     }
-    if (data['fullname'] != null) await setFullname(data['fullname']);
+    final name = data['fullname'] ?? data['name'];
+    if (name != null) await setFullname(name.toString());
     if (data['username'] != null) await setUsername(data['username']);
     if (data['email'] != null) await setEmail(data['email']);
     if (data['phone'] != null) await setPhone(data['phone']);

@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../core/controllers/app_controller.dart';
 import '../../core/routes/app_routes.dart';
-import '../../services/network_caller.dart';
-import '../../services/urls.dart';
-import '../../services/user_info.dart';
+import '../../services/auth_service.dart';
 import '../../services/reverb_service.dart';
+import '../../services/user_info.dart';
 import '../../controllers/chat_controller.dart';
 import '../../controllers/inbox_controller.dart';
 
@@ -25,6 +25,9 @@ class LoginController extends GetxController {
 
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
+
+  /// Persisted from create_users: exist=true = returning user (go Home after OTP)
+  final RxBool userExists = false.obs;
 
   // =========================
   // RESEND OTP TIMER
@@ -144,53 +147,38 @@ class LoginController extends GetxController {
     }
 
     isLoading.value = true;
+    errorMessage.value = '';
 
     try {
-      final response = await NetworkCaller.postRequest(
-        url: Urls.create_users,
-        body: {'phone': cleanPhone},
-      );
+      final res = await AuthService().createUsers(phone: cleanPhone);
 
-      if (!response.isSuccess || response.body == null) {
-        _showError('Failed to send OTP');
-        return;
-      }
-
-      final data = response.body!;
-
-      if (data['status'] != true) {
-        _showError(data['message'] ?? 'OTP request failed');
-        return;
-      }
-
-      final payload = data['data'];
-
-      final otpCode = payload['otp_code'];
-      final token = payload['token'];
-      final userId = payload['id'] ?? payload['user_id'];
-
-      if (token != null) {
-        await UserInfo.saveToken(token.toString());
-      }
-
-      if (userId != null) {
-        await UserInfo.setUserId(int.parse(userId.toString()));
-      }
-
+      await UserInfo.saveToken(res.token);
       await UserInfo.setPhone(cleanPhone);
+      userExists.value = res.exist;
+
+      if (kDebugMode && res.otpCode != null) {
+        Get.snackbar(
+          'OTP Sent',
+          'Your OTP is: ${res.otpCode}',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.green.shade100,
+          colorText: Colors.green.shade800,
+        );
+      } else {
+        Get.snackbar(
+          'OTP Sent',
+          'Check your phone for the verification code.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.green.shade100,
+          colorText: Colors.green.shade800,
+        );
+      }
 
       step.value = 'otp';
-
-      Get.snackbar(
-        'OTP Sent',
-        'Your OTP is: $otpCode',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.green.shade100,
-        colorText: Colors.green.shade800,
-      );
-
       resendTimer.value = 0;
       canResend.value = true;
+    } on Exception catch (e) {
+      _showError(e.toString().replaceFirst('Exception: ', ''));
     } catch (e) {
       _showError('Network error');
     } finally {
@@ -233,67 +221,56 @@ class LoginController extends GetxController {
       return;
     }
 
+    final otpInt = int.tryParse(fullOtp);
+    if (otpInt == null) {
+      _showError('Invalid OTP format');
+      return;
+    }
+
     isLoading.value = true;
+    errorMessage.value = '';
 
     try {
-      final response = await NetworkCaller.postRequest(
-        url: Urls.verify_otp,
-        body: {'api_token': token, 'otp_code': int.parse(fullOtp)},
-      );
+      final res = await AuthService().verifyOtp(apiToken: token, otp: otpInt);
 
-      if (!response.isSuccess || response.body == null) {
-        _showError('OTP verification failed');
-        _clearOtp();
-        return;
+      final profileOk = await AuthService().onLoginSuccess(res.apiToken);
+      if (!profileOk) {
+        Get.snackbar(
+          'Logged in',
+          'Syncing profile…',
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 3),
+        );
       }
 
-      final data = response.body!;
-
-      if (data['status'] != true) {
-        _showError(data['message'] ?? 'Invalid OTP');
-        _clearOtp();
-        return;
-      }
-
-      final payload = data['data'];
-
-      final newToken = payload?['api_token'];
-      final userId = payload?['id'] ?? payload?['user_id'];
-
-      if (newToken != null) {
-        await UserInfo.saveToken(newToken);
-      }
-
-      if (userId != null) {
-        await UserInfo.setUserId(int.parse(userId.toString()));
-      }
-
-      await UserInfo.setVerified(true);
-
-      // ===============================
-      // INIT REALTIME SYSTEM
-      // ===============================
-
+      // Init realtime
       final currentUserId = UserInfo.userId;
-
       if (currentUserId != null) {
         if (!Get.isRegistered<InboxController>()) {
           Get.put(InboxController(), permanent: true);
         }
-
         if (!Get.isRegistered<ChatController>()) {
           Get.put(ChatController(), permanent: true);
         }
-
         await ReverbService().disconnect();
         await ReverbService().init(userId: currentUserId);
-
         if (kDebugMode) {
-          debugPrint('[LOGIN] Realtime initialized for userId=$currentUserId');
+          debugPrint('[LOGIN] Realtime init userId=$currentUserId');
         }
       }
 
-      Get.offAllNamed(AppRoutes.profileData);
+      if (Get.isRegistered<AppController>()) {
+        Get.find<AppController>().refreshUserProfile();
+      }
+
+      if (userExists.value) {
+        Get.offAllNamed(AppRoutes.home);
+      } else {
+        Get.offAllNamed(AppRoutes.profileData);
+      }
+    } on Exception catch (e) {
+      _showError(e.toString().replaceFirst('Exception: ', ''));
+      _clearOtp();
     } catch (e) {
       _showError('Network error');
       _clearOtp();
@@ -312,52 +289,42 @@ class LoginController extends GetxController {
     isLoading.value = true;
 
     try {
-      final response = await NetworkCaller.postRequest(
-        url: Urls.create_users,
-        body: {'phone': cleanPhone},
-      );
+      final res = await AuthService().createUsers(phone: cleanPhone);
 
-      if (!response.isSuccess || response.body == null) {
-        _showError('Failed to resend OTP');
-        return;
-      }
-
-      final data = response.body!;
-
-      if (data['status'] != true) {
-        _showError(data['message'] ?? 'Resend failed');
-        return;
-      }
-
-      final payload = data['data'];
-
-      final otpCode = payload['otp_code'];
-      final token = payload['token'];
-
-      if (token != null) {
-        await UserInfo.saveToken(token.toString());
-      }
+      await UserInfo.saveToken(res.token);
+      userExists.value = res.exist;
 
       showOtpResentConfirm.value = true;
-
       resendTimer.value = 60;
       canResend.value = false;
-
       _startResendTimer();
-
       _clearOtp();
 
-      Get.snackbar(
-        'OTP Resent',
-        'Your OTP is: $otpCode',
-        snackPosition: SnackPosition.TOP,
-        backgroundColor: Colors.green.shade100,
-        colorText: Colors.green.shade800,
-      );
+      if (kDebugMode && res.otpCode != null) {
+        Get.snackbar(
+          'OTP Resent',
+          'Your OTP is: ${res.otpCode}',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.green.shade100,
+          colorText: Colors.green.shade800,
+        );
+      } else {
+        Get.snackbar(
+          'OTP Resent',
+          'Check your phone for the verification code.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: Colors.green.shade100,
+          colorText: Colors.green.shade800,
+        );
+      }
 
       Future.delayed(const Duration(seconds: 3), () {
         showOtpResentConfirm.value = false;
       });
+    } on Exception catch (e) {
+      _showError(e.toString().replaceFirst('Exception: ', ''));
+    } catch (e) {
+      _showError('Failed to resend OTP');
     } finally {
       isLoading.value = false;
     }
@@ -402,6 +369,7 @@ class LoginController extends GetxController {
 
   void goBackToPhone() {
     step.value = 'phone';
+    userExists.value = false;
     _clearOtp();
   }
 

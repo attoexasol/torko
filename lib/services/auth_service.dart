@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'package:get/get.dart';
+import '../core/controllers/app_controller.dart';
 import '../models/auth/create_user_response.dart';
 import '../models/auth/verify_otp_response.dart';
 import '../services/network_caller.dart';
@@ -108,8 +110,9 @@ class AuthService {
     return res;
   }
 
-  /// Load and cache current user profile from update_users API
-  /// Call after token is saved. Saves profile to UserInfo for UI display.
+  /// Load and cache current user profile from update_users API.
+  /// POST update_users with api_token only returns current user.
+  /// Supports response.data or response.data.user structure.
   static Future<void> loadAndCacheCurrentUser() async {
     final token = UserInfo.apiToken;
     if (token == null || token.isEmpty) return;
@@ -119,30 +122,53 @@ class AuthService {
       body: {'api_token': token},
     );
 
-    if (response.isSuccess && response.body != null && response.body!['status'] == true) {
-      final data = response.body!['data'];
-      if (data is Map<String, dynamic>) {
-        await UserInfo.saveUserProfile(data);
-        if (kDebugMode) {
-          final id = data['id'];
-          final name = data['fullname']?.toString() ?? '';
-          final img = data['profile_image']?.toString() ?? '';
-          debugPrint('[AuthService] USER loaded id=$id name=${name.isNotEmpty ? "${name.length}ch" : "empty"} img=${img.isNotEmpty ? "ok" : "empty"}');
-        }
+    if (!response.isSuccess || response.body == null || response.body!['status'] != true) {
+      if (kDebugMode) {
+        debugPrint('[AuthService] loadAndCacheCurrentUser failed status=${response.body?['status']}');
+      }
+      return;
+    }
+
+    dynamic rawData = response.body!['data'];
+    Map<String, dynamic>? data;
+    if (rawData is Map<String, dynamic>) {
+      data = rawData;
+    } else if (rawData is Map && rawData['user'] != null) {
+      final user = rawData['user'];
+      data = user is Map<String, dynamic> ? user : Map<String, dynamic>.from(user as Map);
+    }
+
+    if (data != null) {
+      await UserInfo.saveUserProfile(data);
+      if (Get.isRegistered<AppController>()) {
+        Get.find<AppController>().refreshUserProfile();
+      }
+      if (kDebugMode) {
+        final id = data['id'];
+        final name = data['fullname']?.toString() ?? data['name']?.toString() ?? '';
+        final img = data['profile_image']?.toString() ?? '';
+        debugPrint('[AuthService] USER loaded id=$id name=${name.isNotEmpty ? "${name.length}ch" : "empty"} img=${img.isNotEmpty ? "ok" : "empty"}');
       }
     }
   }
 
   /// Single entry point for login success: save token, load user, mark verified
   /// Call after verify_otp success. Both returning and new users use this.
-  /// If loadAndCacheCurrentUser fails, completes anyway; profile can sync later.
-  Future<void> onLoginSuccess(String token) async {
+  /// Returns true if profile loaded, false if load failed (caller may show snackbar).
+  /// If load fails, retries once after delay.
+  Future<bool> onLoginSuccess(String token) async {
     await UserInfo.saveApiToken(token);
     await UserInfo.setVerified(true);
     try {
       await loadAndCacheCurrentUser();
+      return true;
     } catch (_) {
-      // Navigate anyway; profile will sync on next load
+      Future.delayed(const Duration(seconds: 2), () async {
+        try {
+          await loadAndCacheCurrentUser();
+        } catch (__) {}
+      });
+      return false;
     }
   }
 }

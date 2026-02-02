@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import '../core/controllers/app_controller.dart';
 import '../core/routes/app_routes.dart';
 import '../services/auth_service.dart';
 
@@ -30,19 +31,18 @@ class SplashController extends GetxController {
   /// This method handles all navigation logic based on auth state
   Future<void> _checkAuthAndNavigate() async {
     try {
-      // Check if user is logged in
       final isLoggedIn = await _authService.isLoggedIn();
-      
-      // Navigate based on authentication status
+
       if (isLoggedIn) {
-        // User is logged in → Navigate to Home
+        await AuthService.loadAndCacheCurrentUser();
+        if (Get.isRegistered<AppController>()) {
+          Get.find<AppController>().refreshUserProfile();
+        }
         _navigateToHome();
       } else {
-        // User is not logged in → Navigate to Login
         _navigateToLogin();
       }
     } catch (e) {
-      // On any error, navigate to login for safety
       _navigateToLogin();
     }
   }
