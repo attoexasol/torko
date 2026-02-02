@@ -5,7 +5,7 @@ import '../../core/routes/app_routes.dart';
 import '../../services/network_caller.dart';
 import '../../services/urls.dart';
 import '../../services/user_info.dart';
-import '../../services/pusher_service.dart';
+import '../../services/reverb_service.dart';
 import '../../controllers/chat_controller.dart';
 import '../../controllers/inbox_controller.dart';
 
@@ -285,8 +285,8 @@ class LoginController extends GetxController {
           Get.put(ChatController(), permanent: true);
         }
 
-        await PusherService().disconnect();
-        await PusherService().init(userId: currentUserId);
+        await ReverbService().disconnect();
+        await ReverbService().init(userId: currentUserId);
 
         if (kDebugMode) {
           debugPrint('[LOGIN] Realtime initialized for userId=$currentUserId');

@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
-import 'pusher_service.dart';
+import 'reverb_service.dart';
 import 'user_info.dart';
 
-/// Listens to app lifecycle and re-initializes Pusher on resume when the OS
+/// Listens to app lifecycle and re-initializes Reverb on resume when the OS
 /// may have dropped the socket. No disconnect on pause; only reconnect on resume.
 class AppLifecycleService extends GetxController
     with WidgetsBindingObserver {
@@ -39,20 +39,20 @@ class AppLifecycleService extends GetxController
       return;
     }
 
-    final ps = PusherService();
-    if (ps.isConnected && ps.currentUserId == userId) {
+    final rs = ReverbService();
+    if (rs.isConnected && rs.currentUserId == userId) {
       if (kDebugMode) {
         debugPrint('[AppLifecycleService] resume: already connected, skip re-subscribe');
       }
-      ps.debugPrintConnectionState();
+      rs.debugPrintConnectionState();
       return;
     }
 
     if (kDebugMode) {
-      debugPrint('[AppLifecycleService] resume: reconnecting Pusher for userId=$userId');
+      debugPrint('[AppLifecycleService] resume: reconnecting Reverb for userId=$userId');
     }
-    ps.debugPrintConnectionState();
-    ps.init(userId: userId).catchError((e) {
+    rs.debugPrintConnectionState();
+    rs.init(userId: userId).catchError((e) {
       if (kDebugMode) debugPrint('[AppLifecycleService] resume reconnect failed: $e');
     });
   }

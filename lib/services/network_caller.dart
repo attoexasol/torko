@@ -91,9 +91,8 @@ class NetworkCaller {
     return postRequest(url: url, body: fullBody, headers: mergedHeaders);
   }
 
-  /// POST for Pusher broadcasting auth. Body: { socket_id, channel_name, api_token }.
-  /// Also sends Authorization: Bearer. Laravel broadcasting auth expects api_token in body
-  /// (returns "Token missing" when only Bearer is sent). Token from UserInfo.
+  /// POST for Reverb/Pusher broadcasting auth. Body: socket_id, channel_name (and api_token if backend requires).
+  /// Sends Authorization: Bearer. Used by custom auth flows; ReverbService uses authorizer (Bearer only).
   static Future<NetworkResponse> postBroadcastingAuth({
     required String url,
     required String socketId,
