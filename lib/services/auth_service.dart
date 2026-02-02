@@ -1,7 +1,12 @@
+import 'package:flutter/foundation.dart';
+import '../models/auth/create_user_response.dart';
+import '../models/auth/verify_otp_response.dart';
+import '../services/network_caller.dart';
+import '../services/urls.dart';
 import 'user_info.dart';
 
 /// Authentication Service
-/// Handles authentication state checks and token validation
+/// Handles authentication state checks, token validation, and auth API calls
 class AuthService {
   // Singleton pattern
   static final AuthService _instance = AuthService._internal();
@@ -41,6 +46,103 @@ class AuthService {
       return token != null && token.isNotEmpty;
     } catch (e) {
       return false;
+    }
+  }
+
+  /// Create users / send OTP - POST create_users
+  /// Throws [Exception] on API error or non-JSON/HTML response
+  Future<CreateUserResponse> createUsers({required String phone}) async {
+    final response = await NetworkCaller.postRequest(
+      url: Urls.create_users,
+      body: {'phone': phone},
+    );
+
+    if (!response.isSuccess || response.body == null) {
+      throw Exception(response.errorMessage ?? 'Failed to send OTP');
+    }
+
+    final body = response.body!;
+    final res = CreateUserResponse.fromJson(Map<String, dynamic>.from(body));
+    if (!res.status) {
+      throw Exception(res.message.isNotEmpty ? res.message : 'OTP request failed');
+    }
+
+    if (res.token.isEmpty) {
+      throw Exception('No token received');
+    }
+
+    if (kDebugMode) {
+      debugPrint('[AuthService] createUsers: exist=${res.exist} tokenLen=${res.token.length}');
+    }
+    return res;
+  }
+
+  /// Verify OTP - POST verify_otp
+  /// Throws [Exception] on API error or non-JSON/HTML response
+  Future<VerifyOtpResponse> verifyOtp({
+    required String apiToken,
+    required int otp,
+  }) async {
+    final response = await NetworkCaller.postRequest(
+      url: Urls.verify_otp,
+      body: {'api_token': apiToken, 'otp_code': otp},
+    );
+
+    if (!response.isSuccess || response.body == null) {
+      throw Exception(response.errorMessage ?? 'OTP verification failed');
+    }
+
+    final body = response.body!;
+    final res = VerifyOtpResponse.fromJson(Map<String, dynamic>.from(body));
+    if (!res.status) {
+      throw Exception(res.message.isNotEmpty ? res.message : 'Invalid OTP');
+    }
+
+    if (res.apiToken.isEmpty) {
+      throw Exception('No api_token received');
+    }
+
+    if (kDebugMode) {
+      debugPrint('[AuthService] verifyOtp: success tokenLen=${res.apiToken.length}');
+    }
+    return res;
+  }
+
+  /// Load and cache current user profile from update_users API
+  /// Call after token is saved. Saves profile to UserInfo for UI display.
+  static Future<void> loadAndCacheCurrentUser() async {
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) return;
+
+    final response = await NetworkCaller.postRequest(
+      url: Urls.update_users,
+      body: {'api_token': token},
+    );
+
+    if (response.isSuccess && response.body != null && response.body!['status'] == true) {
+      final data = response.body!['data'];
+      if (data is Map<String, dynamic>) {
+        await UserInfo.saveUserProfile(data);
+        if (kDebugMode) {
+          final id = data['id'];
+          final name = data['fullname']?.toString() ?? '';
+          final img = data['profile_image']?.toString() ?? '';
+          debugPrint('[AuthService] USER loaded id=$id name=${name.isNotEmpty ? "${name.length}ch" : "empty"} img=${img.isNotEmpty ? "ok" : "empty"}');
+        }
+      }
+    }
+  }
+
+  /// Single entry point for login success: save token, load user, mark verified
+  /// Call after verify_otp success. Both returning and new users use this.
+  /// If loadAndCacheCurrentUser fails, completes anyway; profile can sync later.
+  Future<void> onLoginSuccess(String token) async {
+    await UserInfo.saveApiToken(token);
+    await UserInfo.setVerified(true);
+    try {
+      await loadAndCacheCurrentUser();
+    } catch (_) {
+      // Navigate anyway; profile will sync on next load
     }
   }
 }

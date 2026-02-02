@@ -105,23 +105,11 @@ class PostController extends GetxController {
         return;
       }
 
-      // Try GET first, if it fails, try POST with api_token
-      var response = await NetworkCaller.getRequest(
+      // Backend requires POST with api_token
+      final response = await NetworkCaller.postRequest(
         url: Urls.get_all_post,
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        body: {'api_token': token},
       );
-
-      // If GET fails, try POST with api_token in body
-      if (!response.isSuccess) {
-        response = await NetworkCaller.postRequest(
-          url: Urls.get_all_post,
-          body: {
-            'api_token': token,
-          },
-        );
-      }
 
       if (response.isSuccess && response.body != null) {
         if (response.body!['status'] == true) {
@@ -195,23 +183,11 @@ class PostController extends GetxController {
       }
       _lastUserId = currentUserId;
 
-      // Try GET first, if it fails, try POST with api_token
-      var response = await NetworkCaller.getRequest(
+      // Backend requires POST with api_token
+      final response = await NetworkCaller.postRequest(
         url: Urls.get_all_post,
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        body: {'api_token': token},
       );
-
-      // If GET fails, try POST with api_token in body
-      if (!response.isSuccess) {
-        response = await NetworkCaller.postRequest(
-          url: Urls.get_all_post,
-          body: {
-            'api_token': token,
-          },
-        );
-      }
 
       if (response.isSuccess && response.body != null) {
         if (response.body!['status'] == true) {

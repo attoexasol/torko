@@ -86,13 +86,15 @@ class AppController extends GetxController {
 
   void _loadUserProfile() {
     final imageUrl = UserInfo.profileImage;
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      _profileImageUrl.value = imageUrl;
-    }
+    _profileImageUrl.value = imageUrl ?? '';
     final name = UserInfo.fullname;
-    if (name != null && name.isNotEmpty) {
-      _userFullname.value = name;
-    }
+    _userFullname.value = name ?? '';
+  }
+
+  /// Refresh user profile from UserInfo storage. Call after login or profile fetch.
+  /// Ensures Drawer, Home header, and all Obx listening to userFullname/profileImageUrl update.
+  void refreshUserProfile() {
+    _loadUserProfile();
   }
 
   Future<void> _loadLanguage() async {

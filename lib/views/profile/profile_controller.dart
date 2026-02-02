@@ -183,10 +183,9 @@ class ProfileController extends GetxController {
       bio.value = _savedBio;
       profileImageUrl.value = storedProfileImage;
       coverImageUrl.value = storedCoverImage;
-      // Update AppController for reactive updates in drawer
-      if (storedProfileImage.isNotEmpty) {
-        appController.updateProfileImageUrl(storedProfileImage);
-      }
+      // Update AppController for reactive updates in drawer/header
+      appController.updateProfileImageUrl(storedProfileImage.isNotEmpty ? storedProfileImage : null);
+      appController.updateUserFullname(_savedName.isNotEmpty ? _savedName : null);
 
       // Update text controllers
       nameController.text = _savedName;
@@ -255,17 +254,20 @@ class ProfileController extends GetxController {
   Future<bool> saveBio() async {
     if (isSavingBio.value) return false;
 
+    final newBio = bioController.text.trim();
+    if (newBio.isEmpty) {
+      Future.microtask(() => _showErrorSnackbar('Bio can not be empty'));
+      return false;
+    }
+
     final token = UserInfo.getToken();
     if (token == null || token.isEmpty) {
-      _showErrorSnackbar('Session expired. Please login again.');
+      Future.microtask(() => _showErrorSnackbar('Session expired. Please login again.'));
       Get.offAllNamed(AppRoutes.login);
       return false;
     }
 
     isSavingBio.value = true;
-
-    // Get new bio value
-    final newBio = bioController.text.trim();
 
     try {
       final response = await NetworkCaller.postRequest(
@@ -309,28 +311,28 @@ class ProfileController extends GetxController {
             await _markStepCompleted(2);
           }
 
-          _showSuccessSnackbar('Bio updated successfully');
+          Future.microtask(() => _showSuccessSnackbar('Bio updated successfully'));
           
           isSavingBio.value = false;
           return true; // Return true on success
         } else {
           // Revert on API error
           bioController.text = _savedBio;
-          _showErrorSnackbar(data['message'] ?? 'Failed to update bio');
+          Future.microtask(() => _showErrorSnackbar(data['message'] ?? 'Failed to update bio'));
           isSavingBio.value = false;
           return false; // Return false on error
         }
       } else {
         // Revert on request error
         bioController.text = _savedBio;
-        _showErrorSnackbar(response.errorMessage ?? 'Failed to update bio');
+        Future.microtask(() => _showErrorSnackbar(response.errorMessage ?? 'Failed to update bio'));
         isSavingBio.value = false;
         return false; // Return false on error
       }
     } catch (e) {
       // Revert on exception
       bioController.text = _savedBio;
-      _showErrorSnackbar('Network error: ${e.toString()}');
+      Future.microtask(() => _showErrorSnackbar('Network error: ${e.toString()}'));
       isSavingBio.value = false;
       return false; // Return false on error
     }

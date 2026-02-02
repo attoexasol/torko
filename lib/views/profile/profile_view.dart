@@ -683,11 +683,13 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                     onTap: controller.isSavingBio.value
                         ? null
                         : () async {
-                            // Save bio and close dialog
-                            final success = await controller.saveBio();
-                            if (success) {
-                              Get.back(); // Close dialog only on success
+                            // 1) Close bottomsheet first
+                            if (Get.isBottomSheetOpen ?? false) {
+                              Get.back();
+                              await Future.delayed(const Duration(milliseconds: 150));
                             }
+                            // 2) Then call API/validation
+                            await controller.saveBio();
                           },
                     child: Container(
                       height: 48,

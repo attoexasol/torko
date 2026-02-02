@@ -52,6 +52,8 @@ class UserInfo {
   
   static String? get apiToken => _box.read<String>(_apiTokenKey);
   static Future<void> setApiToken(String token) async => await _box.write(_apiTokenKey, token);
+  static Future<void> saveApiToken(String token) => setApiToken(token);
+  static String? getApiToken() => apiToken;
   static String? get token => apiToken;
   static Future<void> setToken(String token) => setApiToken(token);
   static String? getToken() => apiToken;
