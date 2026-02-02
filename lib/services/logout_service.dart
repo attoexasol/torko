@@ -12,22 +12,22 @@ import '../controllers/inbox_controller.dart';
 import '../views/profile/profile_controller.dart';
 import '../views/home/home_controller.dart';
 import 'user_info.dart';
-import 'pusher_service.dart';
+import 'reverb_service.dart';
 
 /// Centralized logout service that clears all user data from the app.
-/// Order is critical: disconnect Pusher first, then storage/caches, then controllers.
+/// Order is critical: disconnect Reverb first, then storage/caches, then controllers.
 class LogoutService {
   /// Clear all user-related data from the app.
-  /// 1. Disconnect Pusher (unsubscribe, disconnect, reset state).
+  /// 1. Disconnect Reverb (unsubscribe, disconnect, reset state).
   /// 2. Clear GetStorage (UserInfo), SharedPreferences, image cache.
   /// 3. Clear GetX controller states.
   /// 4. Delete registered controllers (except permanent Chat/Inbox).
   static Future<void> clearAllData() async {
     try {
-      // 1. FIRST: Disconnect Pusher – tear down socket and channels before clearing token
-      await PusherService().disconnect();
+      // 1. FIRST: Disconnect Reverb – tear down socket and channels before clearing token
+      await ReverbService().disconnect();
       if (kDebugMode) {
-        debugPrint('[LogoutService] Pusher disconnected');
+        debugPrint('[LogoutService] Reverb disconnected');
       }
 
       // 2. Clear GetStorage (UserInfo - token, profile data, etc.)

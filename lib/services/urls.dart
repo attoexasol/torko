@@ -69,8 +69,9 @@ class Urls{
     static const get_Single_Message_API = "$_baseUrL/single/message" ;
     static const message_search = "$_baseUrL/search/message" ;
 
-    // Pusher Broadcasting Auth
+    // Broadcasting Auth (Pusher/Reverb protocol)
     static const pusher_auth = "$_baseUrL/broadcasting/auth";
+    static const broadcastingAuth = pusher_auth;
 
 
 }

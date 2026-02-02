@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 
 import '../models/message_model.dart';
 import '../services/message_api_service.dart';
-import '../services/pusher_service.dart';
+import '../services/reverb_service.dart';
 import '../services/user_info.dart';
 import '../core/controllers/app_controller.dart';
 import 'inbox_controller.dart';
@@ -11,7 +11,7 @@ import 'inbox_controller.dart';
 /// PRODUCTION REALTIME CHAT CONTROLLER (FIXED)
 ///
 /// Fixes included:
-/// ✅ Prevent duplicate Pusher callback registration
+/// ✅ Prevent duplicate Reverb callback registration
 /// ✅ Proper cleanup in onClose()
 /// ✅ Safer conversation switching + load-once per user
 /// ✅ Stronger de-duplication (temp ids vs real ids)
@@ -51,7 +51,7 @@ class ChatController extends GetxController {
   /// Track which conversations were loaded at least once
   final Map<int, bool> _conversationLoaded = <int, bool>{};
 
-  final PusherService _pusher = PusherService();
+  final ReverbService _reverb = ReverbService();
 
   bool _callbackRegistered = false;
 
@@ -74,7 +74,7 @@ class ChatController extends GetxController {
 
     if (kDebugMode) debugPrint('[CHAT] registering realtime callback');
 
-    _pusher.onMessageReceived = (message) {
+    _reverb.onMessageReceived = (message) {
       if (kDebugMode) {
         debugPrint('[CHAT] REALTIME callback | id=${message.id}');
       }
@@ -343,8 +343,8 @@ class ChatController extends GetxController {
     if (kDebugMode) debugPrint('[CHAT] onClose - cleanup');
 
     // prevent callback leak (especially when controller is recreated)
-    if (_pusher.onMessageReceived != null) {
-      _pusher.onMessageReceived = null;
+    if (_reverb.onMessageReceived != null) {
+      _reverb.onMessageReceived = null;
     }
 
     super.onClose();

@@ -7,7 +7,7 @@ import '../../controllers/navigation_controller.dart';
 import '../../controllers/chat_controller.dart';
 import '../../controllers/inbox_controller.dart';
 import '../../services/app_lifecycle_service.dart';
-import '../../services/pusher_service.dart';
+import '../../services/reverb_service.dart';
 import '../../services/user_info.dart';
 
 class InitialBindings extends Bindings {
@@ -19,39 +19,39 @@ class InitialBindings extends Bindings {
     Get.put(InboxController(), permanent: true);
     Get.put(AppLifecycleService(), permanent: true);
 
-    // Initialize Pusher only if both token and userId exist; call init once
-    _initializePusherIfLoggedIn();
+    // Initialize Reverb only if both token and userId exist; call init once
+    _initializeReverbIfLoggedIn();
 
     Get.lazyPut(() => BottomNavController());
     Get.lazyPut(() => HomeHeaderController());
   }
 
-  /// Initialize Pusher at app start only when token and userId exist.
-  /// Calls init(userId) once; PusherService prevents double init for same user.
-  void _initializePusherIfLoggedIn() {
+  /// Initialize Reverb at app start only when token and userId exist.
+  /// Calls init(userId) once; ReverbService prevents double init for same user.
+  void _initializeReverbIfLoggedIn() {
     final token = UserInfo.apiToken;
     final userId = UserInfo.userId;
 
     if (token == null || token.isEmpty || userId == null) {
       if (kDebugMode) {
         debugPrint(
-            '[InitialBindings] Pusher skip: token=${token != null && token.isNotEmpty}, userId=$userId');
+            '[InitialBindings] Reverb skip: token=${token != null && token.isNotEmpty}, userId=$userId');
       }
       return;
     }
 
     if (kDebugMode) {
-      debugPrint('[InitialBindings] Pusher init for userId=$userId');
+      debugPrint('[InitialBindings] Reverb init for userId=$userId');
     }
-    final ps = PusherService();
-    ps.init(userId: userId).then((_) {
+    final rs = ReverbService();
+    rs.init(userId: userId).then((_) {
       if (kDebugMode) {
-        ps.debugPrintConnectionState();
+        rs.debugPrintConnectionState();
       }
     }).catchError((error) {
       if (kDebugMode) {
-        debugPrint('[InitialBindings] Pusher init failed: $error');
-        ps.debugPrintConnectionState();
+        debugPrint('[InitialBindings] Reverb init failed: $error');
+        rs.debugPrintConnectionState();
       }
     });
   }

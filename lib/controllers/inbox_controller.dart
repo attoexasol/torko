@@ -8,7 +8,7 @@ import '../models/search_message_result_model.dart';
 import '../models/user_mini_model.dart';
 import '../models/message_model.dart';
 import '../services/message_api_service.dart';
-import '../services/pusher_service.dart';
+import '../services/reverb_service.dart';
 import '../services/user_info.dart';
 import '../core/routes/app_routes.dart';
 
@@ -42,7 +42,7 @@ class InboxController extends GetxService {
   // =========================
   // Internal State
   // =========================
-  final PusherService _pusher = PusherService();
+  final ReverbService _reverb = ReverbService();
 
   bool _loadedOnce = false;
   bool _callbackRegistered = false;
@@ -70,7 +70,7 @@ class InboxController extends GetxService {
       debugPrint('[INBOX] registering realtime callback');
     }
 
-    _pusher.onInboxMessage = (message) {
+    _reverb.onInboxMessage = (message) {
       if (kDebugMode) {
         debugPrint('[INBOX] REALTIME message | id=${message.id}');
       }
@@ -346,8 +346,8 @@ class InboxController extends GetxService {
     // (if you keep it permanent, it won't be called unless you delete it)
     if (kDebugMode) debugPrint('[INBOX] onClose - cleanup');
 
-    if (_pusher.onInboxMessage != null) {
-      _pusher.onInboxMessage = null;
+    if (_reverb.onInboxMessage != null) {
+      _reverb.onInboxMessage = null;
     }
 
     searchEC.dispose();
