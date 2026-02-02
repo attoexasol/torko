@@ -735,7 +735,8 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 24),
         child: Obx(() {
-          final postCount = postController.posts.length.toString();
+          // Use timeline length for post count (same data as Post tab)
+          final postCount = timelineController.timeline.length.toString();
           final friendsCount = friendsController.friends.length.toString();
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
