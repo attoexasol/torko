@@ -1,35 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:torko/core/controllers/dashboard_controller.dart';
-import 'core/bindings/initial_bindings.dart';
-import 'core/routes/app_routes.dart';
-import 'core/theme/app_theme.dart';
-import 'core/controllers/app_controller.dart';
-import 'services/user_info.dart';
-import 'views/splash/splash_view.dart';
-import 'views/onboarding/onboarding_view.dart';
-import 'views/login/login_view.dart';
-import 'views/profile_data_onboarding/profile_data_onboarding_view.dart';
-import 'views/location_onboarding/location_onboarding_view.dart';
-import 'views/create_post/create_post_view.dart';
-import 'views/notifications/notifications_view.dart';
-import 'views/profile/profile_view.dart';
-import 'views/explore/explore_view.dart';
-import 'views/messages/messages_view.dart';
-import 'modules/community/community_binding.dart';
-import 'modules/community/community_routes.dart';
-import 'modules/community/screens/community_view.dart';
-import 'views/settings/settings_view.dart';
-import 'views/account_settings/account_settings_view.dart';
-import 'views/privacy_settings/privacy_settings_view.dart';
-import 'views/notification_settings/notification_settings_view.dart';
-import 'views/conversation/conversation_view.dart';
-import 'views/calling/calling_view.dart';
-import 'views/post_detail/post_detail_view.dart';
-import 'views/home/home_view.dart';
-import 'controllers/community_groups_controller.dart';
-import 'views/community/group_detail_screen.dart';
-import 'views/community/create_group_view.dart';
+import 'package:torko/app/bindings/initial_bindings.dart';
+import 'package:torko/app/routes/app_routes.dart';
+import 'package:torko/app/theme/app_theme.dart';
+import 'package:torko/core/controllers/app_controller.dart';
+import 'package:torko/presentation/community/controllers/community_groups_controller.dart';
+import 'package:torko/presentation/main/controllers/dashboard_controller.dart';
+import 'package:torko/core/services/user_info.dart';
+import 'package:torko/presentation/auth/views/login_view.dart';
+import 'package:torko/presentation/calling/views/calling_view.dart';
+import 'package:torko/presentation/community/bindings/community_binding.dart';
+import 'package:torko/presentation/community/routes/community_routes.dart';
+import 'package:torko/presentation/community/views/community_view.dart';
+import 'package:torko/presentation/community/views/create_group_view.dart';
+import 'package:torko/presentation/community/views/group_detail_screen.dart';
+import 'package:torko/presentation/conversation/views/conversation_view.dart';
+import 'package:torko/presentation/create_post/views/create_post_view.dart';
+import 'package:torko/presentation/home/views/home_view.dart';
+import 'package:torko/presentation/location_onboarding/views/location_onboarding_view.dart';
+import 'package:torko/presentation/messages/views/messages_view.dart';
+import 'package:torko/presentation/notification_settings/views/notification_settings_view.dart';
+import 'package:torko/presentation/notifications/views/notifications_view.dart';
+import 'package:torko/presentation/onboarding/views/onboarding_view.dart';
+import 'package:torko/presentation/post_detail/views/post_detail_view.dart';
+import 'package:torko/presentation/privacy_settings/views/privacy_settings_view.dart';
+import 'package:torko/presentation/profile/views/profile_view.dart';
+import 'package:torko/presentation/profile_data_onboarding/views/profile_data_onboarding_view.dart';
+import 'package:torko/presentation/account_settings/views/account_settings_view.dart';
+import 'package:torko/presentation/explore/views/explore_view.dart';
+import 'package:torko/presentation/settings/views/settings_view.dart';
+import 'package:torko/presentation/splash/views/splash_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -117,5 +117,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-

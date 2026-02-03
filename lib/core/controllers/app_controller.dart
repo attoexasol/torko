@@ -1,8 +1,8 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../services/user_info.dart';
-import '../translations/app_translations.dart';
+import 'package:torko/core/localization/app_translations.dart';
+import 'package:torko/core/services/user_info.dart';
 
 enum AppLanguage { bn, en }
 enum AppThemeMode { light, dark }
