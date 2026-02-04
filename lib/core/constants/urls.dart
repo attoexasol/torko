@@ -73,5 +73,14 @@ class Urls{
     static const pusher_auth = "$_baseUrL/broadcasting/auth";
     static const broadcastingAuth = pusher_auth;
 
+    //  friends
+    static const friend_request = "$_baseUrL/friend/request" ;
+    static const accept_friend_request = "$_baseUrL/friend/accept" ;
+    static const reject_friend_reject = "$_baseUrL/friend/reject" ;
+    static const pending_friend_requests = "$_baseUrL/friend/requests" ;
+    static const friend_lists = "$_baseUrL/friends" ;
+    static const friend_suggestion = "$_baseUrL/friend/suggestions" ;
+    static const mutual_friend_suggestion = "$_baseUrL/friends/mutual-suggestions" ;
+
 
 }

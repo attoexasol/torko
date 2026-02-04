@@ -53,9 +53,6 @@ dependencies:
   
   # Animations
   flutter_animate: ^4.5.0
-  
-  # Laravel Reverb (Pusher protocol) for real-time messaging
-  pusher_reverb_flutter: ^0.0.4
 
 dev_dependencies:
   flutter_test:

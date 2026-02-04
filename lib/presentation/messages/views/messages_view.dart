@@ -38,8 +38,7 @@ class _MessagesViewState extends State<MessagesView> {
       print('   Controller is PERMANENT - stream listener never dies');
     }
     
-    // ⚠️ REALTIME RULE: Use loadInboxOnce() to ensure API is called ONLY ONCE
-    // After this, all updates come from Pusher stream only
+    // loadInboxOnce() ensures API is called only once per session
     inboxController.loadInboxOnce();
   }
 
