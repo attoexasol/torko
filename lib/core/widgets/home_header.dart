@@ -8,7 +8,6 @@ import 'package:torko/app/theme/app_colors.dart';
 import 'package:torko/presentation/main/controllers/navigation_controller.dart';
 import 'package:torko/core/services/logout_service.dart';
 import 'package:torko/core/services/user_info.dart';
-import 'package:torko/presentation/friends/views/friends_screen.dart';
 
 class HomeHeader extends StatefulWidget {
   final Function(String)? onNavigate;
@@ -383,7 +382,7 @@ class _AppDrawerState extends State<_AppDrawer> {
           label: isBn ? 'বন্ধু' : 'Friends',
           onTap: () {
             widget.onClose();
-            Get.to(() => const FriendsScreen());
+            Get.toNamed(AppRoutes.friends);
           },
         ),
         _MenuItem(
@@ -790,7 +789,6 @@ class _SearchDialogState extends State<_SearchDialog> {
                                 },
                                 onSubmitted: (_) {
                                   if (searchQuery.trim().isNotEmpty) {
-                                    print('Searching for: $searchQuery');
                                     widget.onClose();
                                   }
                                 },

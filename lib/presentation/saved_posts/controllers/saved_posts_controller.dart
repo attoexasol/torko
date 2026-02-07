@@ -21,9 +21,6 @@ class SavedPostsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    if (kDebugMode) {
-      print('🔍 [SavedPostsController] onInit called');
-    }
   }
 
   /// Fetch saved posts from API
@@ -42,58 +39,27 @@ class SavedPostsController extends GetxController {
   }
 
   Future<void> _fetchSavedImpl() async {
-    if (kDebugMode) {
-      print('═══════════════════════════════════════════════════════════');
-      print('🔍 [fetchSavedPosts] fetchSavedPosts() called');
-    }
-    
     final token = UserInfo.apiToken;
     if (token == null || token.isEmpty) {
-      if (kDebugMode) {
-        print('❌ [fetchSavedPosts] Token is null or empty');
-      }
       error.value = 'Session expired. Please login again.';
       isLoading.value = false;
       return;
-    }
-
-    if (kDebugMode) {
-      print('✅ [fetchSavedPosts] Token found (length: ${token.length})');
     }
 
     isLoading.value = true;
     error.value = '';
 
     try {
-      if (kDebugMode) {
-        print('🔄 [fetchSavedPosts] Calling PostApiService.getSavedPosts()...');
-      }
-      
       final posts = await PostApiService.getSavedPosts();
-      
-      if (kDebugMode) {
-        print('✅ [fetchSavedPosts] API returned ${posts.length} saved posts');
-      }
-      
       savedPosts.assignAll(posts);
       error.value = '';
-
-      if (kDebugMode) {
-        print('✅ [fetchSavedPosts] Saved posts list updated (length: ${savedPosts.length})');
-        print('═══════════════════════════════════════════════════════════');
-      }
     } catch (e, stackTrace) {
       error.value = e is PostApiException 
           ? e.message 
           : 'Failed to load saved posts';
       
       savedPosts.clear();
-
-      if (kDebugMode) {
-        print('❌ [fetchSavedPosts] Error: $e');
-        print('   Stack trace: $stackTrace');
-        print('═══════════════════════════════════════════════════════════');
-      }
+      if (kDebugMode) debugPrint('[API] fetchSavedPosts error: $e');
     } finally {
       isLoading.value = false;
     }

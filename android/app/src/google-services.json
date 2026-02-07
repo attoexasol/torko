@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "813541859378",
+    "project_id": "torko-ad923",
+    "storage_bucket": "torko-ad923.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:813541859378:android:c9abc2a28bd4c30b31dc2b",
+        "android_client_info": {
+          "package_name": "com.example.torko"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZ0mcPhZ2yfU3MZEOkFUSA3XoJ4KdtJVo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

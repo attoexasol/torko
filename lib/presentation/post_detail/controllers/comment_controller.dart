@@ -30,7 +30,6 @@ class CommentController extends GetxController {
   Future<void> loadComments(int postId) async {
     if (postId <= 0) {
       errorMessage.value = 'Invalid post ID';
-      print('DEBUG loadComments: Invalid post ID = $postId');
       return;
     }
 
@@ -38,47 +37,31 @@ class CommentController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
 
-    print('DEBUG loadComments: Loading comments for post_id = $postId');
-
     try {
       final token = UserInfo.apiToken;
-      
-      print('DEBUG loadComments: Using api_token = ${token != null && token.length > 10 ? '${token.substring(0, 10)}...' : token}');
-      
-      // Try using GET request with query parameter (similar to get_all_post)
       final url = '${Urls.get_all_comment}?post_id=$postId';
-      print('DEBUG loadComments: URL = $url');
-      
+
       final response = await NetworkCaller.getRequest(
         url: url,
         headers: token != null ? {'Authorization': 'Bearer $token'} : null,
       );
-
-      print('DEBUG loadComments: Response success = ${response.isSuccess}');
-      print('DEBUG loadComments: Response statusCode = ${response.statusCode}');
-      print('DEBUG loadComments: Response body = ${response.body}');
-      print('DEBUG loadComments: Response errorMessage = ${response.errorMessage}');
 
       if (response.isSuccess && response.body != null) {
         if (response.body!['status'] == true) {
           final data = response.body!['data'];
           if (data is List) {
             comments.value = data.map((json) => CommentModel.fromJson(json)).toList();
-            print('DEBUG loadComments: Loaded ${comments.length} comments');
             errorMessage.value = '';
           } else {
             errorMessage.value = 'Invalid response format';
-            print('DEBUG loadComments: Invalid data format - ${data.runtimeType}');
             comments.value = [];
           }
         } else {
           errorMessage.value = response.body!['message'] ?? 'Failed to load comments';
-          print('DEBUG loadComments: API returned false status - ${response.body!['message']}');
           comments.value = [];
         }
       } else {
         // If GET fails, try POST as fallback
-        print('DEBUG loadComments: GET failed, trying POST...');
         final postResponse = await NetworkCaller.postRequest(
           url: Urls.get_all_comment,
           body: {
@@ -86,17 +69,12 @@ class CommentController extends GetxController {
             'post_id': postId,
           },
         );
-        
-        print('DEBUG loadComments: POST Response success = ${postResponse.isSuccess}');
-        print('DEBUG loadComments: POST Response statusCode = ${postResponse.statusCode}');
-        print('DEBUG loadComments: POST Response body = ${postResponse.body}');
-        
+
         if (postResponse.isSuccess && postResponse.body != null) {
           if (postResponse.body!['status'] == true) {
             final data = postResponse.body!['data'];
             if (data is List) {
               comments.value = data.map((json) => CommentModel.fromJson(json)).toList();
-              print('DEBUG loadComments: Loaded ${comments.length} comments via POST');
               errorMessage.value = '';
             } else {
               errorMessage.value = 'Invalid response format';
@@ -108,13 +86,11 @@ class CommentController extends GetxController {
           }
         } else {
           errorMessage.value = response.errorMessage ?? 'Failed to load comments';
-          print('DEBUG loadComments: Both GET and POST failed');
           comments.value = [];
         }
       }
     } catch (e) {
       errorMessage.value = 'Error: ${e.toString()}';
-      print('DEBUG loadComments: Exception - $e');
       comments.value = [];
     } finally {
       isLoading.value = false;
@@ -221,9 +197,7 @@ class CommentController extends GetxController {
                   homeController.updatePostCommentCount(postId, currentCount + 1);
                 }
               }
-            } catch (e) {
-              print('DEBUG createComment: Error updating post count - $e');
-            }
+            } catch (_) {}
           }
           
           // Reload comments to get fresh data with user info
@@ -351,9 +325,7 @@ class CommentController extends GetxController {
           final updatedCount = (currentCount - 1).clamp(0, double.infinity).toInt();
           homeController.updatePostCommentCount(currentPostId.value, updatedCount);
         }
-      } catch (e) {
-        print('DEBUG deleteComment: Error updating post count (optimistic) - $e');
-      }
+      } catch (_) {}
     }
 
     try {
@@ -387,9 +359,7 @@ class CommentController extends GetxController {
                   homeController.updatePostCommentCount(currentPostId.value, updatedCount);
                 }
               }
-            } catch (e) {
-              print('DEBUG deleteComment: Error updating post count - $e');
-            }
+            } catch (_) {}
           }
           
           // Reload comments to ensure sync with server (gets accurate count and structure)
@@ -401,9 +371,7 @@ class CommentController extends GetxController {
                 final homeController = Get.find<HomeController>();
                 final actualCount = commentCount;
                 homeController.updatePostCommentCount(currentPostId.value, actualCount);
-              } catch (e) {
-                print('DEBUG deleteComment: Error updating count after reload - $e');
-              }
+              } catch (_) {}
             }
           }
           
@@ -420,9 +388,7 @@ class CommentController extends GetxController {
               if (currentPost != null) {
                 homeController.updatePostCommentCount(currentPostId.value, originalCommentCount);
               }
-            } catch (e) {
-              print('DEBUG deleteComment: Error rolling back post count - $e');
-            }
+            } catch (_) {}
           }
           errorMessage.value = response.body!['message'] ?? 'Failed to delete comment';
         }
@@ -437,9 +403,7 @@ class CommentController extends GetxController {
             if (currentPost != null) {
               homeController.updatePostCommentCount(currentPostId.value, originalCommentCount);
             }
-          } catch (e) {
-            print('DEBUG deleteComment: Error rolling back post count - $e');
-          }
+          } catch (_) {}
         }
         errorMessage.value = response.errorMessage ?? 'Failed to delete comment';
       }
@@ -454,9 +418,7 @@ class CommentController extends GetxController {
           if (currentPost != null) {
             homeController.updatePostCommentCount(currentPostId.value, originalCommentCount);
           }
-        } catch (e) {
-          print('DEBUG deleteComment: Error rolling back post count - $e');
-        }
+        } catch (_) {}
       }
       errorMessage.value = 'Error: ${e.toString()}';
     } finally {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:torko/core/controllers/app_controller.dart';
 import 'package:torko/app/routes/app_routes.dart';
@@ -12,12 +13,20 @@ import 'package:torko/core/services/post_api_service.dart';
 import 'package:torko/core/constants/urls.dart';
 import 'package:torko/core/services/user_info.dart';
 
+/// Top-level function for compute() - parses posts in isolate (avoids main-thread jank).
+List<PostModel> _parsePostsIsolate(List<dynamic> data) {
+  return data
+      .map((json) => PostModel.fromJson(Map<String, dynamic>.from(json)))
+      .toList();
+}
+
 class HomeController extends GetxController {
   final RxString activeTab = 'forYou'.obs;
   final RxBool showHeader = true.obs;
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
   final RxList<PostModel> posts = <PostModel>[].obs;
+  final RxList<PostModel> _cachedFiltered = <PostModel>[].obs;
   final RxSet<int> hiddenPosts = <int>{}.obs;
   final RxSet<int> likedPosts = <int>{}.obs;
   final RxMap<int, int> postLikeCounts = <int, int>{}.obs;
@@ -41,10 +50,20 @@ class HomeController extends GetxController {
     super.onInit();
     scrollController.addListener(_handleScroll);
     _initializeFollowingUsers();
-    loadAllPosts();
-    
+    // Defer API load to next frame - show UI first, data second (performance)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!isClosed) loadAllPosts();
+    });
+    // Update filtered cache when posts, tab, or hidden change (avoids recompute in build)
+    ever(posts, (_) => _updateFilteredCache());
+    ever(activeTab, (_) => _updateFilteredCache());
+    ever(hiddenPosts, (_) => _updateFilteredCache());
     // Set navigation state to home
     _navController.setCurrentScreen('home');
+  }
+
+  void _updateFilteredCache() {
+    _cachedFiltered.value = _computeFilteredPosts();
   }
 
   @override
@@ -101,13 +120,9 @@ class HomeController extends GetxController {
         if (response.body!['status'] == true) {
           final data = response.body!['data'];
           if (data is List) {
-            posts.value = data.map((json) {
-              final post = PostModel.fromJson(json);
-              if (kDebugMode) {
-                print('DEBUG loadAllPosts: postId=${post.id} is_like=${post.isLike} isLiked=${post.isLiked}');
-              }
-              return post;
-            }).toList();
+            // Parse in isolate to avoid main-thread jank (large lists)
+            final list = await compute(_parsePostsIsolate, data);
+            posts.value = list;
             errorMessage.value = '';
           } else {
             errorMessage.value = 'Invalid response format';
@@ -130,21 +145,26 @@ class HomeController extends GetxController {
     await loadAllPosts();
   }
 
-  // Get filtered posts based on active tab
-  List<PostModel> get filteredPosts {
-    final visiblePosts = posts.where((post) => !hiddenPosts.contains(post.id)).toList();
-    
+  /// Cached filtered posts - updated via worker (avoids O(n) work in build).
+  List<PostModel> get filteredPosts => _cachedFiltered;
+
+  List<PostModel> _computeFilteredPosts() {
+    final visiblePosts =
+        posts.where((post) => !hiddenPosts.contains(post.id)).toList();
+
     switch (activeTab.value) {
       case 'following':
-        return visiblePosts.where((post) {
-          final authorName = post.createdBy?.name ?? '';
-          return followingUsers.contains(authorName);
-        }).toList();
+        return visiblePosts
+            .where((post) =>
+                followingUsers.contains(post.createdBy?.name ?? ''))
+            .toList();
       case 'trending':
         final sorted = List<PostModel>.from(visiblePosts);
         sorted.sort((a, b) {
-          final aScore = a.postLikeCount + a.postCommentCount + a.postShareCount;
-          final bScore = b.postLikeCount + b.postCommentCount + b.postShareCount;
+          final aScore =
+              a.postLikeCount + a.postCommentCount + a.postShareCount;
+          final bScore =
+              b.postLikeCount + b.postCommentCount + b.postShareCount;
           return bScore.compareTo(aScore);
         });
         return sorted;
@@ -205,9 +225,7 @@ class HomeController extends GetxController {
           'post_id': postId,
         },
       );
-      
-      print('DEBUG handleLike: Response = ${response.body}');
-      
+
       if (response.isSuccess && response.body != null) {
         if (response.body!['status'] == true) {
           // Sync with API response
@@ -224,25 +242,20 @@ class HomeController extends GetxController {
           
           // Update the post model's isLike field to sync with server
           final postIndex = posts.indexWhere((p) => p.id == postId);
-          if (postIndex != -1) {
+          if (          postIndex != -1) {
             posts[postIndex] = posts[postIndex].copyWith(isLike: likeStatus);
           }
-          
-          print('DEBUG handleLike: Success - liked=$likeStatus, count=$serverLikeCount');
         } else {
           // API returned false status - rollback
           _rollbackLike(postId, wasLiked, originalCount);
-          print('DEBUG handleLike: API returned false - ${response.body!['message']}');
         }
       } else {
         // API call failed - rollback
         _rollbackLike(postId, wasLiked, originalCount);
-        print('DEBUG handleLike: API failed - ${response.errorMessage}');
       }
     } catch (e) {
       // Exception - rollback
       _rollbackLike(postId, wasLiked, originalCount);
-      print('DEBUG handleLike: Exception - $e');
     } finally {
       likingInProgress.remove(postId);
     }

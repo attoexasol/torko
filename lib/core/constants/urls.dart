@@ -79,7 +79,6 @@ class Urls{
     static const reject_friend_reject = "$_baseUrL/friend/reject" ;
     static const pending_friend_requests = "$_baseUrL/friend/requests" ;
     static const friend_lists = "$_baseUrL/friends" ;
-    static const friend_suggestion = "$_baseUrL/friend/suggestions" ;
     static const mutual_friend_suggestion = "$_baseUrL/friends/mutual-suggestions" ;
 
 

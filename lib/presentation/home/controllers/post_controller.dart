@@ -40,39 +40,22 @@ class PostController extends GetxController {
   // ==================== Helper: Fetch User ID ====================
   /// Fetches user ID from API if not stored locally
   Future<int?> _ensureUserId() async {
-    // If we already have userId, return it
-    if (UserInfo.userId != null) {
-      print('DEBUG _ensureUserId: Already have userId = ${UserInfo.userId}');
-      return UserInfo.userId;
-    }
+    if (UserInfo.userId != null) return UserInfo.userId;
 
-    print('DEBUG _ensureUserId: No userId stored, fetching from API...');
-    
-    // Try to fetch user profile from update_users API
     final token = UserInfo.apiToken;
-    if (token == null || token.isEmpty) {
-      print('DEBUG _ensureUserId: No token available');
-      return null;
-    }
+    if (token == null || token.isEmpty) return null;
 
     try {
       final response = await NetworkCaller.postRequest(
         url: Urls.update_users,
-        body: {
-          'api_token': token,
-        },
+        body: {'api_token': token},
       );
 
-      print('DEBUG _ensureUserId: API response success = ${response.isSuccess}');
-      
       if (response.isSuccess && response.body != null) {
         final data = response.body!;
-        print('DEBUG _ensureUserId: Response data = $data');
-        
         if (data['status'] == true && data['data'] != null) {
           final userData = data['data'];
           final userId = userData['id'];
-          print('DEBUG _ensureUserId: Found userId = $userId (type: ${userId.runtimeType})');
           
           if (userId != null) {
             if (userId is int) {
@@ -86,9 +69,7 @@ class PostController extends GetxController {
           }
         }
       }
-    } catch (e) {
-      print('DEBUG _ensureUserId: Error = $e');
-    }
+    } catch (_) {}
     return null;
   }
 
@@ -115,13 +96,11 @@ class PostController extends GetxController {
         if (response.body!['status'] == true) {
           final data = response.body!['data'];
           if (data is List) {
-            posts.value = data.map((json) {
-              final post = PostModel.fromJson(json);
-              if (kDebugMode) {
-                print('DEBUG loadAllPosts: postId=${post.id} is_like=${post.isLike} isLiked=${post.isLiked}');
-              }
-              return post;
-            }).toList();
+            final list = data.map((json) => PostModel.fromJson(json)).toList();
+            posts.value = list;
+            if (kDebugMode) {
+              final liked = list.where((p) => p.isLiked == true).length;
+            }
             errorMessage.value = '';
           } else {
             errorMessage.value = 'Invalid response format';
@@ -156,26 +135,16 @@ class PostController extends GetxController {
         return;
       }
 
-      // Try to get userId, fetch from API if not available
       int? currentUserId = UserInfo.userId;
-      print('DEBUG loadUserPosts: Initial userId from storage = $currentUserId');
-      
-      if (currentUserId == null) {
-        print('DEBUG loadUserPosts: userId is null, calling _ensureUserId()');
-        currentUserId = await _ensureUserId();
-        print('DEBUG loadUserPosts: After _ensureUserId(), userId = $currentUserId');
-      }
+      if (currentUserId == null) currentUserId = await _ensureUserId();
 
       if (currentUserId == null) {
-        print('DEBUG loadUserPosts: userId is still null, returning empty');
         errorMessage.value = 'User ID not found';
         isLoading.value = false;
         posts.value = []; // Clear posts if user ID is missing
         _lastUserId = null;
         return;
       }
-      
-      print('DEBUG loadUserPosts: Using userId = $currentUserId for filtering');
 
       // Clear posts if user has changed (new login)
       if (_lastUserId != null && _lastUserId != currentUserId) {
@@ -193,20 +162,10 @@ class PostController extends GetxController {
         if (response.body!['status'] == true) {
           final data = response.body!['data'];
           if (data is List) {
-            // Filter posts by current user's ID
-            final allPosts = data.map((json) {
-              final post = PostModel.fromJson(json);
-              if (kDebugMode) {
-                print('DEBUG loadUserPosts: postId=${post.id} is_like=${post.isLike} isLiked=${post.isLiked}');
-              }
-              return post;
-            }).toList();
-            print('DEBUG loadUserPosts: Total posts from API = ${allPosts.length}');
-            print('DEBUG loadUserPosts: Post userIds = ${allPosts.map((p) => p.userId).toList()}');
-            print('DEBUG loadUserPosts: Filtering for userId = $currentUserId');
-            
+            final allPosts = data.map((json) => PostModel.fromJson(json)).toList();
             posts.value = allPosts.where((post) => post.userId == currentUserId).toList();
-            print('DEBUG loadUserPosts: Filtered posts count = ${posts.length}');
+            if (kDebugMode) {
+            }
             errorMessage.value = '';
           } else {
             errorMessage.value = 'Invalid response format';
@@ -379,7 +338,7 @@ class PostController extends GetxController {
               base64Images.add(base64String);
             }
           } catch (e) {
-            print('Error downloading existing image $imageUrl: $e');
+            if (kDebugMode) debugPrint('[API] Image download error: $e');
             // Continue with other images even if one fails
           }
         }
@@ -447,7 +406,7 @@ class PostController extends GetxController {
       httpClient.close();
       return null;
     } catch (e) {
-      print('Error downloading image $imageUrl: $e');
+      if (kDebugMode) debugPrint('[API] Image download error: $e');
       httpClient?.close();
       return null;
     }
@@ -541,7 +500,6 @@ class PostController extends GetxController {
       final token = UserInfo.apiToken;
       if (token == null || token.isEmpty) {
         if (kDebugMode) {
-          print('❌ [savePost] Token is null or empty');
         }
         Get.snackbar(
           'Error',
@@ -557,7 +515,6 @@ class PostController extends GetxController {
         final post = posts[postIndex];
         posts[postIndex] = post.copyWith(isSave: 1);
         if (kDebugMode) {
-          print('✅ [savePost] Optimistically updated post $postId to saved');
         }
       }
 
@@ -567,7 +524,6 @@ class PostController extends GetxController {
 
       if (success) {
         if (kDebugMode) {
-          print('✅ [savePost] Post $postId saved successfully');
         }
         // Ensure optimistic update is persisted
         if (postIndex != -1 && posts[postIndex].isSave != 1) {
@@ -580,7 +536,6 @@ class PostController extends GetxController {
           final post = posts[postIndex];
           posts[postIndex] = post.copyWith(isSave: 0);
           if (kDebugMode) {
-            print('❌ [savePost] Reverted optimistic update for post $postId');
           }
         }
         return false;
@@ -594,7 +549,7 @@ class PostController extends GetxController {
       }
 
       if (kDebugMode) {
-        print('❌ [savePost] Error saving post $postId: $e');
+        if (kDebugMode) debugPrint('[API] savePost error: $e');
       }
       return false;
     }

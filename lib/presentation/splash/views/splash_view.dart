@@ -8,9 +8,7 @@ class SplashView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Initialize controller - it will handle navigation in onInit()
-    Get.put(SplashController());
-    
+    // Controller created by SplashBinding
     final screenWidth = MediaQuery.of(context).size.width;
     final logoSize = screenWidth < 350 ? 150.0 : 200.0;
 

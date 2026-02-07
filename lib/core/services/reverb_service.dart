@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 import 'package:torko/data/models/message_model.dart';
 
 /// No-op realtime adapter. Realtime (Pusher/Reverb) removed.
@@ -25,30 +23,13 @@ class ReverbService {
   Function(MessageModel)? onMessageReceived;
   Function(MessageModel)? onInboxMessage;
 
-  void debugPrintConnectionState() {
-    if (kDebugMode) {
-      debugPrint('[REVERB] Realtime disabled (Pusher removed)');
-    }
-  }
+  void debugPrintConnectionState() {}
 
-  Future<void> init({required int userId}) async {
-    if (kDebugMode) {
-      debugPrint('[REVERB] Realtime disabled (Pusher removed)');
-    }
-  }
+  Future<void> init({required int userId}) async {}
 
   void clearDeliveredCache() {}
 
-  Future<void> disconnect() async {
-    if (kDebugMode) {
-      debugPrint('[REVERB] Realtime disabled (Pusher removed)');
-    }
-  }
+  Future<void> disconnect() async {}
 
-  /// Health check: no-op.
-  static Future<void> healthCheck() async {
-    if (kDebugMode) {
-      debugPrint('[REVERB] Realtime disabled (Pusher removed)');
-    }
-  }
+  static Future<void> healthCheck() async {}
 }

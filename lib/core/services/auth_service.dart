@@ -73,9 +73,6 @@ class AuthService {
       throw Exception('No token received');
     }
 
-    if (kDebugMode) {
-      debugPrint('[AuthService] createUsers: exist=${res.exist} tokenLen=${res.token.length}');
-    }
     return res;
   }
 
@@ -104,9 +101,6 @@ class AuthService {
       throw Exception('No api_token received');
     }
 
-    if (kDebugMode) {
-      debugPrint('[AuthService] verifyOtp: success tokenLen=${res.apiToken.length}');
-    }
     return res;
   }
 
@@ -123,9 +117,6 @@ class AuthService {
     );
 
     if (!response.isSuccess || response.body == null || response.body!['status'] != true) {
-      if (kDebugMode) {
-        debugPrint('[AuthService] loadAndCacheCurrentUser failed status=${response.body?['status']}');
-      }
       return;
     }
 
@@ -147,7 +138,9 @@ class AuthService {
         final id = data['id'];
         final name = data['fullname']?.toString() ?? data['name']?.toString() ?? '';
         final img = data['profile_image']?.toString() ?? '';
-        debugPrint('[AuthService] USER loaded id=$id name=${name.isNotEmpty ? "${name.length}ch" : "empty"} img=${img.isNotEmpty ? "ok" : "empty"}');
+        final token = UserInfo.apiToken;
+        final masked = token == null || token.isEmpty ? 'null' : (token.length <= 20 ? '${token.substring(0, token.length ~/ 2)}***' : '${token.substring(0, 12)}...${token.substring(token.length - 6)}');
+        debugPrint('[AUTH] USER loaded id=$id name=${name.isNotEmpty ? name : "empty"} img=${img.isNotEmpty ? "ok" : "empty"} firebaseToken=$masked');
       }
     }
   }

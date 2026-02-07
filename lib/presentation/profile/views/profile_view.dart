@@ -1610,10 +1610,10 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                             color: isDark ? Colors.white : const Color(0xFF0f1419),
                           ),
                         ),
-                        if (friend.username.isNotEmpty) ...[
+                        if ((friend.username ?? '').isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
-                            '@${friend.username}',
+                            friend.displayUsername,
                             style: GoogleFonts.notoSansBengali(
                               fontSize: 13,
                               color: isDark ? const Color(0xFFB8DED6).withOpacity(0.6) : const Color(0xFF657786),

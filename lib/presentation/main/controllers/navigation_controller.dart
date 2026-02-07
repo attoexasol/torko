@@ -118,7 +118,6 @@ class NavigationController extends GetxController {
       
       // Inbox loads via API; MessagesView calls loadInboxOnce() in initState
       if (kDebugMode) {
-        debugPrint('[NAV] Messages screen selected');
       }
     }
     
@@ -194,7 +193,6 @@ class NavigationController extends GetxController {
     
     // Inbox loads via API; MessagesView calls loadInboxOnce() in initState
     if (kDebugMode) {
-      debugPrint('[NAV] Messages tab tapped');
     }
     
     navigateTo('messages');

@@ -28,46 +28,26 @@ class _PostDetailViewState extends State<PostDetailView> {
     // Get post ID from arguments
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = Get.arguments;
-      print('DEBUG PostDetail: args = $args');
-      
-      if (args != null) {
-        if (args is Map && args['postId'] != null) {
-          final id = args['postId'];
-          print('DEBUG PostDetail: postId from args = $id (${id.runtimeType})');
-          if (id is int) {
-            postId = id;
-          } else if (id is String) {
-            postId = int.tryParse(id);
-          }
+      if (args != null && args is Map && args['postId'] != null) {
+        final id = args['postId'];
+        if (id is int) {
+          postId = id;
+        } else if (id is String) {
+          postId = int.tryParse(id);
         }
       }
-      
-      // Also try to get from postDetailData
       final postData = appController.postDetailData;
-      print('DEBUG PostDetail: postData = $postData');
-      
-      if (postData != null && postData['id'] != null) {
+      if (postId == null && postData != null && postData['id'] != null) {
         final id = postData['id'];
-        print('DEBUG PostDetail: id from postData = $id (${id.runtimeType})');
-        if (postId == null) {
-          if (id is int) {
-            postId = id;
-          } else if (id is String) {
-            postId = int.tryParse(id);
-          }
+        if (id is int) {
+          postId = id;
+        } else if (id is String) {
+          postId = int.tryParse(id);
         }
       }
-      
-      print('DEBUG PostDetail: Final postId = $postId');
-      
-      // Load comments if we have a post ID
       if (postId != null && postId! > 0) {
-        print('DEBUG PostDetail: Loading comments for postId = $postId');
         commentController.loadComments(postId!);
-      } else {
-        print('DEBUG PostDetail: No valid postId found');
       }
-      
       setState(() {});
     });
   }

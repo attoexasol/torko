@@ -1,258 +1,200 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 
-/// Friend user model
-class FriendUser {
-  final String id;
-  final String name;
-  final String username;
-  final String? location;
-  final int? mutualFriends;
-  final bool isOnline;
-  final String? bio;
-  final String? avatar;
+import 'package:torko/app/theme/app_colors.dart';
+import 'package:torko/core/controllers/app_controller.dart';
+import 'package:torko/core/services/friends_api_service.dart';
+import 'package:torko/core/services/user_info.dart';
+import 'package:torko/data/models/friend_user.dart';
 
-  FriendUser({
-    required this.id,
-    required this.name,
-    required this.username,
-    this.location,
-    this.mutualFriends,
-    this.isOnline = false,
-    this.bio,
-    this.avatar,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'username': username,
-        'location': location,
-        'mutualFriends': mutualFriends,
-        'isOnline': isOnline,
-        'bio': bio,
-        'avatar': avatar,
-      };
-
-  factory FriendUser.fromJson(Map<String, dynamic> json) => FriendUser(
-        id: json['id']?.toString() ?? '',
-        name: json['name']?.toString() ?? '',
-        username: json['username']?.toString() ?? '',
-        location: json['location']?.toString(),
-        mutualFriends: json['mutualFriends'] is int
-            ? json['mutualFriends'] as int
-            : (json['mutualFriends'] is String
-                ? int.tryParse(json['mutualFriends'] as String)
-                : null),
-        isOnline: json['isOnline'] == true || json['isOnline'] == 1,
-        bio: json['bio']?.toString(),
-        avatar: json['avatar']?.toString(),
-      );
-}
-
-/// Friend request model
-class FriendRequest {
-  final String id;
-  final FriendUser from;
-  final DateTime timestamp;
-  final String status; // 'pending' | 'accepted' | 'declined'
-
-  FriendRequest({
-    required this.id,
-    required this.from,
-    required this.timestamp,
-    required this.status,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'from': from.toJson(),
-        'timestamp': timestamp.toIso8601String(),
-        'status': status,
-      };
-
-  factory FriendRequest.fromJson(Map<String, dynamic> json) => FriendRequest(
-        id: json['id']?.toString() ?? '',
-        from: FriendUser.fromJson(json['from'] as Map<String, dynamic>),
-        timestamp: json['timestamp'] is String
-            ? DateTime.tryParse(json['timestamp'] as String) ?? DateTime.now()
-            : DateTime.now(),
-        status: json['status']?.toString() ?? 'pending',
-      );
-}
-
-/// Controller for managing friends, friend requests, and sent requests
+/// Friends controller with full API integration.
 class FriendsController extends GetxController {
-  static const String _friendsKey = 'torko_friends';
-  static const String _friendRequestsKey = 'torko_friend_requests';
-  static const String _sentRequestsKey = 'torko_sent_requests';
-
-  final _storage = GetStorage();
-
+  final RxList<FriendUser> suggestions = <FriendUser>[].obs;
   final RxList<FriendUser> friends = <FriendUser>[].obs;
-  final RxList<FriendRequest> friendRequests = <FriendRequest>[].obs;
-  final RxList<FriendRequest> sentRequests = <FriendRequest>[].obs;
+  final RxList<FriendRequestItem> requests = <FriendRequestItem>[].obs;
+
+  final RxBool isLoadingSuggestions = false.obs;
+  final RxBool isLoadingFriends = false.obs;
+  final RxBool isLoadingRequests = false.obs;
+
+  final RxMap<int, bool> isSendingRequestByUserId = <int, bool>{}.obs;
+  final RxMap<int, bool> isAcceptingByRequestId = <int, bool>{}.obs;
+  final RxMap<int, bool> isRejectingByRequestId = <int, bool>{}.obs;
+
+  int get pendingCount => requests.length;
 
   @override
   void onInit() {
     super.onInit();
-    _loadFromStorage();
+    loadAll();
   }
 
-  void _loadFromStorage() {
+  /// Load all tabs (suggestions, friends, requests).
+  Future<void> loadAll() async {
+    await Future.wait([
+      loadSuggestions(),
+      loadFriends(),
+      loadRequests(),
+    ]);
+  }
+
+  Future<void> loadSuggestions() async {
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) return;
+
+    isLoadingSuggestions.value = true;
     try {
-      // Load friends
-      final friendsData = _storage.read(_friendsKey);
-      if (friendsData is List) {
-        friends.value = friendsData
-            .map((e) => FriendUser.fromJson(e as Map<String, dynamic>))
-            .toList();
-      }
+      final list = await FriendsApiService.fetchSuggestions(token);
+      suggestions.assignAll(list);
+    } on FriendsApiException catch (e) {
+      if (kDebugMode) debugPrint('[Friends] loadSuggestions: ${e.message}');
+    } catch (e) {
+      if (kDebugMode) debugPrint('[Friends] loadSuggestions error: $e');
+    } finally {
+      isLoadingSuggestions.value = false;
+    }
+  }
 
-      // Load friend requests
-      final requestsData = _storage.read(_friendRequestsKey);
-      if (requestsData is List) {
-        friendRequests.value = requestsData
-            .map((e) => FriendRequest.fromJson(e as Map<String, dynamic>))
-            .toList();
-      }
+  Future<void> loadFriends() async {
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) return;
 
-      // Load sent requests
-      final sentData = _storage.read(_sentRequestsKey);
-      if (sentData is List) {
-        sentRequests.value = sentData
-            .map((e) => FriendRequest.fromJson(e as Map<String, dynamic>))
-            .toList();
+    isLoadingFriends.value = true;
+    try {
+      final list = await FriendsApiService.fetchFriends(token);
+      friends.assignAll(list);
+    } on FriendsApiException catch (e) {
+      if (kDebugMode) debugPrint('[Friends] loadFriends: ${e.message}');
+    } catch (e) {
+      if (kDebugMode) debugPrint('[Friends] loadFriends error: $e');
+    } finally {
+      isLoadingFriends.value = false;
+    }
+  }
+
+  Future<void> loadRequests() async {
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) return;
+
+    isLoadingRequests.value = true;
+    try {
+      final list = await FriendsApiService.fetchRequests(token);
+      requests.assignAll(list);
+    } on FriendsApiException catch (e) {
+      if (kDebugMode) debugPrint('[Friends] loadRequests: ${e.message}');
+    } catch (e) {
+      if (kDebugMode) debugPrint('[Friends] loadRequests error: $e');
+    } finally {
+      isLoadingRequests.value = false;
+    }
+  }
+
+  Future<void> onAddFriend(int userId) async {
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) return;
+
+    isSendingRequestByUserId[userId] = true;
+    isSendingRequestByUserId.refresh();
+
+    try {
+      final (success, message) =
+          await FriendsApiService.sendFriendRequest(token, userId);
+
+      _showSnackbar(message, isSuccess: success);
+
+      if (success) {
+        suggestions.removeWhere((u) => u.id == userId);
+      } else if (message.toLowerCase().contains('already exists')) {
+        // Keep UI; info snackbar already shown
       }
     } catch (e) {
-      if (kDebugMode) print('FriendsController._loadFromStorage error: $e');
+      if (kDebugMode) debugPrint('[Friends] onAddFriend error: $e');
+      _showSnackbar('Failed to send request', isSuccess: false);
+    } finally {
+      isSendingRequestByUserId[userId] = false;
+      isSendingRequestByUserId.refresh();
     }
   }
 
-  void _saveFriends() {
-    _storage.write(_friendsKey, friends.map((f) => f.toJson()).toList());
+  Future<void> onAccept(int requestId) async {
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) return;
+
+    isAcceptingByRequestId[requestId] = true;
+    isAcceptingByRequestId.refresh();
+
+    try {
+      final (success, message, user) =
+          await FriendsApiService.acceptRequest(token, requestId);
+
+      _showSnackbar(message, isSuccess: success);
+
+      if (success) {
+        requests.removeWhere((r) => r.requestId == requestId);
+        if (user != null && !friends.any((f) => f.id == user.id)) {
+          friends.insert(0, user);
+        } else {
+          loadFriends();
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[Friends] onAccept error: $e');
+      _showSnackbar('Failed to accept request', isSuccess: false);
+    } finally {
+      isAcceptingByRequestId[requestId] = false;
+      isAcceptingByRequestId.refresh();
+    }
   }
 
-  void _saveFriendRequests() {
-    _storage.write(
-        _friendRequestsKey, friendRequests.map((r) => r.toJson()).toList());
+  Future<void> onDecline(int requestId) async {
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) return;
+
+    isRejectingByRequestId[requestId] = true;
+    isRejectingByRequestId.refresh();
+
+    try {
+      final (success, message) =
+          await FriendsApiService.rejectRequest(token, requestId);
+
+      _showSnackbar(message, isSuccess: success);
+
+      if (success) {
+        requests.removeWhere((r) => r.requestId == requestId);
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('[Friends] onDecline error: $e');
+      _showSnackbar('Failed to reject request', isSuccess: false);
+    } finally {
+      isRejectingByRequestId[requestId] = false;
+      isRejectingByRequestId.refresh();
+    }
   }
 
-  void _saveSentRequests() {
-    _storage.write(
-        _sentRequestsKey, sentRequests.map((r) => r.toJson()).toList());
-  }
+  void _showSnackbar(String message, {required bool isSuccess}) {
+    final appController = Get.find<AppController>();
+    final isDark = appController.isDarkMode;
+    final isBn = appController.language == AppLanguage.bn;
 
-  int get pendingCount =>
-      friendRequests.where((r) => r.status == 'pending').length;
-
-  List<FriendRequest> get pendingRequests =>
-      friendRequests.where((r) => r.status == 'pending').toList();
-
-  List<FriendRequest> get pendingSentRequests =>
-      sentRequests.where((r) => r.status == 'pending').toList();
-
-  void acceptFriendRequest(String requestId) {
-    final request = friendRequests.firstWhereOrNull((r) => r.id == requestId);
-    if (request == null) return;
-
-    // Add to friends
-    friends.add(request.from);
-    _saveFriends();
-
-    // Remove from requests
-    friendRequests.removeWhere((r) => r.id == requestId);
-    _saveFriendRequests();
-
-    if (kDebugMode) print('FriendsController: Accepted request $requestId');
-  }
-
-  void declineFriendRequest(String requestId) {
-    friendRequests.removeWhere((r) => r.id == requestId);
-    _saveFriendRequests();
-
-    if (kDebugMode) print('FriendsController: Declined request $requestId');
-  }
-
-  void cancelFriendRequest(String requestId) {
-    sentRequests.removeWhere((r) => r.id == requestId);
-    _saveSentRequests();
-
-    if (kDebugMode) print('FriendsController: Cancelled sent request $requestId');
-  }
-
-  void removeFriend(String friendId) {
-    friends.removeWhere((f) => f.id == friendId);
-    _saveFriends();
-
-    if (kDebugMode) print('FriendsController: Removed friend $friendId');
-  }
-
-  void sendFriendRequest(String userId, FriendUser userObject) {
-    // Check if already sent
-    if (hasSentRequest(userId)) return;
-
-    final request = FriendRequest(
-      id: 'sent_${DateTime.now().millisecondsSinceEpoch}_${userId}',
-      from: userObject,
-      timestamp: DateTime.now(),
-      status: 'pending',
+    Get.snackbar(
+      isSuccess ? (isBn ? 'সফল' : 'Success') : (isBn ? 'ত্রুটি' : 'Error'),
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: isSuccess
+          ? (isDark ? AppColors.darkMuted : AppColors.lightMuted)
+          : AppColors.darkDestructive,
+      colorText: isDark ? AppColors.darkForeground : AppColors.lightForeground,
+      duration: const Duration(seconds: 2),
+      margin: const EdgeInsets.all(16),
+      borderRadius: 8,
     );
-
-    sentRequests.add(request);
-    _saveSentRequests();
-
-    if (kDebugMode) print('FriendsController: Sent request to $userId');
   }
 
-  bool isFriend(String userId) => friends.any((f) => f.id == userId);
-
-  bool hasSentRequest(String userId) =>
-      sentRequests.any((r) => r.from.id == userId && r.status == 'pending');
-
-  /// Add demo friend requests (for testing)
-  void addDemoFriendRequests() {
-    final demoUsers = [
-      FriendUser(
-        id: 'demo_1',
-        name: 'শাহরিয়ার কবির',
-        username: 'shahriar_kabir',
-        location: 'ঢাকা, বাংলাদেশ',
-        mutualFriends: 5,
-        isOnline: true,
-      ),
-      FriendUser(
-        id: 'demo_2',
-        name: 'তাসনিম আহমেদ',
-        username: 'tasnim_ahmed',
-        location: 'চট্টগ্রাম, বাংলাদেশ',
-        mutualFriends: 3,
-        isOnline: false,
-      ),
-      FriendUser(
-        id: 'demo_3',
-        name: 'নাদিয়া খান',
-        username: 'nadia_khan',
-        location: 'সিলেট, বাংলাদেশ',
-        mutualFriends: 8,
-        isOnline: true,
-      ),
-    ];
-
-    for (final user in demoUsers) {
-      final request = FriendRequest(
-        id:
-            'req_demo_${DateTime.now().millisecondsSinceEpoch}_${user.id}_${DateTime.now().microsecondsSinceEpoch}',
-        from: user,
-        timestamp: DateTime.now(),
-        status: 'pending',
-      );
-      friendRequests.add(request);
-    }
-
-    _saveFriendRequests();
-    if (kDebugMode) print('FriendsController: Added ${demoUsers.length} demo requests');
+  /// For profile_view: remove friend (not in API spec - keep for compatibility).
+  void removeFriend(int friendId) {
+    friends.removeWhere((f) => f.id == friendId);
   }
+
+  bool isFriend(int userId) => friends.any((f) => f.id == userId);
 }

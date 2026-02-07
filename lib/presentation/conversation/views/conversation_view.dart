@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:torko/core/controllers/app_controller.dart';
 import 'package:torko/app/theme/app_colors.dart';
@@ -26,15 +26,7 @@ class _ConversationViewState extends State<ConversationView> {
   @override
   void initState() {
     super.initState();
-    // CRITICAL: Controller is PERMANENT and created in InitialBindings
-    // Use Get.find() to get existing instance - NEVER create new one
     chatController = Get.find<ChatController>();
-    
-    if (kDebugMode) {
-      debugPrint('[CONV] initState: ChatController obtained (${chatController.hashCode})');
-    }
-    
-    // Listen to scroll position for smart auto-scroll
     scrollController.addListener(_onScroll);
   }
   
@@ -58,13 +50,7 @@ class _ConversationViewState extends State<ConversationView> {
   }
 
   Future<void> _initializeChat() async {
-    if (kDebugMode) {
-      debugPrint('[CONV] _initializeChat: initializing');
-    }
     final token = UserInfo.apiToken;
-    if (kDebugMode) {
-      debugPrint('[CONV] token length=${token?.length ?? 0}');
-    }
     
     // Try route arguments first (from inbox navigation)
     // Support both standardized format (to_user_id, fullname, profile_image) and legacy format
@@ -89,26 +75,16 @@ class _ConversationViewState extends State<ConversationView> {
         final receiverName = args['fullname']?.toString() ?? args['receiverName']?.toString();
         final receiverAvatar = args['profile_image']?.toString() ?? args['receiverAvatar']?.toString();
         
-        if (kDebugMode) {
-          debugPrint('[CONV] initChat toUserId=$toUserId receiver=$receiverName');
-        }
         await chatController.initChat(
           toUserId: toUserId,
           receiverName: receiverName,
           receiverAvatar: receiverAvatar,
         );
-        
-        if (kDebugMode) {
-          debugPrint('[CONV] Chat initialized, messages=${chatController.messages.length}');
-        }
         // Scroll to bottom after initial load
         WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom(force: true));
         return;
       } else {
         // Invalid user ID
-        if (kDebugMode) {
-          debugPrint('[CONV] Invalid toUserId - showing error');
-        }
         chatController.errorMessage.value = 'Invalid user';
         return;
       }
@@ -164,15 +140,15 @@ class _ConversationViewState extends State<ConversationView> {
     if (chatController.isSending.value) return;
 
     final content = messageController.text.trim();
-    
+    messageController.clear(); // Clear immediately (Firestore stream updates UI)
+    _shouldAutoScroll = true;
+
     final success = await chatController.sendMessage(content);
     if (success) {
-      // Only clear input on success
-      messageController.clear();
-      _shouldAutoScroll = true; // Re-enable auto-scroll after sending
-      _scrollToBottom(force: true); // Force scroll after sending
+      _scrollToBottom(force: true);
+    } else {
+      messageController.text = content; // Restore on failure
     }
-    // If failed, keep the text so user can retry
   }
 
   @override

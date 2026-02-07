@@ -1,13 +1,16 @@
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:torko/app/routes/app_routes.dart';
 import 'package:torko/core/controllers/app_controller.dart';
-import 'package:torko/presentation/conversation/controllers/chat_controller.dart';
-import 'package:torko/presentation/messages/controllers/inbox_controller.dart';
+import 'package:torko/core/debug/auth_self_check.dart';
+import 'package:torko/core/ids/user_id.dart';
+import 'package:torko/core/repositories/user_repository.dart';
 import 'package:torko/core/services/auth_service.dart';
-import 'package:torko/core/services/reverb_service.dart';
+import 'package:torko/core/services/firebase_auth_service.dart';
 import 'package:torko/core/services/user_info.dart';
+import 'package:torko/core/utils/app_logger.dart';
 
 class LoginController extends GetxController {
   // =========================
@@ -28,6 +31,13 @@ class LoginController extends GetxController {
 
   /// Persisted from create_users: exist=true = returning user (go Home after OTP)
   final RxBool userExists = false.obs;
+
+  /// Firebase custom token from create_users (do NOT persist - memory only)
+  String? _firebaseCustomToken;
+  String? _firebaseUid;
+
+  final FirebaseAuthService _firebaseAuth = FirebaseAuthService();
+  final UserRepository _userRepo = UserRepository();
 
   // =========================
   // RESEND OTP TIMER
@@ -152,9 +162,16 @@ class LoginController extends GetxController {
     try {
       final res = await AuthService().createUsers(phone: cleanPhone);
 
+      final rawFirebaseUid = res.firebaseUid;
+      final normalizedUid = rawFirebaseUid != null && rawFirebaseUid.isNotEmpty
+          ? normalizeUserId(rawFirebaseUid)
+          : null;
+
       await UserInfo.saveToken(res.token);
       await UserInfo.setPhone(cleanPhone);
       userExists.value = res.exist;
+      _firebaseCustomToken = res.firebaseCustomToken;
+      _firebaseUid = normalizedUid;
 
       if (kDebugMode && res.otpCode != null) {
         Get.snackbar(
@@ -233,6 +250,57 @@ class LoginController extends GetxController {
     try {
       final res = await AuthService().verifyOtp(apiToken: token, otp: otpInt);
 
+      await UserInfo.saveApiToken(res.apiToken);
+
+      // Firebase flow: sign in with custom token, save firebase_uid, upsert user doc
+      if (_firebaseCustomToken != null &&
+          _firebaseCustomToken!.isNotEmpty &&
+          _firebaseUid != null &&
+          _firebaseUid!.isNotEmpty) {
+        if (kDebugMode) AppLogger.auth('Firebase sign-in with custom token');
+        await _firebaseAuth.signInWithCustomToken(_firebaseCustomToken!);
+        final authUid = FirebaseAuth.instance.currentUser?.uid;
+        if (kDebugMode) AppLogger.auth('Signed in (uid=${authUid != null ? "present" : "null"})');
+        String finalUid = _firebaseUid!;
+        if (authUid != null && authUid.isNotEmpty) {
+          final normalizedAuth = normalizeUserId(authUid);
+          if (normalizedAuth != _firebaseUid) {
+            if (kDebugMode) AppLogger.auth('UID mismatch, using Firebase uid');
+            finalUid = normalizedAuth;
+          }
+        }
+        await UserInfo.setFirebaseUid(finalUid);
+        if (kDebugMode) AppLogger.auth('Auth state: SIGNED IN');
+        await _userRepo.upsertUserDoc(
+          finalUid,
+          cleanPhone,
+          fullname: UserInfo.fullname,
+          profileImage: UserInfo.profileImage,
+        );
+        _firebaseCustomToken = null;
+        runAuthSelfCheck();
+        // Same as Laravel flow: load profile, then Home (never Chat as initial route)
+        final profileOk = await AuthService().onLoginSuccess(res.apiToken);
+        if (!profileOk) {
+          Get.snackbar(
+            'Logged in',
+            'Syncing profile…',
+            snackPosition: SnackPosition.BOTTOM,
+            duration: const Duration(seconds: 3),
+          );
+        }
+        if (Get.isRegistered<AppController>()) {
+          Get.find<AppController>().refreshUserProfile();
+        }
+        if (kDebugMode) AppLogger.nav('Post-login → ${userExists.value ? "Home" : "ProfileData"}');
+        if (userExists.value) {
+          Get.offAllNamed(AppRoutes.home);
+        } else {
+          Get.offAllNamed(AppRoutes.profileData);
+        }
+        return;
+      }
+
       final profileOk = await AuthService().onLoginSuccess(res.apiToken);
       if (!profileOk) {
         Get.snackbar(
@@ -243,35 +311,22 @@ class LoginController extends GetxController {
         );
       }
 
-      // Init realtime
-      final currentUserId = UserInfo.userId;
-      if (currentUserId != null) {
-        if (!Get.isRegistered<InboxController>()) {
-          Get.put(InboxController(), permanent: true);
-        }
-        if (!Get.isRegistered<ChatController>()) {
-          Get.put(ChatController(), permanent: true);
-        }
-        await ReverbService().disconnect();
-        await ReverbService().init(userId: currentUserId);
-        if (kDebugMode) {
-          debugPrint('[LOGIN] Realtime init userId=$currentUserId');
-        }
-      }
-
       if (Get.isRegistered<AppController>()) {
         Get.find<AppController>().refreshUserProfile();
       }
 
+      if (kDebugMode) AppLogger.nav('Post-login → ${userExists.value ? "Home" : "ProfileData"}');
       if (userExists.value) {
         Get.offAllNamed(AppRoutes.home);
       } else {
         Get.offAllNamed(AppRoutes.profileData);
       }
     } on Exception catch (e) {
+      if (kDebugMode) AppLogger.err('Login OTP verify failed', error: e);
       _showError(e.toString().replaceFirst('Exception: ', ''));
       _clearOtp();
     } catch (e) {
+      if (kDebugMode) AppLogger.err('Login failed (network)', error: e);
       _showError('Network error');
       _clearOtp();
     } finally {
@@ -293,6 +348,10 @@ class LoginController extends GetxController {
 
       await UserInfo.saveToken(res.token);
       userExists.value = res.exist;
+      _firebaseCustomToken = res.firebaseCustomToken;
+      _firebaseUid = res.firebaseUid != null && res.firebaseUid!.isNotEmpty
+          ? normalizeUserId(res.firebaseUid!)
+          : res.firebaseUid;
 
       showOtpResentConfirm.value = true;
       resendTimer.value = 60;

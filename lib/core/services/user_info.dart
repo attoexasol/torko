@@ -1,10 +1,13 @@
+import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuth;
 import 'package:get_storage/get_storage.dart';
+import 'package:torko/core/ids/user_id.dart';
 
 class UserInfo {
   static final _box = GetStorage();
   
   // Storage keys
   static const String _apiTokenKey = 'torko_api_token';
+  static const String _firebaseUidKey = 'torko_firebase_uid';
   static const String _otpCodeKey = 'torko_otp_code';
   static const String _phoneKey = 'torko_phone';
   static const String _isVerifiedKey = 'torko_is_verified';
@@ -51,6 +54,36 @@ class UserInfo {
   // ==================== API Token ====================
   
   static String? get apiToken => _box.read<String>(_apiTokenKey);
+
+  // ==================== Firebase UID ====================
+  
+  static String? get firebaseUid => _box.read<String>(_firebaseUidKey);
+  /// Normalized numeric uid (e.g. "65"). Returns null if empty.
+  static String? get firebaseUidNormalized {
+    final raw = firebaseUid;
+    if (raw == null || raw.isEmpty) return null;
+    try {
+      return normalizeUserId(raw);
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  /// Canonical UID for Firestore: FirebaseAuth.uid first, fallback to stored.
+  /// Both must be numeric string (e.g. "65"). Use this for all Firestore paths/queries.
+  static String? get myUidString {
+    final authUid = FirebaseAuth.instance.currentUser?.uid;
+    if (authUid != null && authUid.isNotEmpty) {
+      try {
+        return normalizeUserId(authUid);
+      } catch (_) {
+        return authUid;
+      }
+    }
+    return firebaseUidNormalized;
+  }
+  static Future<void> setFirebaseUid(String uid) async => await _box.write(_firebaseUidKey, uid);
+  static Future<void> clearFirebaseUid() async => await _box.remove(_firebaseUidKey);
   static Future<void> setApiToken(String token) async => await _box.write(_apiTokenKey, token);
   static Future<void> saveApiToken(String token) => setApiToken(token);
   static String? getApiToken() => apiToken;

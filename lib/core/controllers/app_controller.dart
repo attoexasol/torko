@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:torko/core/localization/app_translations.dart';
 import 'package:torko/core/services/user_info.dart';
@@ -79,9 +80,13 @@ class AppController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _loadLanguage();
-    _loadTheme();
+    // Sync reads from storage (fast) - profile from memory
     _loadUserProfile();
+    // Defer SharedPreferences reads to next frame (avoids blocking startup)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadLanguage();
+      _loadTheme();
+    });
   }
 
   void _loadUserProfile() {

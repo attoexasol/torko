@@ -839,7 +839,6 @@ class CommentSection extends StatelessWidget {
 
     // Load comments when widget is built (if not already loading this post)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      print('DEBUG CommentSection: postId = $postId, currentPostId = ${commentController.currentPostId.value}');
       if (commentController.currentPostId.value != postId && postId > 0) {
         commentController.loadComments(postId);
       }

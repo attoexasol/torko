@@ -24,15 +24,8 @@ class LogoutService {
   /// 4. Delete registered controllers (except permanent Chat/Inbox).
   static Future<void> clearAllData() async {
     try {
-      // 1. FIRST: Disconnect Reverb – tear down socket and channels before clearing token
       await ReverbService().disconnect();
-      if (kDebugMode) {
-        debugPrint('[LogoutService] Reverb disconnected');
-      }
-
-      // 2. Clear GetStorage (UserInfo - token, profile data, etc.)
       await UserInfo.eraseAll();
-
       // 3. Clear SharedPreferences (profile completion steps, local paths, etc.)
       await _clearSharedPreferences();
 
@@ -69,7 +62,7 @@ class LogoutService {
       await _deleteLocalImageFiles(prefs);
       
     } catch (e) {
-      print('LogoutService._clearSharedPreferences error: $e');
+      if (kDebugMode) debugPrint('[LogoutService] _clearSharedPreferences error: $e');
     }
   }
   
@@ -94,7 +87,7 @@ class LogoutService {
         }
       }
     } catch (e) {
-      print('LogoutService._deleteLocalImageFiles error: $e');
+      if (kDebugMode) debugPrint('[LogoutService] _deleteLocalImageFiles error: $e');
     }
   }
   
@@ -104,7 +97,7 @@ class LogoutService {
       // Clear the default cache manager used by CachedNetworkImage
       await DefaultCacheManager().emptyCache();
     } catch (e) {
-      print('LogoutService._clearImageCache error: $e');
+      if (kDebugMode) debugPrint('[LogoutService] _clearImageCache error: $e');
     }
   }
   
@@ -166,13 +159,9 @@ class LogoutService {
         gc.isLoading.value = false;
       }
 
-      // Clear PERMANENT ChatController (do NOT delete - it's permanent)
       if (Get.isRegistered<ChatController>()) {
-        final chatController = Get.find<ChatController>();
-        chatController.clearChat();
+        Get.find<ChatController>().clearChat();
       }
-      
-      // Clear PERMANENT InboxController (do NOT delete - it's permanent)
       if (Get.isRegistered<InboxController>()) {
         final inboxController = Get.find<InboxController>();
         inboxController.threads.clear();
@@ -183,39 +172,35 @@ class LogoutService {
         inboxController.searchError.value = '';
         inboxController.error.value = '';
         inboxController.loading.value = false;
-        // Reset loaded flag so it can reload on next login
-        inboxController.resetLoadedFlag();
       }
     } catch (e) {
-      print('LogoutService._clearControllerStates error: $e');
+      if (kDebugMode) debugPrint('[LogoutService] _clearControllerStates error: $e');
     }
   }
   
   /// Delete GetX controllers so they are re-created fresh on next login
-  /// NOTE: ChatController and InboxController are PERMANENT and should NOT be deleted
   static void _deleteControllers() {
     try {
-      // Delete controllers that store user-specific data
       if (Get.isRegistered<PostController>()) {
         Get.delete<PostController>(force: true);
       }
-      
       if (Get.isRegistered<ProfileController>()) {
         Get.delete<ProfileController>(force: true);
       }
-      
       if (Get.isRegistered<HomeController>()) {
         Get.delete<HomeController>(force: true);
       }
-      
       if (Get.isRegistered<CommentController>()) {
         Get.delete<CommentController>(force: true);
       }
-      
-      // DO NOT delete ChatController or InboxController - they are permanent
-      // Their state is cleared in _clearControllerStates() above
+      if (Get.isRegistered<ChatController>()) {
+        Get.delete<ChatController>(force: true);
+      }
+      if (Get.isRegistered<InboxController>()) {
+        Get.delete<InboxController>(force: true);
+      }
     } catch (e) {
-      print('LogoutService._deleteControllers error: $e');
+      if (kDebugMode) debugPrint('[LogoutService] _deleteControllers error: $e');
     }
   }
 }

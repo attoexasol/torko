@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart';
 import 'package:torko/core/services/user_info.dart';
+import 'package:torko/core/utils/app_logger.dart';
 
 /// Thrown when postAuth is called without a valid token.
 class NetworkAuthException implements Exception {
@@ -35,7 +36,6 @@ class NetworkCaller {
   }) async {
     final uri = Uri.parse(url);
     final sw = Stopwatch()..start();
-    _logRequest(method: 'GET', url: url, headers: headers);
 
     try {
       final res = await get(uri, headers: headers).timeout(const Duration(seconds: 10));
@@ -44,11 +44,7 @@ class NetworkCaller {
       final decoded = _tryDecode(res.body);
       final ok = res.statusCode >= 200 && res.statusCode < 300;
 
-      _logResponse(
-        method: 'GET', url: url, statusCode: res.statusCode,
-        body: res.body, durationMs: sw.elapsedMilliseconds,
-        headers: res.request?.headers,
-      );
+      _logApi(method: 'GET', url: url, statusCode: res.statusCode, durationMs: sw.elapsedMilliseconds);
 
       return NetworkResponse(
         isSuccess: ok,
@@ -58,11 +54,11 @@ class NetworkCaller {
       );
     } on TimeoutException {
       sw.stop();
-      _logError(method: 'GET', url: url, error: 'Timeout after ${sw.elapsedMilliseconds}ms');
+      _logApiError(method: 'GET', url: url, error: 'Timeout');
       return NetworkResponse(isSuccess: false, statusCode: -1, errorMessage: "Request timed out. Check your internet.");
     } catch (e) {
       sw.stop();
-      _logError(method: 'GET', url: url, error: e.toString());
+      _logApiError(method: 'GET', url: url, error: e.toString());
       return NetworkResponse(isSuccess: false, statusCode: -1, errorMessage: e.toString());
     }
   }
@@ -77,10 +73,6 @@ class NetworkCaller {
     final token = UserInfo.apiToken;
     if (token == null || token.isEmpty) {
       throw NetworkAuthException('Session expired. Please login again.');
-    }
-    if (kDebugMode) {
-      final pre = token.length >= 6 ? token.substring(0, 6) : token;
-      debugPrint('AUTH token len=${token.length} prefix=${pre}***');
     }
     final fullBody = <String, dynamic>{...?body, 'api_token': token};
     final mergedHeaders = <String, String>{
@@ -124,7 +116,6 @@ class NetworkCaller {
     final uri = Uri.parse(url);
     final mergedHeaders = {'Content-Type': 'application/json', ...?headers};
     final sw = Stopwatch()..start();
-    _logRequest(method: 'POST', url: url, headers: mergedHeaders, body: body);
 
     try {
       final res = await post(uri, headers: mergedHeaders, body: jsonEncode(body))
@@ -134,11 +125,7 @@ class NetworkCaller {
       final decoded = _tryDecode(res.body);
       final ok = res.statusCode >= 200 && res.statusCode < 300;
 
-      _logResponse(
-        method: 'POST', url: url, statusCode: res.statusCode,
-        body: res.body, durationMs: sw.elapsedMilliseconds,
-        headers: res.request?.headers,
-      );
+      _logApi(method: 'POST', url: url, statusCode: res.statusCode, durationMs: sw.elapsedMilliseconds);
 
       return NetworkResponse(
         isSuccess: ok,
@@ -148,11 +135,11 @@ class NetworkCaller {
       );
     } on TimeoutException {
       sw.stop();
-      _logError(method: 'POST', url: url, error: 'Timeout after ${sw.elapsedMilliseconds}ms');
+      _logApiError(method: 'POST', url: url, error: 'Timeout');
       return NetworkResponse(isSuccess: false, statusCode: -1, errorMessage: "Request timed out. Check your internet.");
     } catch (e) {
       sw.stop();
-      _logError(method: 'POST', url: url, error: e.toString());
+      _logApiError(method: 'POST', url: url, error: e.toString());
       return NetworkResponse(isSuccess: false, statusCode: -1, errorMessage: e.toString());
     }
   }
@@ -166,7 +153,6 @@ class NetworkCaller {
     final uri = Uri.parse(url);
     final mergedHeaders = {'Content-Type': 'application/x-www-form-urlencoded', ...?headers};
     final sw = Stopwatch()..start();
-    _logRequest(method: 'POST(FORM)', url: url, headers: mergedHeaders, body: fields);
 
     try {
       final res = await post(uri, headers: mergedHeaders, body: fields)
@@ -176,11 +162,7 @@ class NetworkCaller {
       final decoded = _tryDecode(res.body);
       final ok = res.statusCode >= 200 && res.statusCode < 300;
 
-      _logResponse(
-        method: 'POST(FORM)', url: url, statusCode: res.statusCode,
-        body: res.body, durationMs: sw.elapsedMilliseconds,
-        headers: res.request?.headers,
-      );
+      _logApi(method: 'POST(FORM)', url: url, statusCode: res.statusCode, durationMs: sw.elapsedMilliseconds);
 
       return NetworkResponse(
         isSuccess: ok, statusCode: res.statusCode,
@@ -189,11 +171,11 @@ class NetworkCaller {
       );
     } on TimeoutException {
       sw.stop();
-      _logError(method: 'POST(FORM)', url: url, error: 'Timeout after ${sw.elapsedMilliseconds}ms');
+      _logApiError(method: 'POST(FORM)', url: url, error: 'Timeout');
       return NetworkResponse(isSuccess: false, statusCode: -1, errorMessage: "Request timed out. Check your internet.");
     } catch (e) {
       sw.stop();
-      _logError(method: 'POST(FORM)', url: url, error: e.toString());
+      _logApiError(method: 'POST(FORM)', url: url, error: e.toString());
       return NetworkResponse(isSuccess: false, statusCode: -1, errorMessage: e.toString());
     }
   }
@@ -218,36 +200,22 @@ class NetworkCaller {
     }
   }
 
-  static void _logRequest({required String method, required String url, Map<String, String>? headers, Map? body}) {
-    if (!kDebugMode) return;
-    debugPrint('================ HTTP REQUEST ================\n'
-        'Method  : $method\nURL     : $url\nHeaders : ${_pretty(headers)}\nBody    : ${_pretty(body)}\n'
-        '=============================================');
+  static String _path(String url) {
+    try {
+      final u = Uri.parse(url);
+      return u.path.isEmpty ? url : u.path;
+    } catch (_) { return url; }
   }
 
-  static void _logResponse({required String method, required String url, required int statusCode, required String body,
-    required int durationMs, Map<String, String>? headers}) {
+  static void _logApi({required String method, required String url, required int statusCode, required int durationMs}) {
     if (!kDebugMode) return;
-    final String bodyLog = body.isEmpty
-        ? '<empty>'
-        : body.trimLeft().startsWith('<')
-            ? '<HTML response ${body.length} chars>'
-            : (body.length > 800 ? '${body.substring(0, 800)}...' : body);
-    debugPrint('================ HTTP RESPONSE ===============\n'
-        'Method   : $method\nURL      : $url\nStatus   : $statusCode\nDuration : ${durationMs}ms\n'
-        'Headers  : ${_pretty(headers)}\nBody     : $bodyLog\n'
-        '=============================================');
+    if (statusCode >= 400) {
+      AppLog.e('API', 'ERROR $method ${_path(url)} status=$statusCode ms=$durationMs');
+    }
   }
 
-  static void _logError({required String method, required String url, required String error}) {
+  static void _logApiError({required String method, required String url, required String error}) {
     if (!kDebugMode) return;
-    debugPrint('================ HTTP ERROR ==================\n'
-        'Method : $method\nURL    : $url\nError  : $error\n'
-        '=============================================');
-  }
-
-  static String _pretty(Object? obj) {
-    if (obj == null) return '{}';
-    try { return const JsonEncoder.withIndent('  ').convert(obj); } catch (_) { return obj.toString(); }
+    AppLog.e('API', 'ERROR $method ${_path(url)} msg=$error');
   }
 }

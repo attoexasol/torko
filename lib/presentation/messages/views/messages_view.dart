@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:torko/core/controllers/app_controller.dart';
 import 'package:torko/app/routes/app_routes.dart';
 import 'package:torko/app/theme/app_colors.dart';
+import 'package:torko/presentation/conversation/controllers/chat_controller.dart';
 import 'package:torko/presentation/main/controllers/navigation_controller.dart';
 import 'package:torko/presentation/messages/controllers/inbox_controller.dart';
 import 'package:torko/data/models/inbox_thread_model.dart';
@@ -25,32 +25,28 @@ class _MessagesViewState extends State<MessagesView> {
   @override
   void initState() {
     super.initState();
-    if (kDebugMode) {
-      print('🔍 [MessagesView] MessagesView opened');
-    }
-    
-    // CRITICAL: Controller is PERMANENT and created in InitialBindings
-    // Use Get.find() to get existing instance - NEVER create new one
     inboxController = Get.find<InboxController>();
-    
-    if (kDebugMode) {
-      print('   InboxController instance: ${inboxController.hashCode}');
-      print('   Controller is PERMANENT - stream listener never dies');
-    }
-    
-    // loadInboxOnce() ensures API is called only once per session
-    inboxController.loadInboxOnce();
+    // Defer inbox stream to next frame - show UI first (performance)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) inboxController.startInboxStream();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && Get.isRegistered<NavigationController>()) {
+        Get.find<NavigationController>().setCurrentScreen('messages');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    // Controllers are permanent; do NOT delete here (cleaned up on logout).
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final appController = Get.find<AppController>();
-    
-    // Sync navigation state
-    if (Get.isRegistered<NavigationController>()) {
-      Get.find<NavigationController>().setCurrentScreen('messages');
-    }
-    
+
     return Obx(() {
       final isDark = appController.isDarkMode;
       final language = appController.language;
@@ -306,7 +302,7 @@ class _MessagesViewState extends State<MessagesView> {
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: () => inboxController.fetchInbox(),
+                  onPressed: () => inboxController.refreshInbox(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.lightPrimary,
                     foregroundColor: Colors.white,

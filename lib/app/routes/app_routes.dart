@@ -28,6 +28,10 @@ class AppRoutes {
   static const String friends = '/friends';
   static const String groupDetail = '/groupDetail';
   static const String createGroup = '/createGroup';
+
+  // Firestore chat (Laravel + Firebase auth flow)
+  static const String chatList = '/chatList';
+  static const String chat = '/chat';
 }
 
 

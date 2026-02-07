@@ -86,12 +86,6 @@ class ProfileDataOnboardingController extends GetxController {
       // Map Flutter gender value to backend format
       final backendGender = GenderMapper.mapToBackend(selectedGender.value);
       
-      if (kDebugMode) {
-        print('🔍 [ProfileDataOnboarding] Gender mapping:');
-        print('   Flutter value: "${selectedGender.value}"');
-        print('   Backend value: "$backendGender"');
-      }
-      
       final response = await NetworkCaller.postRequest(
         url: Urls.update_users,
         body: {

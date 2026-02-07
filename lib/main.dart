@@ -1,6 +1,14 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:torko/core/utils/app_logger.dart';
+import 'package:torko/core/services/firestore_network_service.dart';
+import 'package:torko/core/services/user_info.dart';
 import 'package:get/get.dart';
+import 'package:torko/app/bindings/firestore_chat_binding.dart';
 import 'package:torko/app/bindings/initial_bindings.dart';
+import 'package:torko/app/bindings/splash_binding.dart';
+import 'package:torko/app/bindings/messages_binding.dart';
 import 'package:torko/app/routes/app_routes.dart';
 import 'package:torko/app/theme/app_theme.dart';
 import 'package:torko/core/controllers/app_controller.dart';
@@ -28,12 +36,23 @@ import 'package:torko/presentation/profile/views/profile_view.dart';
 import 'package:torko/presentation/profile_data_onboarding/views/profile_data_onboarding_view.dart';
 import 'package:torko/presentation/account_settings/views/account_settings_view.dart';
 import 'package:torko/presentation/explore/views/explore_view.dart';
+import 'package:torko/presentation/firestore_chat/views/chat_list_screen.dart';
+import 'package:torko/presentation/firestore_chat/views/chat_screen.dart';
+import 'package:torko/presentation/friends/views/friends_screen.dart';
 import 'package:torko/presentation/settings/views/settings_view.dart';
 import 'package:torko/presentation/splash/views/splash_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  if (kDebugMode) AppLogger.auth('Firebase initialized');
+  // Firestore: settings → enableNetwork (before controllers/streams)
+  await FirestoreNetworkService.initializeOnlineOnly();
   await UserInfo.init();
+  if (kDebugMode) {
+    final uid = UserInfo.myUidString ?? UserInfo.firebaseUid;
+    AppLogger.auth(uid != null ? 'User uid=$uid' : 'User uid=null');
+  }
   runApp(const MyApp());
 }
 
@@ -51,7 +70,11 @@ class MyApp extends StatelessWidget {
       themeMode: ThemeMode.dark,
       initialRoute: AppRoutes.splash,
       getPages: [
-        GetPage(name: AppRoutes.splash, page: () => const SplashView()),
+        GetPage(
+          name: AppRoutes.splash,
+          page: () => const SplashView(),
+          binding: SplashBinding(),
+        ),
         GetPage(name: AppRoutes.onboarding, page: () => const OnboardingView()),
         GetPage(name: AppRoutes.login, page: () => const LoginView()),
         GetPage(name: AppRoutes.profileData, page: () => const ProfileDataOnboardingView()),
@@ -61,7 +84,11 @@ class MyApp extends StatelessWidget {
         GetPage(name: AppRoutes.notifications, page: () => const NotificationsView()),
         GetPage(name: AppRoutes.profile, page: () => const ProfileView()),
         GetPage(name: AppRoutes.explore, page: () => const ExploreView()),
-        GetPage(name: AppRoutes.messages, page: () => const MessagesView()),
+        GetPage(
+          name: AppRoutes.messages,
+          page: () => const MessagesView(),
+          binding: MessagesBinding(),
+        ),
         GetPage(
           name: AppRoutes.community,
           page: () => const CommunityView(),
@@ -77,7 +104,11 @@ class MyApp extends StatelessWidget {
         GetPage(name: AppRoutes.accountSettings, page: () => const AccountSettingsView()),
         GetPage(name: AppRoutes.privacySettings, page: () => const PrivacySettingsView()),
         GetPage(name: AppRoutes.notificationSettings, page: () => const NotificationSettingsView()),
-        GetPage(name: AppRoutes.conversation, page: () => const ConversationView()),
+        GetPage(
+          name: AppRoutes.conversation,
+          page: () => const ConversationView(),
+          binding: MessagesBinding(),
+        ),
         GetPage(name: AppRoutes.calling, page: () => const CallingView()),
         GetPage(name: AppRoutes.postDetail, page: () => const PostDetailView()),
         GetPage(name: AppRoutes.dashboard, page: () => const DashboardView()),
@@ -91,6 +122,17 @@ class MyApp extends StatelessWidget {
           }),
         ),
         GetPage(name: AppRoutes.createGroup, page: () => const CreateGroupView()),
+        GetPage(name: AppRoutes.friends, page: () => const FriendsScreen()),
+        GetPage(
+          name: AppRoutes.chatList,
+          page: () => const ChatListScreen(),
+          binding: FirestoreChatListBinding(),
+        ),
+        GetPage(
+          name: AppRoutes.chat,
+          page: () => const ChatScreen(),
+          binding: FirestoreChatRoomBinding(),
+        ),
       ],
       builder: (context, child) {
         final appController = Get.find<AppController>();
