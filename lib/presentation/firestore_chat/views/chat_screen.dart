@@ -136,6 +136,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   final msg = list[i];
                   final isMe = myUid != null && msg.isMine(myUid);
                   return _MessageBubble(
+                    key: ValueKey(msg.id),
                     message: msg,
                     isMe: isMe,
                     isDark: isDark,
@@ -225,6 +226,7 @@ class _MessageBubble extends StatelessWidget {
   final bool isDark;
 
   const _MessageBubble({
+    super.key,
     required this.message,
     required this.isMe,
     required this.isDark,

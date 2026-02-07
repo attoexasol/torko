@@ -82,7 +82,7 @@ class FirestoreChatRoomController extends GetxController {
         if (!isClosed) {
           // Merge stream with optimistic messages (prevent duplicates)
           final merged = _mergeStreamWithOptimistic(list);
-          messages.assignAll(merged);
+          _applyIncrementalUpdate(merged);
         }
       },
       onError: (e) {
@@ -149,6 +149,16 @@ class FirestoreChatRoomController extends GetxController {
       return tb.compareTo(ta);
     });
     return result;
+  }
+
+  /// Only update when content changed (avoids full replace flicker).
+  void _applyIncrementalUpdate(List<FirestoreMessage> merged) {
+    if (merged.length == messages.length &&
+        merged.every((m) => messages.any((e) =>
+            e.id == m.id && e.text == m.text && e.fromId == m.fromId))) {
+      return;
+    }
+    messages.assignAll(merged);
   }
 
   bool _matchesOptimistic(FirestoreMessage real, FirestoreMessage opt) {

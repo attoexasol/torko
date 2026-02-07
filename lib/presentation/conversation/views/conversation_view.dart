@@ -347,22 +347,21 @@ class _ConversationViewState extends State<ConversationView> {
                 }
 
                 // Auto-scroll when new messages arrive (if user is near bottom)
-                // Use PostFrameCallback to ensure scroll happens after build
                 if (_shouldAutoScroll) {
                   WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
                 }
 
+                // Stable key: do NOT use messageCount - changing key forces full ListView recreation (flicker)
                 return ListView.builder(
-                  // CRITICAL: Add key to force rebuild when message count changes
-                  key: ValueKey('messages_$messageCount'),
                   controller: scrollController,
                   padding: const EdgeInsets.all(16),
                   itemCount: messageCount,
                   itemBuilder: (context, index) {
                     final message = chatController.messages[index];
                     final isMe = currentUserId != null && message.isMine(currentUserId);
-                    
-                    return _buildMessageBubble(
+                    // Stable key per message: Flutter reuses tiles, no full rebuild
+                    return _MessageTile(
+                      key: ValueKey(message.id),
                       message: message,
                       isMe: isMe,
                       isDark: isDark,
@@ -484,11 +483,23 @@ class _ConversationViewState extends State<ConversationView> {
       );
   }
 
-  Widget _buildMessageBubble({
-    required MessageModel message,
-    required bool isMe,
-    required bool isDark,
-  }) {
+}
+
+/// Stateless message tile with stable key for minimal rebuilds (no flicker).
+class _MessageTile extends StatelessWidget {
+  final MessageModel message;
+  final bool isMe;
+  final bool isDark;
+
+  const _MessageTile({
+    super.key,
+    required this.message,
+    required this.isMe,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(

@@ -99,8 +99,7 @@ class ChatController extends GetxController {
       (list) {
         // Merge stream data with optimistic messages (keep optimistic until backend echo)
         final merged = _mergeStreamWithOptimistic(list);
-        messages.assignAll(merged);
-        messagesVersion.value++;
+        _applyIncrementalUpdate(merged);
         isLoading.value = false;
       },
       onError: (e) {
@@ -144,7 +143,6 @@ class ChatController extends GetxController {
         messageContent: text,
       ).copyWith(isSending: false);
       messages.add(optimistic);
-      messagesVersion.value++;
 
       // Dual-write to Firestore: ensures User B receives in real-time via Firestore stream.
       // REST persists to Laravel DB; Firestore propagates to all listeners on same conversation.
@@ -198,6 +196,21 @@ class ChatController extends GetxController {
       if (!isDup) result.add(m);
     }
     return result;
+  }
+
+  /// Apply merged list incrementally to avoid full replace flicker.
+  /// Only updates when content changed; preserves existing widget state when possible.
+  void _applyIncrementalUpdate(List<MessageModel> merged) {
+    if (merged.length == messages.length &&
+        merged.every((m) =>
+            messages.any((e) =>
+                e.id == m.id &&
+                e.messageContent == m.messageContent &&
+                e.createdAt == m.createdAt))) {
+      return;
+    }
+    messages.assignAll(merged);
+    messagesVersion.value++;
   }
 
   bool _matchesOptimistic(MessageModel real, MessageModel opt) {
