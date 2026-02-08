@@ -62,29 +62,63 @@ class FriendListTile extends StatelessWidget {
                 ],
                 if (user.address != null && user.address!.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  Text(
-                    user.address!,
-                    style: GoogleFonts.notoSansBengali(
-                      fontSize: 12,
-                      color: isDark
-                          ? const Color(0xFFB8DED6).withValues(alpha: 0.6)
-                          : const Color(0xFF657786),
-                    ),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        size: 12,
+                        color: isDark
+                            ? const Color(0xFFB8DED6).withValues(alpha: 0.6)
+                            : const Color(0xFF657786),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          user.address!,
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 12,
+                            color: isDark
+                                ? const Color(0xFFB8DED6).withValues(alpha: 0.6)
+                                : const Color(0xFF657786),
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
                 if (user.mutualFriends > 0) ...[
                   const SizedBox(height: 4),
-                  Text(
-                    '${user.mutualFriends} ${isBn ? 'মিউচুয়াল বন্ধু' : 'mutual friends'}',
-                    style: GoogleFonts.notoSansBengali(
-                      fontSize: 12,
-                      color: isDark
-                          ? const Color(0xFFB8DED6).withValues(alpha: 0.5)
-                          : const Color(0xFF9ca3af),
-                    ),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.people,
+                        size: 12,
+                        color: AppColors.darkPrimary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${user.mutualFriends} ${isBn ? 'মিউচুয়াল বন্ধু' : 'mutual friends'}',
+                        style: GoogleFonts.notoSansBengali(
+                          fontSize: 12,
+                          color: AppColors.darkPrimary,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ],
+            ),
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.person_outline,
+              size: 22,
+              color: isDark ? const Color(0xFFB8DED6) : const Color(0xFF657786),
+            ),
+            onPressed: null,
+            style: IconButton.styleFrom(
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
           ),
         ],

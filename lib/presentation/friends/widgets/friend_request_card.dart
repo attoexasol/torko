@@ -73,26 +73,49 @@ class FriendRequestCard extends StatelessWidget {
                     ],
                     if (user.address != null && user.address!.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text(
-                        user.address!,
-                        style: GoogleFonts.notoSansBengali(
-                          fontSize: 12,
-                          color: isDark
-                              ? const Color(0xFFB8DED6).withValues(alpha: 0.6)
-                              : const Color(0xFF657786),
-                        ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 12,
+                            color: isDark
+                                ? const Color(0xFFB8DED6).withValues(alpha: 0.6)
+                                : const Color(0xFF657786),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              user.address!,
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 12,
+                                color: isDark
+                                    ? const Color(0xFFB8DED6).withValues(alpha: 0.6)
+                                    : const Color(0xFF657786),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                     if (user.mutualFriends > 0) ...[
                       const SizedBox(height: 4),
-                      Text(
-                        '${user.mutualFriends} ${isBn ? 'মিউচুয়াল বন্ধু' : 'mutual friends'}',
-                        style: GoogleFonts.notoSansBengali(
-                          fontSize: 12,
-                          color: isDark
-                              ? const Color(0xFFB8DED6).withValues(alpha: 0.5)
-                              : const Color(0xFF9ca3af),
-                        ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.people,
+                            size: 12,
+                            color: AppColors.darkPrimary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${user.mutualFriends} ${isBn ? 'মিউচুয়াল বন্ধু' : 'mutual friends'}',
+                            style: GoogleFonts.notoSansBengali(
+                              fontSize: 12,
+                              color: AppColors.darkPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ],
@@ -104,18 +127,9 @@ class FriendRequestCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: ElevatedButton(
+                child: ElevatedButton.icon(
                   onPressed: isBusy ? null : () => controller.onAccept(request.requestId),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.darkPrimary,
-                    foregroundColor: Colors.white,
-                    disabledBackgroundColor: const Color(0xFF0d3a4a),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                  ),
-                  child: isAccepting
+                  icon: isAccepting
                       ? const SizedBox(
                           height: 18,
                           width: 18,
@@ -124,6 +138,9 @@ class FriendRequestCard extends StatelessWidget {
                             color: Colors.white,
                           ),
                         )
+                      : const Icon(Icons.check, size: 18, color: Colors.white),
+                  label: isAccepting
+                      ? const SizedBox.shrink()
                       : Text(
                           isBn ? 'গ্রহণ করুন' : 'Accept',
                           style: GoogleFonts.notoSansBengali(
@@ -131,12 +148,39 @@ class FriendRequestCard extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.darkPrimary,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: const Color(0xFF0d3a4a),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+                child: OutlinedButton.icon(
                   onPressed: isBusy ? null : () => controller.onDecline(request.requestId),
+                  icon: isRejecting
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Icon(Icons.close, size: 18, color: isDark ? const Color(0xFFB8DED6) : const Color(0xFF657786)),
+                  label: isRejecting
+                      ? const SizedBox.shrink()
+                      : Text(
+                          isBn ? 'প্রত্যাখ্যান' : 'Decline',
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: isDark ? const Color(0xFFB8DED6) : const Color(0xFF657786),
                     side: BorderSide(
@@ -147,21 +191,6 @@ class FriendRequestCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                     ),
                   ),
-                  child: isRejecting
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          isBn ? 'প্রত্যাখ্যান' : 'Decline',
-                          style: GoogleFonts.notoSansBengali(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
                 ),
               ),
             ],

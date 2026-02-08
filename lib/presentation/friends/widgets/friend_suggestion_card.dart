@@ -26,6 +26,7 @@ class FriendSuggestionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = Get.find<FriendsController>();
     final isSending = controller.isSendingRequestByUserId[user.id] == true;
+    final isRequested = controller.requestedUserIds.contains(user.id);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -71,14 +72,29 @@ class FriendSuggestionCard extends StatelessWidget {
                     ],
                     if (user.address != null && user.address!.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text(
-                        user.address!,
-                        style: GoogleFonts.notoSansBengali(
-                          fontSize: 12,
-                          color: isDark
-                              ? const Color(0xFFB8DED6).withValues(alpha: 0.6)
-                              : const Color(0xFF657786),
-                        ),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 12,
+                            color: isDark
+                                ? const Color(0xFFB8DED6).withValues(alpha: 0.6)
+                                : const Color(0xFF657786),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              user.address!,
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 12,
+                                color: isDark
+                                    ? const Color(0xFFB8DED6).withValues(alpha: 0.6)
+                                    : const Color(0xFF657786),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                     if (user.mutualFriends > 0) ...[
@@ -110,7 +126,7 @@ class FriendSuggestionCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: isSending ? null : () => controller.onAddFriend(user.id),
+              onPressed: (isSending || isRequested) ? null : () => controller.onAddFriend(user.id),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.darkPrimary,
                 foregroundColor: Colors.white,
@@ -130,7 +146,9 @@ class FriendSuggestionCard extends StatelessWidget {
                       ),
                     )
                   : Text(
-                      isBn ? 'বন্ধু যোগ করুন' : 'Add Friend',
+                      isRequested
+                          ? (isBn ? 'রিকোয়েস্ট পাঠানো হয়েছে' : 'Requested')
+                          : (isBn ? 'বন্ধু যোগ করুন' : 'Add Friend'),
                       style: GoogleFonts.notoSansBengali(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,

@@ -138,6 +138,55 @@ class FriendsApiService {
     return (status, message, user);
   }
 
+  /// Fetch pending outgoing (sent) friend requests.
+  static Future<List<FriendRequestItem>> fetchPendingOutgoingRequests(
+    String token,
+  ) async {
+    final res = await NetworkCaller.postAuth(
+      url: Urls.pending_friend_requests,
+      body: {},
+    );
+    if (!res.isSuccess) {
+      throw FriendsApiException(
+        res.errorMessage ?? 'Failed to load sent requests',
+      );
+    }
+    final body = res.body;
+    if (body == null) return [];
+
+    final status = body['status'];
+    if (status == false) {
+      throw FriendsApiException(
+        body['message']?.toString() ?? 'Failed to load sent requests',
+      );
+    }
+
+    final requests = body['requests'];
+    if (requests == null || requests is! List) return [];
+
+    return (requests as List)
+        .map((e) =>
+            FriendRequestItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  /// Cancel a sent friend request.
+  static Future<(bool success, String message)> cancelSentRequest(
+    String token,
+    int requestId,
+  ) async {
+    const _cancelUrl = 'https://torko.attoexasolutions.com/api/friend/cancel-or-delete';
+    final res = await NetworkCaller.postAuth(
+      url: _cancelUrl,
+      body: {'request_id': requestId},
+    );
+    final body = res.body ?? {};
+    final status = body['status'] == true;
+    final message =
+        body['message']?.toString() ?? (res.errorMessage ?? 'Unknown error');
+    return (status, message);
+  }
+
   /// Reject friend request.
   static Future<(bool success, String message)> rejectRequest(
     String token,

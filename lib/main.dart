@@ -39,6 +39,8 @@ import 'package:torko/presentation/explore/views/explore_view.dart';
 import 'package:torko/presentation/firestore_chat/views/chat_list_screen.dart';
 import 'package:torko/presentation/firestore_chat/views/chat_screen.dart';
 import 'package:torko/presentation/friends/views/friends_screen.dart';
+import 'package:torko/views/friends/requests/friends_requests_screen.dart';
+import 'package:torko/views/friends/sent/sent_requests_screen.dart';
 import 'package:torko/presentation/settings/views/settings_view.dart';
 import 'package:torko/presentation/splash/views/splash_view.dart';
 
@@ -123,6 +125,8 @@ class MyApp extends StatelessWidget {
         ),
         GetPage(name: AppRoutes.createGroup, page: () => const CreateGroupView()),
         GetPage(name: AppRoutes.friends, page: () => const FriendsScreen()),
+        GetPage(name: AppRoutes.friendsRequests, page: () => const FriendsRequestsScreen()),
+        GetPage(name: AppRoutes.friendsSent, page: () => const SentRequestsScreen()),
         GetPage(
           name: AppRoutes.chatList,
           page: () => const ChatListScreen(),
