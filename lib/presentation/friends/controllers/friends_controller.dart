@@ -2,9 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import 'package:torko/app/routes/app_routes.dart';
 import 'package:torko/app/theme/app_colors.dart';
 import 'package:torko/core/controllers/app_controller.dart';
+import 'package:torko/core/services/firestore_chat_service.dart';
 import 'package:torko/core/services/friends_api_service.dart';
+import 'package:torko/core/services/user_profile_sync_service.dart';
+import 'package:torko/core/services/network_caller.dart';
 import 'package:torko/core/services/user_info.dart';
 import 'package:torko/data/models/friend_user.dart';
 
@@ -30,6 +34,7 @@ class FriendsController extends GetxController {
   RxMap<int, bool> get isSendingByUserId => isSendingRequestByUserId;
   final RxMap<int, bool> isAcceptingByRequestId = <int, bool>{}.obs;
   final RxMap<int, bool> isRejectingByRequestId = <int, bool>{}.obs;
+  final RxMap<int, bool> isStartingChatByUserId = <int, bool>{}.obs;
 
   /// User IDs we have sent a request to (show "Requested" state).
   final RxSet<int> requestedUserIds = <int>{}.obs;
@@ -269,10 +274,17 @@ class FriendsController extends GetxController {
 
   Future<void> onAccept(int requestId) async {
     final token = UserInfo.apiToken;
-    if (token == null || token.isEmpty) return;
+    if (token == null || token.isEmpty) {
+      _showSnackbar('Session expired. Please login again.', isSuccess: false);
+      return;
+    }
 
     isAcceptingByRequestId[requestId] = true;
     isAcceptingByRequestId.refresh();
+
+    if (kDebugMode) {
+      debugPrint('ACCEPT payload: token=*** request_id=$requestId');
+    }
 
     try {
       final (success, message, user) =
@@ -288,9 +300,19 @@ class FriendsController extends GetxController {
           loadFriends();
         }
       }
+    } on FriendsApiException catch (e) {
+      if (kDebugMode) debugPrint('[Friends] onAccept: ${e.message}');
+      _showSnackbar(e.message, isSuccess: false);
+    } on NetworkAuthException catch (e) {
+      _showSnackbar(e.message, isSuccess: false);
     } catch (e) {
       if (kDebugMode) debugPrint('[Friends] onAccept error: $e');
-      _showSnackbar('Failed to accept request', isSuccess: false);
+      _showSnackbar(
+        e.toString().contains('timeout') || e.toString().contains('Timeout')
+            ? 'Request timed out. Please check your connection.'
+            : 'Failed to accept request.',
+        isSuccess: false,
+      );
     } finally {
       isAcceptingByRequestId[requestId] = false;
       isAcceptingByRequestId.refresh();
@@ -347,4 +369,48 @@ class FriendsController extends GetxController {
   }
 
   bool isFriend(int userId) => friends.any((f) => f.id == userId);
+
+  /// Start chat with friend: ensure Firestore conversation (write-first), then navigate.
+  Future<void> startChatWithFriend(FriendUser friend) async {
+    final myUid = UserInfo.userId?.toString() ?? UserInfo.myUidString;
+    if (myUid == null || myUid.isEmpty) {
+      _showSnackbar('Session expired. Please login again.', isSuccess: false);
+      return;
+    }
+    final friendUid = friend.id.toString();
+    if (friendUid.isEmpty) {
+      _showSnackbar('Invalid friend', isSuccess: false);
+      return;
+    }
+
+    final friendId = friend.id;
+    if (isStartingChatByUserId[friendId] == true) return;
+    isStartingChatByUserId[friendId] = true;
+    isStartingChatByUserId.refresh();
+
+    try {
+      await UserProfileSyncService.syncMe();
+      final firestoreChat = FirestoreChatService();
+      final conversationId = await firestoreChat.ensureConversationExists(myUid, friendUid);
+      Get.toNamed(
+        AppRoutes.conversation,
+        arguments: {
+          'conversationId': conversationId,
+          'toUserId': friend.id,
+          'peerUserId': friendUid,
+          'receiverName': friend.fullname ?? friend.username ?? friend.id.toString(),
+          'receiverAvatar': friend.profileImage,
+        },
+      );
+    } catch (e, st) {
+      if (kDebugMode) {
+        debugPrint('[Friends] startChatWithFriend error: $e');
+        debugPrint('[Friends] stackTrace: $st');
+      }
+      _showSnackbar('Could not start chat', isSuccess: false);
+    } finally {
+      isStartingChatByUserId[friendId] = false;
+      isStartingChatByUserId.refresh();
+    }
+  }
 }

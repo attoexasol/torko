@@ -74,9 +74,13 @@ class _ConversationViewState extends State<ConversationView> {
         // Get receiver info (standardized or legacy)
         final receiverName = args['fullname']?.toString() ?? args['receiverName']?.toString();
         final receiverAvatar = args['profile_image']?.toString() ?? args['receiverAvatar']?.toString();
+        final conversationId = args['conversationId']?.toString();
+        final peerUserId = args['peerUserId']?.toString();
         
         await chatController.initChat(
           toUserId: toUserId,
+          conversationId: conversationId,
+          peerUserId: peerUserId,
           receiverName: receiverName,
           receiverAvatar: receiverAvatar,
         );

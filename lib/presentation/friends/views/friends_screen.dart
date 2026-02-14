@@ -383,6 +383,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
               user: friend,
               isDark: isDark,
               isBn: isBn,
+              onMessageTap: () => friendsController.startChatWithFriend(friend),
+              isMessageLoading: friendsController.isStartingChatByUserId[friend.id] == true,
             );
           },
         ),

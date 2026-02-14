@@ -62,20 +62,30 @@ class FriendUser {
 }
 
 /// Pending friend request item (from API).
-/// Backend returns "id" in requests - treat as request_id for accept/reject.
+/// API returns: id=USER_ID, request_id=FRIEND_REQUEST_ROW_ID (use for accept).
 class FriendRequestItem {
+  /// User ID from json["id"] - for display/profile.
+  final int userId;
+  /// Friend request row ID from json["request_id"] - required for accept API.
   final int requestId;
   final FriendUser user;
 
   FriendRequestItem({
+    required this.userId,
     required this.requestId,
     required this.user,
   });
 
   factory FriendRequestItem.fromJson(Map<String, dynamic> json) {
-    final id = json['id'] ?? json['request_id'];
-    final requestId = id is int ? id : int.tryParse(id?.toString() ?? '0') ?? 0;
+    final userId = json['id'] is int
+        ? json['id'] as int
+        : int.tryParse(json['id']?.toString() ?? '0') ?? 0;
+    // request_id from JSON - Accept API requires this, NOT id (user id).
+    final requestId = json['request_id'] is int
+        ? json['request_id'] as int
+        : int.tryParse(json['request_id']?.toString() ?? '0') ?? 0;
     return FriendRequestItem(
+      userId: userId,
       requestId: requestId,
       user: FriendUser.fromJson(Map<String, dynamic>.from(json)),
     );

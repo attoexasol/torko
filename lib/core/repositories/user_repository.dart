@@ -37,6 +37,30 @@ class UserRepository {
     await ref.set(data, SetOptions(merge: true));
   }
 
+  /// Ensure user doc exists with fullname/profileImage. Merge-only, no overwrite.
+  /// Use when starting chat so inbox thread shows friend name instead of uid.
+  Future<void> ensureUserDoc(
+    String uid, {
+    String? fullname,
+    String? profileImage,
+  }) async {
+    final normalizedUid = normalizeUserId(uid);
+    final ref = _users.doc(normalizedUid);
+    final snap = await ref.get();
+
+    final data = <String, dynamic>{
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+    if (fullname != null && fullname.isNotEmpty) data['fullname'] = fullname;
+    if (profileImage != null) data['profileImage'] = profileImage;
+    if (!snap.exists) {
+      data['phone'] = '';
+      data['createdAt'] = FieldValue.serverTimestamp();
+    }
+
+    await ref.set(data, SetOptions(merge: true));
+  }
+
   /// Fetches user doc. Returns null on permission-denied or not-found.
   /// Never throws: permission-denied is caught and logged.
   Future<FirestoreUser?> getUser(String uid) async {

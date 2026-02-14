@@ -1,30 +1,33 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:torko/core/ids/user_id.dart';
 
-/// Firestore message document: conversations/{conversationId}/messages/{messageId}
-/// fromId, toId, seenBy are normalized to numeric strings.
+/// Firestore message: conversations/{conversationId}/messages/{messageId}
+/// Schema: senderId, text, type, createdAt. Backward compat: fromId/toId.
 class FirestoreMessage {
   final String id;
-  final String fromId;
-  final String toId;
+  final String senderId;
   final String text;
   final String type;
-  final String status;
-  final List<String> seenBy;
   final DateTime? createdAt;
+  final String fromId;
+  final String toId;
+  final List<String> seenBy;
 
   const FirestoreMessage({
     required this.id,
-    required this.fromId,
-    required this.toId,
+    required this.senderId,
     required this.text,
     this.type = 'text',
-    this.status = 'sent',
-    this.seenBy = const [],
     this.createdAt,
+    this.fromId = '',
+    this.toId = '',
+    this.seenBy = const [],
   });
 
-  /// Creates an optimistic message for instant UI feedback before stream echo.
+  /// Backward compat: fromId for isMine/UI.
+  String get effectiveFromId => fromId.isNotEmpty ? fromId : senderId;
+
+  /// Optimistic message for instant UI before stream echo.
   factory FirestoreMessage.optimistic({
     required String fromId,
     required String toId,
@@ -33,50 +36,50 @@ class FirestoreMessage {
     final now = DateTime.now();
     return FirestoreMessage(
       id: 'temp_${now.millisecondsSinceEpoch}',
+      senderId: fromId,
+      text: text,
       fromId: fromId,
       toId: toId,
-      text: text,
-      type: 'text',
-      status: 'sent',
-      seenBy: [fromId],
       createdAt: now,
     );
   }
 
   factory FirestoreMessage.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data() ?? {};
-    final _norm = (String s) {
+    String normId(String s) {
       if (s.isEmpty) return s;
       try {
         return normalizeUserId(s);
       } catch (_) {
         return s;
       }
-    };
-    final fromRaw = d['fromId']?.toString() ?? '';
+    }
+    final senderRaw = d['senderId']?.toString() ?? d['fromId']?.toString() ?? '';
+    final fromRaw = d['fromId']?.toString() ?? senderRaw;
     final toRaw = d['toId']?.toString() ?? '';
     final seenList = d['seenBy'];
     final seenBy = seenList is List
-        ? seenList.map((e) => _norm(e.toString().trim())).where((s) => s.isNotEmpty).toList()
+        ? seenList.map((e) => normId(e.toString().trim())).where((s) => s.isNotEmpty).toList()
         : <String>[];
     Timestamp? ts = d['createdAt'];
     return FirestoreMessage(
       id: doc.id,
-      fromId: _norm(fromRaw),
-      toId: _norm(toRaw),
+      senderId: normId(senderRaw),
       text: d['text']?.toString() ?? '',
       type: d['type']?.toString() ?? 'text',
-      status: d['status']?.toString() ?? 'sent',
-      seenBy: seenBy,
       createdAt: ts?.toDate(),
+      fromId: normId(fromRaw),
+      toId: normId(toRaw),
+      seenBy: seenBy,
     );
   }
 
   bool isMine(String myUid) {
     try {
-      return fromId == normalizeUserId(myUid);
+      final norm = normalizeUserId(myUid);
+      return senderId == norm || fromId == norm || effectiveFromId == norm;
     } catch (_) {
-      return fromId == myUid;
+      return senderId == myUid || fromId == myUid;
     }
   }
 

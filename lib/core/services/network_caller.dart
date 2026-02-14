@@ -2,7 +2,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:http/http.dart';
 import 'package:torko/core/services/user_info.dart';
 import 'package:torko/core/utils/app_logger.dart';
@@ -181,10 +180,45 @@ class NetworkCaller {
   }
 
   // ---------- helpers ----------
+
+  /// Safely extract error message from API response. Handles message as String OR Map.
+  /// Laravel 422: { "message": "...", "errors": {...} } or { "error": { "field": ["msg"] } }.
+  static String extractMessage(dynamic data) {
+    if (data == null) return _defaultErrorMessage;
+    if (data is String) return data.isNotEmpty ? data : _defaultErrorMessage;
+    if (data is Map) {
+      final m = data['message'];
+      if (m is String && m.isNotEmpty) return m;
+      if (m is Map || m is List) return m.toString();
+      final errors = data['errors'];
+      if (errors is Map && errors.isNotEmpty) {
+        final firstKey = errors.keys.first;
+        final firstVal = errors[firstKey];
+        if (firstVal is List && firstVal.isNotEmpty) {
+          return firstVal.first.toString();
+        }
+        return errors.toString();
+      }
+      final errorObj = data['error'];
+      if (errorObj is Map && errorObj.isNotEmpty) {
+        final firstKey = errorObj.keys.first;
+        final firstVal = errorObj[firstKey];
+        if (firstVal is List && firstVal.isNotEmpty) {
+          return firstVal.first.toString();
+        }
+        return errorObj.toString();
+      }
+      final err = data['Error'] ?? data['detail'];
+      if (err is String) return err;
+      return data.toString();
+    }
+    return data.toString();
+  }
+
   static String _extractError(dynamic json) {
     if (json == null) return _defaultErrorMessage;
-    if (json is Map<String, dynamic>) {
-      return json['Error'] ?? json['error'] ?? json['message'] ?? json['detail'] ?? _defaultErrorMessage;
+    if (json is Map) {
+      return extractMessage(json['message'] ?? json['Error'] ?? json['error'] ?? json['detail'] ?? json);
     }
     return json.toString().isNotEmpty ? json.toString() : _defaultErrorMessage;
   }
@@ -214,8 +248,9 @@ class NetworkCaller {
     }
   }
 
-  static void _logApiError({required String method, required String url, required String error}) {
+  static void _logApiError({required String method, required String url, required Object error}) {
     if (!kDebugMode) return;
-    AppLog.e('API', 'ERROR $method ${_path(url)} msg=$error');
+    final msg = error is String ? error : error.toString();
+    AppLog.e('API', 'ERROR $method ${_path(url)} msg=$msg');
   }
 }

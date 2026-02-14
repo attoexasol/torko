@@ -1,20 +1,19 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:get/get.dart';
 
 import 'package:torko/core/controllers/app_controller.dart';
 import 'package:torko/core/ids/user_id.dart';
 import 'package:torko/core/repositories/chat_repository.dart';
 import 'package:torko/core/services/firestore_chat_service.dart';
-import 'package:torko/core/services/message_api_service.dart';
 import 'package:torko/core/services/user_info.dart';
 import 'package:torko/data/models/message_model.dart';
 
-/// Realtime chat controller via Firestore snapshots.
-/// - Messages: stream from conversations/{groupId}/messages
-/// - Send: REST POST /api/messages/send (backend writes to Firestore)
-/// - No manual reload; Firestore listener updates UI
+/// Realtime chat controller via Firestore snapshots (Messenger-style).
+/// - Messages: stream from conversations/{conversationId}/messages
+/// - Send: Firestore write (realtime)
+/// - markConversationRead on open
 class ChatController extends GetxController {
   final RxList<MessageModel> messages = <MessageModel>[].obs;
   final RxInt messagesVersion = 0.obs;
@@ -53,6 +52,8 @@ class ChatController extends GetxController {
   /// Open conversation: subscribe to Firestore messages stream.
   Future<void> initChat({
     required int toUserId,
+    String? conversationId,
+    String? peerUserId,
     String? receiverName,
     String? receiverAvatar,
   }) async {
@@ -63,7 +64,9 @@ class ChatController extends GetxController {
     }
 
     currentUserId = currentUser;
-    final groupId = buildConversationId(currentUser.toString(), toUserId.toString());
+    final groupId = conversationId?.isNotEmpty == true
+        ? conversationId!
+        : buildConversationId(currentUser.toString(), toUserId.toString());
     final token = UserInfo.apiToken;
     if (token == null || token.isEmpty) {
       errorMessage.value = 'User not logged in';
@@ -110,7 +113,7 @@ class ChatController extends GetxController {
     );
   }
 
-  /// Send via REST. Optimistic update: add message immediately so UI shows it without waiting for stream.
+  /// Send via Firestore (realtime). Optimistic update for instant UI.
   Future<bool> sendMessage(String content) async {
     final text = content.trim();
     if (text.isEmpty) {
@@ -120,9 +123,14 @@ class ChatController extends GetxController {
 
     final tId = toUserId;
     final cId = currentUserId;
-    final token = UserInfo.apiToken;
 
-    if (tId == null || cId == null || token == null || token.isEmpty) {
+    if (tId == null || cId == null) {
+      errorMessage.value = 'Chat not initialized';
+      return false;
+    }
+
+    final groupId = _activeGroupId ?? buildConversationId(cId.toString(), tId.toString());
+    if (groupId.isEmpty) {
       errorMessage.value = 'Chat not initialized';
       return false;
     }
@@ -130,34 +138,24 @@ class ChatController extends GetxController {
     isSending.value = true;
     errorMessage.value = '';
 
-    try {
-      await MessageApiService.sendMessage(
-        token: token,
-        toUserId: tId,
-        content: text,
-      );
-      // Optimistic update: add message to list immediately (stream may be delayed)
-      final optimistic = MessageModel.temporary(
-        fromUserId: cId,
-        toUserId: tId,
-        messageContent: text,
-      ).copyWith(isSending: false);
-      messages.add(optimistic);
+    final optimistic = MessageModel.temporary(
+      fromUserId: cId,
+      toUserId: tId,
+      messageContent: text,
+    ).copyWith(isSending: false);
+    messages.add(optimistic);
 
-      // Dual-write to Firestore: ensures User B receives in real-time via Firestore stream.
-      // REST persists to Laravel DB; Firestore propagates to all listeners on same conversation.
-      final groupId = _activeGroupId ?? buildConversationId(cId.toString(), tId.toString());
-      if (groupId.isNotEmpty) {
-        try {
-          await _chatRepo.createConversationIfNotExists(cId.toString(), tId.toString());
-          await _chatRepo.sendTextMessage(groupId, cId.toString(), tId.toString(), text);
-        } catch (_) {
-          // Optimistic already shown; Firestore write failure does not block sender
-        }
-      }
+    try {
+      await _chatRepo.sendTextMessage(
+        groupId,
+        cId.toString(),
+        tId.toString(),
+        text,
+      );
       return true;
     } catch (e) {
       errorMessage.value = 'Failed to send message';
+      messages.removeWhere((m) => m.id == optimistic.id);
       Get.snackbar(
         Get.find<AppController>().language == AppLanguage.bn ? 'ত্রুটি' : 'Error',
         errorMessage.value,

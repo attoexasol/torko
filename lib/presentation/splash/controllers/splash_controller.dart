@@ -5,7 +5,7 @@ import 'package:torko/app/routes/app_routes.dart';
 import 'package:torko/core/utils/app_logger.dart';
 import 'package:torko/core/controllers/app_controller.dart';
 import 'package:torko/core/services/auth_service.dart';
-import 'package:torko/core/services/user_info.dart';
+import 'package:torko/core/services/user_profile_sync_service.dart';
 
 /// Splash Controller
 /// Manages splash screen logic and authentication routing.
@@ -64,7 +64,9 @@ class SplashController extends GetxController {
 
   /// Load user profile after navigation (non-blocking).
   void _loadUserProfileDeferred() {
-    AuthService.loadAndCacheCurrentUser().then((_) {
+    UserProfileSyncService.syncMe().then((_) {
+      return AuthService.loadAndCacheCurrentUser();
+    }).then((_) {
       if (Get.isRegistered<AppController>()) {
         Get.find<AppController>().refreshUserProfile();
       }

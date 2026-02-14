@@ -68,6 +68,8 @@ class FriendsRequestsScreen extends StatelessWidget {
 
   Widget _buildRequestsList(FriendsRequestsController c) {
     return Obx(() {
+      c.acceptingIds.length;
+      c.rejectingIds.length;
       if (c.requests.isEmpty) {
         return _buildEmptyState();
       }

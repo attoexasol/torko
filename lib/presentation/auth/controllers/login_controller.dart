@@ -6,8 +6,8 @@ import 'package:torko/app/routes/app_routes.dart';
 import 'package:torko/core/controllers/app_controller.dart';
 import 'package:torko/core/debug/auth_self_check.dart';
 import 'package:torko/core/ids/user_id.dart';
-import 'package:torko/core/repositories/user_repository.dart';
 import 'package:torko/core/services/auth_service.dart';
+import 'package:torko/core/services/user_profile_sync_service.dart';
 import 'package:torko/core/services/firebase_auth_service.dart';
 import 'package:torko/core/services/user_info.dart';
 import 'package:torko/core/utils/app_logger.dart';
@@ -37,7 +37,6 @@ class LoginController extends GetxController {
   String? _firebaseUid;
 
   final FirebaseAuthService _firebaseAuth = FirebaseAuthService();
-  final UserRepository _userRepo = UserRepository();
 
   // =========================
   // RESEND OTP TIMER
@@ -271,12 +270,7 @@ class LoginController extends GetxController {
         }
         await UserInfo.setFirebaseUid(finalUid);
         if (kDebugMode) AppLogger.auth('Auth state: SIGNED IN');
-        await _userRepo.upsertUserDoc(
-          finalUid,
-          cleanPhone,
-          fullname: UserInfo.fullname,
-          profileImage: UserInfo.profileImage,
-        );
+        await UserProfileSyncService.syncMe();
         _firebaseCustomToken = null;
         runAuthSelfCheck();
         // Same as Laravel flow: load profile, then Home (never Chat as initial route)

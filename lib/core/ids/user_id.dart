@@ -19,11 +19,8 @@ String normalizeUserId(dynamic id) {
   return s;
 }
 
-/// Builds deterministic conversation doc ID from two uids.
-/// Returns e.g. "65_81" (numeric strings, sorted).
-String buildConversationId(String uidA, String uidB) {
-  final a = normalizeUserId(uidA);
-  final b = normalizeUserId(uidB);
-  final ids = [a, b]..sort((x, y) => x.compareTo(y));
+/// Builds deterministic conversation doc ID. Sorts uids, returns "${min}_${max}".
+String buildConversationId(String a, String b) {
+  final ids = [normalizeUserId(a), normalizeUserId(b)]..sort();
   return '${ids[0]}_${ids[1]}';
 }

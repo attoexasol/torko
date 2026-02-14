@@ -2,6 +2,14 @@ import 'package:torko/core/constants/urls.dart';
 import 'package:torko/core/services/network_caller.dart';
 import 'package:torko/data/models/friend_user.dart';
 
+/// Safe message extraction from API body. Handles message as String or Map.
+String _safeMsg(dynamic body, String fallback) {
+  if (body == null || body is! Map) return fallback;
+  final s = NetworkCaller.extractMessage(body).trim();
+  if (s.isEmpty || s == 'Something went wrong' || s == '{}') return fallback;
+  return s;
+}
+
 /// Exception thrown when friends API fails.
 class FriendsApiException implements Exception {
   final String message;
@@ -27,7 +35,7 @@ class FriendsApiService {
     final status = body['status'];
     if (status == false) {
       throw FriendsApiException(
-        body['message']?.toString() ?? 'Failed to load suggestions',
+        _safeMsg(body, 'Failed to load suggestions'),
       );
     }
 
@@ -56,7 +64,7 @@ class FriendsApiService {
     final status = body['status'];
     if (status == false) {
       throw FriendsApiException(
-        body['message']?.toString() ?? 'Failed to load friends',
+        _safeMsg(body, 'Failed to load friends'),
       );
     }
 
@@ -85,7 +93,7 @@ class FriendsApiService {
     final status = body['status'];
     if (status == false) {
       throw FriendsApiException(
-        body['message']?.toString() ?? 'Failed to load requests',
+        _safeMsg(body, 'Failed to load requests'),
       );
     }
 
@@ -111,8 +119,7 @@ class FriendsApiService {
     );
     final body = res.body ?? {};
     final status = body['status'] == true;
-    final message =
-        body['message']?.toString() ?? (res.errorMessage ?? 'Unknown error');
+    final message = _safeMsg(body, res.errorMessage ?? 'Unknown error');
     return (status, message);
   }
 
@@ -127,8 +134,7 @@ class FriendsApiService {
     );
     final body = res.body ?? {};
     final status = body['status'] == true;
-    final message =
-        body['message']?.toString() ?? (res.errorMessage ?? 'Unknown error');
+    final message = _safeMsg(body, res.errorMessage ?? 'Unknown error');
 
     FriendUser? user;
     final data = body['data'];
@@ -157,7 +163,7 @@ class FriendsApiService {
     final status = body['status'];
     if (status == false) {
       throw FriendsApiException(
-        body['message']?.toString() ?? 'Failed to load sent requests',
+        _safeMsg(body, 'Failed to load sent requests'),
       );
     }
 
@@ -182,8 +188,7 @@ class FriendsApiService {
     );
     final body = res.body ?? {};
     final status = body['status'] == true;
-    final message =
-        body['message']?.toString() ?? (res.errorMessage ?? 'Unknown error');
+    final message = _safeMsg(body, res.errorMessage ?? 'Unknown error');
     return (status, message);
   }
 
@@ -198,8 +203,7 @@ class FriendsApiService {
     );
     final body = res.body ?? {};
     final status = body['status'] == true;
-    final message =
-        body['message']?.toString() ?? (res.errorMessage ?? 'Unknown error');
+    final message = _safeMsg(body, res.errorMessage ?? 'Unknown error');
     return (status, message);
   }
 }

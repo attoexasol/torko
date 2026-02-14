@@ -20,24 +20,18 @@ class FirestoreChatService {
   final UserRepository _userRepo = UserRepository();
 
   /// Stream of messages for a conversation, oldest first (ascending).
-  /// groupId format: "65_81" (buildConversationId).
   Stream<List<MessageModel>> messagesStream(String groupId) {
-    return _chatRepo
-        .messagesStream(groupId)
-        .map((list) {
-          // ChatRepository returns desc; reverse for ascending (oldest first)
-          final reversed = list.reversed.toList();
-          return reversed
-              .map((m) => _firestoreMessageToMessageModel(m))
-              .whereType<MessageModel>()
-              .toList();
-        });
+    return _chatRepo.watchMessages(groupId).map((list) {
+      return list
+          .map((m) => _firestoreMessageToMessageModel(m, groupId))
+          .whereType<MessageModel>()
+          .toList();
+    });
   }
 
   /// Stream of inbox threads for current user.
-  /// currentUid: numeric string e.g. "65".
   Stream<List<InboxThreadModel>> inboxStream(String currentUid) {
-    return _chatRepo.conversationsStream(currentUid).asyncMap((convs) async {
+    return _chatRepo.watchMyConversations(currentUid).asyncMap((convs) async {
       final results = <InboxThreadModel>[];
       for (final c in convs) {
         try {
@@ -88,6 +82,16 @@ class FirestoreChatService {
     });
   }
 
+  /// Ensure conversation doc exists (write-first). Returns conversationId.
+  /// DO NOT write friend user doc (users/{friendUid}) - causes PERMISSION_DENIED.
+  /// Friend profile is read-only; only owner writes on login.
+  Future<String> ensureConversationExists(
+    String myUidString,
+    String friendUidString,
+  ) async {
+    return _chatRepo.ensureConversation(myUidString, friendUidString);
+  }
+
   static int _parseInt(String s) {
     if (s.isEmpty) return 0;
     return int.tryParse(s) ?? 0;
@@ -103,11 +107,20 @@ class FirestoreChatService {
     return null;
   }
 
-  /// Map FirestoreMessage to MessageModel (int ids for compatibility with UI).
-  static MessageModel? _firestoreMessageToMessageModel(FirestoreMessage m) {
-    final fromId = _parseInt(m.fromId);
-    final toId = _parseInt(m.toId);
-    if (fromId <= 0 || toId <= 0) return null;
+  /// Map FirestoreMessage to MessageModel. Supports senderId (new) and fromId/toId (legacy).
+  static MessageModel? _firestoreMessageToMessageModel(
+    FirestoreMessage m,
+    String conversationId,
+  ) {
+    final senderStr = m.senderId.isNotEmpty ? m.senderId : m.fromId;
+    final fromId = _parseInt(senderStr);
+    if (fromId <= 0) return null;
+
+    final parts = conversationId.split('_');
+    final toIdStr = parts.length == 2
+        ? (parts[0] == senderStr ? parts[1] : parts[0])
+        : m.toId;
+    final toId = _parseInt(toIdStr);
 
     final createdAt = m.createdAt ?? DateTime.now();
     final msgId = int.tryParse(m.id) ?? m.id.hashCode.abs();
@@ -116,7 +129,7 @@ class FirestoreChatService {
     return MessageModel(
       id: msgId,
       fromUserId: fromId,
-      toUserId: toId,
+      toUserId: toId > 0 ? toId : 0,
       messageContent: m.text,
       isRead: isRead,
       createdAt: createdAt,

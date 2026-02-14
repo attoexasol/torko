@@ -65,6 +65,10 @@ class InboxController extends GetxService {
     loading.value = true;
     error.value = '';
 
+    if (kDebugMode) {
+      debugPrint('[InboxController] startInboxStream query: conversations where members arrayContains $uidStr');
+    }
+
     _inboxSubscription = _firestoreChat.inboxStream(uidStr).listen(
       (list) {
         threads.assignAll(list);

@@ -10,12 +10,16 @@ class FriendListTile extends StatelessWidget {
   final FriendUser user;
   final bool isDark;
   final bool isBn;
+  final VoidCallback? onMessageTap;
+  final bool isMessageLoading;
 
   const FriendListTile({
     super.key,
     required this.user,
     required this.isDark,
     required this.isBn,
+    this.onMessageTap,
+    this.isMessageLoading = false,
   });
 
   static const _baseUrl = 'https://torko.attoexasolutions.com/';
@@ -110,6 +114,27 @@ class FriendListTile extends StatelessWidget {
               ],
             ),
           ),
+          if (onMessageTap != null)
+            IconButton(
+              icon: isMessageLoading
+                  ? SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: isDark ? const Color(0xFFB8DED6) : const Color(0xFF657786),
+                      ),
+                    )
+                  : Icon(
+                      Icons.message,
+                      size: 22,
+                      color: isDark ? const Color(0xFFB8DED6) : const Color(0xFF657786),
+                    ),
+              onPressed: isMessageLoading ? null : onMessageTap,
+              style: IconButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
           IconButton(
             icon: Icon(
               Icons.person_outline,

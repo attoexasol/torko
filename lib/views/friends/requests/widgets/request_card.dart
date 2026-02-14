@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -22,7 +23,13 @@ class RequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (kDebugMode) {
+      debugPrint('PendingRequest userId=${model.userId} requestId=${model.requestId}');
+    }
     final c = Get.find<FriendsRequestsController>();
+    final isAccepting = c.acceptingIds.contains(model.requestId);
+    final isRejecting = c.rejectingIds.contains(model.requestId);
+    final isBusy = isAccepting || isRejecting;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -95,16 +102,27 @@ class RequestCard extends StatelessWidget {
                 child: SizedBox(
                   height: 46,
                   child: ElevatedButton.icon(
-                    onPressed: () => c.onAccept(model),
-                    icon: const Icon(Icons.check, size: 20, color: Colors.white),
-                    label: Text(
-                      'গ্রহন করুন',
-                      style: GoogleFonts.notoSansBengali(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
+                    onPressed: isBusy ? null : () => c.onAccept(model),
+                    icon: isAccepting
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.check, size: 20, color: Colors.white),
+                    label: isAccepting
+                        ? const SizedBox.shrink()
+                        : Text(
+                            'গ্রহন করুন',
+                            style: GoogleFonts.notoSansBengali(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _RequestCardColors.primary,
                       foregroundColor: Colors.white,
@@ -121,7 +139,7 @@ class RequestCard extends StatelessWidget {
                 child: SizedBox(
                   height: 46,
                   child: OutlinedButton.icon(
-                    onPressed: () => c.onReject(model),
+                    onPressed: isBusy ? null : () => c.onReject(model),
                     icon: Icon(
                       Icons.close,
                       size: 20,
