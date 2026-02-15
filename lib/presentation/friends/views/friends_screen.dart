@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -239,7 +240,17 @@ class _FriendsScreenState extends State<FriendsScreen> {
     return Obx(() {
       final isActive = activeTab.value == tab;
       return GestureDetector(
-        onTap: () => activeTab.value = tab,
+        onTap: () {
+          if (tab == 'sent') {
+            if (kDebugMode) {
+              debugPrint('[Sent] tab selected -> calling loadSentRequests()');
+            }
+            if (activeTab.value != 'sent') {
+              friendsController.loadSentRequests();
+            }
+          }
+          activeTab.value = tab;
+        },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
@@ -293,6 +304,9 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 
   Widget _buildContent() {
+    if (friendsController.searchQuery.value.isNotEmpty) {
+      return _buildSearchResults();
+    }
     if (activeTab.value == 'friends') {
       return _buildFriendsTab();
     } else if (activeTab.value == 'requests') {
@@ -302,6 +316,55 @@ class _FriendsScreenState extends State<FriendsScreen> {
     } else {
       return _buildSuggestionsTab();
     }
+  }
+
+  Widget _buildSearchResults() {
+    return Obx(() {
+      if (friendsController.isLoadingSearch.value &&
+          friendsController.searchResults.isEmpty) {
+        return FriendsLoadingSkeleton(isDark: isDark);
+      }
+      if (friendsController.hasErrorSearch.value &&
+          friendsController.searchResults.isEmpty) {
+        return _buildInlineRetry(
+          onRetry: friendsController.retrySearch,
+          isBn: isBn,
+        );
+      }
+      final list = friendsController.searchResults;
+      if (list.isEmpty) {
+        return FriendsEmptyState(
+          icon: Icons.search,
+          message: isBn ? 'কোনো ফলাফল পাওয়া যায়নি' : 'No results found',
+          isDark: isDark,
+        );
+      }
+      return ListView.builder(
+        key: const PageStorageKey<String>('friends_search_results'),
+        padding: const EdgeInsets.all(16),
+        itemCount: list.length,
+        itemBuilder: (context, index) {
+          final item = list[index];
+          final user = item.toFriendUser();
+          if (item.isConnected) {
+            return FriendListTile(
+              user: user,
+              isDark: isDark,
+              isBn: isBn,
+              onMessageTap: () => friendsController.startChatWithFriend(user),
+              isMessageLoading:
+                  friendsController.isStartingChatByUserId[user.id] == true,
+              showOnlyMessageAction: true,
+            );
+          }
+          return SuggestionCard(
+            user: user,
+            isDark: isDark,
+            isBn: isBn,
+          );
+        },
+      );
+    });
   }
 
   Widget _buildSuggestionsTab() {
@@ -437,20 +500,28 @@ class _FriendsScreenState extends State<FriendsScreen> {
 
   Widget _buildSentTab() {
     return Obx(() {
-      if (friendsController.isLoadingSent.value &&
-          friendsController.sentRequests.isEmpty) {
+      final controller = friendsController;
+      if (kDebugMode) {
+        debugPrint('[Sent][Build] controllerHash=${identityHashCode(controller)} sentLen=${controller.sentRequests.length}');
+      }
+      if (controller.isLoadingSent.value &&
+          controller.sentRequests.isEmpty) {
         return FriendsLoadingSkeleton(isDark: isDark);
       }
-      if (friendsController.hasErrorSent.value &&
-          friendsController.sentRequests.isEmpty) {
+      if (controller.hasErrorSent.value &&
+          controller.sentRequests.isEmpty) {
         return _buildInlineRetry(
-          onRetry: () => friendsController.loadSentRequests(),
+          onRetry: () => controller.loadSentRequests(),
           isBn: isBn,
         );
       }
-      final list = friendsController.filteredSentRequests;
+      // Use sentRequests directly (bypass filteredSentRequests to avoid wrong filtering)
+      final list = controller.sentRequests;
+      if (kDebugMode) {
+        debugPrint('[Sent][UI] sentRequests.len=${list.length}');
+      }
       if (list.isEmpty) {
-        final hasQuery = friendsController.searchQuery.value.isNotEmpty;
+        final hasQuery = controller.searchQuery.value.isNotEmpty;
         return FriendsEmptyState(
           icon: Icons.send,
           message: hasQuery
@@ -460,7 +531,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
         );
       }
       return RefreshIndicator(
-        onRefresh: () => friendsController.loadSentRequests(),
+        onRefresh: () => controller.loadSentRequests(),
         child: ListView.builder(
           key: const PageStorageKey<String>('friends_sent_list'),
           padding: const EdgeInsets.all(16),

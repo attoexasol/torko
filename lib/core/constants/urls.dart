@@ -81,6 +81,7 @@ class Urls{
     static const pending_friend_requests = "$_baseUrL/friend/requests" ;
     static const cancel_friend_requests = "$_baseUrL/friend/cancel-or-delete" ;
     static const friend_lists = "$_baseUrL/friends" ;
+    static const friend_search = "$_baseUrL/friends/search" ;
     static const mutual_friend_suggestion = "$_baseUrL/friends/mutual-suggestions" ;
 
 

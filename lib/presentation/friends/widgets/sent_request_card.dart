@@ -51,7 +51,7 @@ class SentRequestCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      user.displayName,
+                      user.fullname ?? 'Unknown',
                       style: GoogleFonts.notoSansBengali(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:torko/core/constants/urls.dart';
 import 'package:torko/core/services/network_caller.dart';
 import 'package:torko/data/models/friend_user.dart';
@@ -18,6 +19,59 @@ class FriendsApiException implements Exception {
 
 /// Friends API service - all endpoints use POST with api_token in body.
 class FriendsApiService {
+  /// Search friends by query. Returns list of FriendSearchItem.
+  /// Uses UserInfo.apiToken via postAuth.
+  static Future<List<FriendSearchItem>> searchFriends({
+    required String query,
+  }) async {
+    final q = query.trim();
+    if (q.isEmpty) return [];
+
+    final res = await NetworkCaller.postAuth(
+      url: Urls.friend_search,
+      body: {'search_content': q},
+    );
+
+    if (!res.isSuccess) {
+      if (kDebugMode) {
+        debugPrint('[FriendsSearch] status=${res.statusCode} query=$q results=0');
+      }
+      throw FriendsApiException(
+        res.errorMessage ?? _safeMsg(res.body ?? {}, 'Search failed'),
+      );
+    }
+
+    final body = res.body ?? {};
+    final status = body['status'] == true;
+
+    if (!status) {
+      if (kDebugMode) {
+        debugPrint('[FriendsSearch] status=${res.statusCode} query=$q results=0');
+      }
+      final msg = _safeMsg(body, 'Search failed');
+      if (msg.isNotEmpty && msg != 'Search failed') {
+        throw FriendsApiException(msg);
+      }
+      return [];
+    }
+
+    final data = body['data'];
+    if (data == null || data is! List) return [];
+
+    final list = (data as List)
+        .map((e) => FriendSearchItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+
+    if (kDebugMode) {
+      debugPrint('[FriendsSearch] status=${res.statusCode} query=$q results=${list.length}');
+      for (final item in list) {
+        debugPrint('[FriendsSearch] item.id=${item.id} isConnected=${item.isConnected}');
+      }
+    }
+
+    return list;
+  }
+
   /// Fetch mutual friend suggestions.
   static Future<List<FriendUser>> fetchSuggestions(String token) async {
     final res = await NetworkCaller.postAuth(
@@ -145,6 +199,7 @@ class FriendsApiService {
   }
 
   /// Fetch pending outgoing (sent) friend requests.
+  /// Alias: fetchSentFriendRequests.
   static Future<List<FriendRequestItem>> fetchPendingOutgoingRequests(
     String token,
   ) async {
@@ -152,23 +207,43 @@ class FriendsApiService {
       url: Urls.pending_friend_requests,
       body: {},
     );
+
+    if (kDebugMode) {
+      debugPrint('[Sent][API] statusCode=${res.statusCode}');
+      debugPrint('[Sent][API] body=${res.body}');
+      final body = res.body;
+      if (body != null && body is Map) {
+        debugPrint('[Sent][API] keys=${body.keys.toList()}');
+        final reqs = body['requests'];
+        debugPrint('[Sent][API] requestsType=${reqs?.runtimeType}');
+        debugPrint('[Sent][API] requestsLen=${reqs is List ? reqs.length : "N/A"}');
+      }
+    }
+
     if (!res.isSuccess) {
       throw FriendsApiException(
         res.errorMessage ?? 'Failed to load sent requests',
       );
     }
     final body = res.body;
-    if (body == null) return [];
+    if (body == null) {
+      if (kDebugMode) debugPrint('[Sent] ERROR: body is null');
+      return [];
+    }
 
     final status = body['status'];
-    if (status == false) {
+    if (status != true) {
+      if (kDebugMode) debugPrint('[Sent] ERROR: status not true OR \'requests\' missing');
       throw FriendsApiException(
         _safeMsg(body, 'Failed to load sent requests'),
       );
     }
 
     final requests = body['requests'];
-    if (requests == null || requests is! List) return [];
+    if (requests == null || requests is! List) {
+      if (kDebugMode) debugPrint('[Sent] ERROR: requests missing or not a list');
+      return [];
+    }
 
     return (requests as List)
         .map((e) =>

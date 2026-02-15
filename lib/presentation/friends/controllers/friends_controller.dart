@@ -10,6 +10,8 @@ import 'package:torko/core/services/friends_api_service.dart';
 import 'package:torko/core/services/user_profile_sync_service.dart';
 import 'package:torko/core/services/network_caller.dart';
 import 'package:torko/core/services/user_info.dart';
+import 'dart:async';
+
 import 'package:torko/data/models/friend_user.dart';
 
 /// Friends controller with full API integration.
@@ -42,6 +44,13 @@ class FriendsController extends GetxController {
   final searchController = TextEditingController();
   final RxString searchQuery = ''.obs;
 
+  /// Search API results (when searchQuery is non-empty).
+  final RxList<FriendSearchItem> searchResults = <FriendSearchItem>[].obs;
+  final RxBool isLoadingSearch = false.obs;
+  final RxBool hasErrorSearch = false.obs;
+
+  Timer? _searchDebounce;
+
   int get pendingCount => requests.length;
   int get sentCount => sentRequests.length;
 
@@ -53,12 +62,58 @@ class FriendsController extends GetxController {
 
   @override
   void onClose() {
+    _searchDebounce?.cancel();
     searchController.dispose();
     super.onClose();
   }
 
   void setSearchQuery(String value) {
     searchQuery.value = value;
+    _searchDebounce?.cancel();
+    final q = value.trim();
+    if (q.isEmpty) {
+      searchResults.clear();
+      isLoadingSearch.value = false;
+      hasErrorSearch.value = false;
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      _performSearch();
+    });
+  }
+
+  Future<void> _performSearch() async {
+    final q = searchQuery.value.trim();
+    if (q.isEmpty) return;
+
+    final token = UserInfo.apiToken;
+    if (token == null || token.isEmpty) return;
+
+    isLoadingSearch.value = true;
+    hasErrorSearch.value = false;
+    searchResults.clear();
+
+    try {
+      final list = await FriendsApiService.searchFriends(query: q);
+      searchResults.assignAll(list);
+    } on FriendsApiException catch (e) {
+      if (kDebugMode) debugPrint('[FriendsSearch] error: ${e.message}');
+      hasErrorSearch.value = true;
+      _showSnackbar(e.message, isSuccess: false);
+    } on NetworkAuthException catch (e) {
+      _showSnackbar(e.message, isSuccess: false);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[FriendsSearch] error: $e');
+      hasErrorSearch.value = true;
+      _showSnackbar(
+        e.toString().contains('timeout') || e.toString().contains('Timeout')
+            ? 'Request timed out. Please check your connection.'
+            : 'Search failed. Please try again.',
+        isSuccess: false,
+      );
+    } finally {
+      isLoadingSearch.value = false;
+    }
   }
 
   void clearSearch() {
@@ -97,6 +152,11 @@ class FriendsController extends GetxController {
     final q = searchQuery.value;
     if (q.isEmpty) return sentRequests;
     return sentRequests.where((r) => _matchesQuery(r.user, q)).toList();
+  }
+
+  /// Retry search with current query (for error state).
+  void retrySearch() {
+    if (searchQuery.value.trim().isNotEmpty) _performSearch();
   }
 
   /// Load all tabs (suggestions, friends, requests, sent).
@@ -187,6 +247,12 @@ class FriendsController extends GetxController {
     try {
       final list = await FriendsApiService.fetchPendingOutgoingRequests(token);
       sentRequests.assignAll(list);
+      if (kDebugMode) {
+        debugPrint('[Sent] loaded count=${sentRequests.length}');
+        for (final r in sentRequests) {
+          debugPrint('[Sent] userId=${r.userId} requestId=${r.requestId} name=${r.user.fullname}');
+        }
+      }
     } on FriendsApiException catch (e) {
       if (kDebugMode) debugPrint('[Friends] loadSentRequests: ${e.message}');
       hasErrorSent.value = true;
@@ -236,7 +302,7 @@ class FriendsController extends GetxController {
     }
   }
 
-  /// Sends friend request and always refreshes suggestions list.
+  /// Sends friend request. If from search results, updates card state; else refreshes suggestions.
   Future<void> sendFriendRequestAndRefresh(int receiverId) async {
     final token = UserInfo.apiToken;
     if (token == null || token.isEmpty) {
@@ -251,10 +317,24 @@ class FriendsController extends GetxController {
       final (success, message) =
           await FriendsApiService.sendFriendRequest(token, receiverId);
 
-      _showSnackbar(message, isSuccess: success);
+      if (kDebugMode) {
+        debugPrint('[FriendRequest] receiverId=$receiverId status=$success msg=$message');
+      }
 
-      // Always refresh suggestions after request (success or already exists)
-      await loadSuggestions(showLoader: false);
+      final isAlreadyExists =
+          !success && message.toLowerCase().contains('already exists');
+
+      if (success || isAlreadyExists) {
+        final inSearchResults = searchQuery.value.trim().isNotEmpty &&
+            searchResults.any((r) => r.id == receiverId);
+        if (inSearchResults) {
+          _markSearchItemConnected(receiverId);
+        } else {
+          await loadSuggestions(showLoader: false);
+        }
+      }
+
+      _showSnackbar(message, isSuccess: success || isAlreadyExists);
     } catch (e) {
       if (kDebugMode) debugPrint('[Friends] sendFriendRequestAndRefresh error: $e');
       _showSnackbar(
@@ -266,6 +346,19 @@ class FriendsController extends GetxController {
     } finally {
       isSendingRequestByUserId[receiverId] = false;
       isSendingRequestByUserId.refresh();
+    }
+  }
+
+  /// Mark a search result item as connected (requested) and refresh UI.
+  void _markSearchItemConnected(int userId) {
+    final idx = searchResults.indexWhere((r) => r.id == userId);
+    if (idx >= 0) {
+      final updated = searchResults.toList();
+      updated[idx] = updated[idx].copyWith(isConnected: true);
+      searchResults.assignAll(updated);
+      if (kDebugMode) {
+        debugPrint('[FriendRequest] updated item.id=$userId isConnected=true');
+      }
     }
   }
 

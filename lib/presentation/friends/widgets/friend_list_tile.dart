@@ -6,12 +6,15 @@ import 'package:torko/app/theme/app_colors.dart';
 import 'package:torko/data/models/friend_user.dart';
 
 /// Friend list tile for Friends tab (avatar, name, username, address, mutual).
+/// For search results: pass showOnlyMessageAction=true to show message icon only (no profile icon).
 class FriendListTile extends StatelessWidget {
   final FriendUser user;
   final bool isDark;
   final bool isBn;
   final VoidCallback? onMessageTap;
   final bool isMessageLoading;
+  /// When true (search results), show only message icon; hide profile icon.
+  final bool showOnlyMessageAction;
 
   const FriendListTile({
     super.key,
@@ -20,6 +23,7 @@ class FriendListTile extends StatelessWidget {
     required this.isBn,
     this.onMessageTap,
     this.isMessageLoading = false,
+    this.showOnlyMessageAction = false,
   });
 
   static const _baseUrl = 'https://torko.attoexasolutions.com/';
@@ -135,17 +139,18 @@ class FriendListTile extends StatelessWidget {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
-          IconButton(
-            icon: Icon(
-              Icons.person_outline,
-              size: 22,
-              color: isDark ? const Color(0xFFB8DED6) : const Color(0xFF657786),
+          if (!showOnlyMessageAction)
+            IconButton(
+              icon: Icon(
+                Icons.person_outline,
+                size: 22,
+                color: isDark ? const Color(0xFFB8DED6) : const Color(0xFF657786),
+              ),
+              onPressed: null,
+              style: IconButton.styleFrom(
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
             ),
-            onPressed: null,
-            style: IconButton.styleFrom(
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
         ],
       ),
     );

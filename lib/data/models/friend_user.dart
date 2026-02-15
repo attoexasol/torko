@@ -61,6 +61,67 @@ class FriendUser {
       };
 }
 
+/// Search result item from friends/search API. Has is_connected for card action.
+class FriendSearchItem {
+  final int id;
+  final String? fullname;
+  final String? username;
+  final String? profileImage;
+  final String? address;
+  final int mutualFriends;
+  final bool isConnected;
+
+  FriendSearchItem({
+    required this.id,
+    this.fullname,
+    this.username,
+    this.profileImage,
+    this.address,
+    this.mutualFriends = 0,
+    this.isConnected = false,
+  });
+
+  FriendUser toFriendUser() => FriendUser(
+        id: id,
+        fullname: fullname,
+        username: username,
+        profileImage: profileImage,
+        address: address,
+        mutualFriends: mutualFriends,
+      );
+
+  String get displayName => fullname ?? 'User';
+
+  FriendSearchItem copyWith({bool? isConnected}) => FriendSearchItem(
+        id: id,
+        fullname: fullname,
+        username: username,
+        profileImage: profileImage,
+        address: address,
+        mutualFriends: mutualFriends,
+        isConnected: isConnected ?? this.isConnected,
+      );
+
+  static bool _parseBool(dynamic v) =>
+      v == true || v == 1 || (v is String && v.toLowerCase() == 'true');
+
+  factory FriendSearchItem.fromJson(Map<String, dynamic> json) {
+    return FriendSearchItem(
+      id: json['id'] is int
+          ? json['id'] as int
+          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      fullname: json['fullname']?.toString(),
+      username: json['username']?.toString(),
+      profileImage: json['profile_image']?.toString(),
+      address: json['address']?.toString(),
+      mutualFriends: json['mutual_friends'] is int
+          ? json['mutual_friends'] as int
+          : int.tryParse(json['mutual_friends']?.toString() ?? '0') ?? 0,
+      isConnected: _parseBool(json['is_connected']),
+    );
+  }
+}
+
 /// Pending friend request item (from API).
 /// API returns: id=USER_ID, request_id=FRIEND_REQUEST_ROW_ID (use for accept).
 class FriendRequestItem {
