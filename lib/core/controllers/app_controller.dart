@@ -59,8 +59,8 @@ class AppController extends GetxController {
   final Rx<dynamic> _postDetailData = Rx<dynamic>(null);
   dynamic get postDetailData => _postDetailData.value;
 
-  // Message Notification Count
-  final RxInt _messageNotificationCount = 5.obs;
+  // Message Notification Count (badge removed from UI; kept for future API)
+  final RxInt _messageNotificationCount = 0.obs;
   int get messageNotificationCount => _messageNotificationCount.value;
 
   // Profile Image (reactive)

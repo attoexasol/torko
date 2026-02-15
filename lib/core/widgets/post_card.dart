@@ -49,6 +49,7 @@ class PostCard extends StatefulWidget {
   final bool verified;
   final String timestamp;
   final String content;
+  final String? title;
   final String? avatar;
   final String? image;
   final String? video;
@@ -74,6 +75,8 @@ class PostCard extends StatefulWidget {
   final int? sharedByUserId;
   final VoidCallback? onDeleteSharedPost;
   final PostModel? post;
+  /// When true, PostWithComments opens with showInteractions: false (e.g. Profile → My Posts).
+  final bool hideInteractionsInDetail;
 
   const PostCard({
     super.key,
@@ -85,6 +88,7 @@ class PostCard extends StatefulWidget {
     this.verified = false,
     required this.timestamp,
     required this.content,
+    this.title,
     this.avatar,
     this.image,
     this.video,
@@ -110,6 +114,7 @@ class PostCard extends StatefulWidget {
     this.sharedByUserId,
     this.onDeleteSharedPost,
     this.post,
+    this.hideInteractionsInDetail = false,
   });
 
   @override
@@ -296,6 +301,7 @@ class _PostCardState extends State<PostCard> {
       () => PostWithComments(
         post: postData,
         onBack: () => Get.back(),
+        showInteractions: !widget.hideInteractionsInDetail,
         onAddComment: (text, replyTo) {
           // Handle comment addition
           Get.snackbar(
@@ -793,6 +799,20 @@ class _PostCardState extends State<PostCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Title (matches Home feed)
+        if (widget.title != null && widget.title!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+            child: Text(
+              widget.title!,
+              style: GoogleFonts.notoSansBengali(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+                color: isDark ? Colors.white : const Color(0xFF0f1419),
+              ),
+            ),
+          ),
         // Text Content (except for gradient type)
         if (widget.type != 'gradient')
           Padding(

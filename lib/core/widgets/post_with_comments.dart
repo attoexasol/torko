@@ -80,6 +80,8 @@ class PostWithComments extends StatefulWidget {
   final Function(String text, String? replyTo)? onAddComment;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  /// When false (e.g. Profile → My Posts), hide counts/actions/comment section.
+  final bool showInteractions;
 
   const PostWithComments({
     super.key,
@@ -88,6 +90,7 @@ class PostWithComments extends StatefulWidget {
     this.onAddComment,
     this.onEdit,
     this.onDelete,
+    this.showInteractions = true,
   });
 
   @override
@@ -367,8 +370,9 @@ class _PostWithCommentsState extends State<PostWithComments> {
 
                                       // Timestamp
                                       Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 12),
+                                        padding: EdgeInsets.only(
+                                          bottom: widget.showInteractions ? 12 : 0,
+                                        ),
                                         child: Text(
                                           widget.post.timestamp,
                                           style: GoogleFonts.roboto(
@@ -380,111 +384,111 @@ class _PostWithCommentsState extends State<PostWithComments> {
                                         ),
                                       ),
 
-                                      // Stats
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 12),
-                                        decoration: BoxDecoration(
-                                          border: Border(
-                                            top: BorderSide(
-                                              color: isDark
-                                                  ? AppColors.darkBorder
-                                                  : AppColors.lightBorder,
-                                            ),
-                                            bottom: BorderSide(
-                                              color: isDark
-                                                  ? AppColors.darkBorder
-                                                  : AppColors.lightBorder,
+                                      // Stats + Action Buttons (hidden when showInteractions=false)
+                                      if (widget.showInteractions) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 12),
+                                          decoration: BoxDecoration(
+                                            border: Border(
+                                              top: BorderSide(
+                                                color: isDark
+                                                    ? AppColors.darkBorder
+                                                    : AppColors.lightBorder,
+                                              ),
+                                              bottom: BorderSide(
+                                                color: isDark
+                                                    ? AppColors.darkBorder
+                                                    : AppColors.lightBorder,
+                                              ),
                                             ),
                                           ),
+                                          child: Row(
+                                            children: [
+                                              _buildStatButton(
+                                                '${widget.post.comments}',
+                                                isBn ? 'মন্তব্য' : 'Comments',
+                                                isDark,
+                                              ),
+                                              const SizedBox(width: 16),
+                                              _buildStatButton(
+                                                '$likesCount',
+                                                isBn ? 'পছন্দ' : 'Likes',
+                                                isDark,
+                                              ),
+                                              const SizedBox(width: 16),
+                                              _buildStatButton(
+                                                '${widget.post.shares}',
+                                                isBn ? 'শেয়ার' : 'Shares',
+                                                isDark,
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                        child: Row(
+                                        const SizedBox(height: 8),
+                                        Row(
                                           children: [
-                                            _buildStatButton(
-                                              '${widget.post.comments}',
-                                              isBn ? 'মন্তব্য' : 'Comments',
-                                              isDark,
+                                            Expanded(
+                                              child: _buildActionButton(
+                                                icon: Icons.favorite,
+                                                label: isBn ? 'পছন্দ' : 'Like',
+                                                isActive: isLiked,
+                                                activeColor:
+                                                    const Color(0xFFf91880),
+                                                onTap: _handleLike,
+                                                isDark: isDark,
+                                              ),
                                             ),
-                                            const SizedBox(width: 16),
-                                            _buildStatButton(
-                                              '$likesCount',
-                                              isBn ? 'পছন্দ' : 'Likes',
-                                              isDark,
+                                            Expanded(
+                                              child: _buildActionButton(
+                                                icon: Icons.chat_bubble_outline,
+                                                label: isBn ? 'মন্তব্য' : 'Comment',
+                                                isActive: false,
+                                                activeColor: Colors.blue,
+                                                onTap: () {},
+                                                isDark: isDark,
+                                              ),
                                             ),
-                                            const SizedBox(width: 16),
-                                            _buildStatButton(
-                                              '${widget.post.shares}',
-                                              isBn ? 'শেয়ার' : 'Shares',
-                                              isDark,
+                                            Expanded(
+                                              child: _buildActionButton(
+                                                icon: Icons.share_outlined,
+                                                label: isBn ? 'শেয়ার' : 'Share',
+                                                isActive: false,
+                                                activeColor: Colors.green,
+                                                onTap: () {},
+                                                isDark: isDark,
+                                              ),
+                                            ),
+                                            GestureDetector(
+                                              onTap: () {
+                                                setState(() {
+                                                  isSaved = !isSaved;
+                                                });
+                                              },
+                                              child: Container(
+                                                width: 36,
+                                                height: 36,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Icon(
+                                                  isSaved
+                                                      ? Icons.bookmark
+                                                      : Icons.bookmark_outline,
+                                                  size: 20,
+                                                  color: isSaved
+                                                      ? AppColors.lightPrimary
+                                                      : (isDark
+                                                          ? AppColors
+                                                              .darkMutedForeground
+                                                          : AppColors
+                                                              .lightMutedForeground),
+                                                ),
+                                              ),
                                             ),
                                           ],
                                         ),
-                                      ),
-                                      const SizedBox(height: 8),
-
-                                      // Action Buttons
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: _buildActionButton(
-                                              icon: Icons.favorite,
-                                              label: isBn ? 'পছন্দ' : 'Like',
-                                              isActive: isLiked,
-                                              activeColor:
-                                                  const Color(0xFFf91880),
-                                              onTap: _handleLike,
-                                              isDark: isDark,
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: _buildActionButton(
-                                              icon: Icons.chat_bubble_outline,
-                                              label: isBn ? 'মন্তব্য' : 'Comment',
-                                              isActive: false,
-                                              activeColor: Colors.blue,
-                                              onTap: () {},
-                                              isDark: isDark,
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: _buildActionButton(
-                                              icon: Icons.share_outlined,
-                                              label: isBn ? 'শেয়ার' : 'Share',
-                                              isActive: false,
-                                              activeColor: Colors.green,
-                                              onTap: () {},
-                                              isDark: isDark,
-                                            ),
-                                          ),
-                                          GestureDetector(
-                                            onTap: () {
-                                              setState(() {
-                                                isSaved = !isSaved;
-                                              });
-                                            },
-                                            child: Container(
-                                              width: 36,
-                                              height: 36,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Icon(
-                                                isSaved
-                                                    ? Icons.bookmark
-                                                    : Icons.bookmark_outline,
-                                                size: 20,
-                                                color: isSaved
-                                                    ? AppColors.lightPrimary
-                                                    : (isDark
-                                                        ? AppColors
-                                                            .darkMutedForeground
-                                                        : AppColors
-                                                            .lightMutedForeground),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -493,14 +497,17 @@ class _PostWithCommentsState extends State<PostWithComments> {
                           ),
                         ),
 
-                        // Comments Section
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: ModernCommentSection(
-                            postId: widget.post.id,
-                            onAddComment: widget.onAddComment,
-                          ),
-                        ),
+                        // Comments Section (hidden when showInteractions=false)
+                        if (widget.showInteractions)
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: ModernCommentSection(
+                              postId: widget.post.id,
+                              onAddComment: widget.onAddComment,
+                            ),
+                          )
+                        else
+                          const SizedBox(height: 16),
                       ],
                     ),
                   ),

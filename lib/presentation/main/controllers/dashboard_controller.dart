@@ -549,16 +549,13 @@ class DashboardBottomNav extends StatelessWidget {
                   // Create Post Button (Center)
                   _buildCenterButton(),
                   
-                  // Messages Button
+                  // Messages Button (badge removed - no overlay)
                   _buildNavItem(
                     icon: Icons.message_outlined,
                     activeIcon: Icons.message,
                     label: appController.t('messages'),
                     isActive: isMessages,
                     onTap: () => onNavigate('messages'),
-                    badge: appController.messageNotificationCount > 0 
-                        ? appController.messageNotificationCount 
-                        : null,
                   ),
                   
                   // Profile Button

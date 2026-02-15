@@ -1088,6 +1088,7 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                       () => PostWithComments(
                         post: postData,
                         onBack: () => Get.back(),
+                        showInteractions: false,
                         onAddComment: (text, replyTo) {
                           // TODO: Handle comment addition
                         },
@@ -1278,6 +1279,7 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                   author: p.createdBy?.name ?? 'User',
                   username: '@user',
                   timestamp: _formatTimestamp(p.createdAt),
+                  title: p.postTitle.isNotEmpty ? p.postTitle : null,
                   content: p.postDescription,
                   type: p.postImages.isEmpty ? 'text' : (p.postImages.length == 1 ? 'image' : 'multiImage'),
                   image: p.postImages.isNotEmpty ? _imageUrl(p.postImages.first) : null,
@@ -1290,7 +1292,42 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                   isShared: item.isShared,
                   sharedAt: item.sharedAt,
                   sharedByUserId: item.sharedByUserId,
+                  hideInteractionsInDetail: true,
                   onLike: () {},
+                  onEdit: item.isShared ? null : () async {
+                    Get.back();
+                    final fp = await postController.getSinglePost(p.id);
+                    if (fp != null) {
+                      Get.to(
+                        () => EditPostView(post: fp),
+                        transition: Transition.rightToLeft,
+                      );
+                    }
+                  },
+                  onDelete: item.isShared ? null : () async {
+                    final success = await postController.deletePost(p.id);
+                    if (success) {
+                      Get.back();
+                      Get.snackbar(
+                        isBn ? 'সফল' : 'Success',
+                        isBn ? 'পোস্ট মুছে ফেলা হয়েছে' : 'Post deleted',
+                        snackPosition: SnackPosition.BOTTOM,
+                        backgroundColor: Colors.green,
+                        colorText: Colors.white,
+                      );
+                      timelineController.fetchTimeline();
+                    } else {
+                      Get.snackbar(
+                        isBn ? 'ত্রুটি' : 'Error',
+                        postController.errorMessage.value.isNotEmpty
+                            ? postController.errorMessage.value
+                            : (isBn ? 'পোস্ট মুছে ফেলতে ব্যর্থ' : 'Failed to delete post'),
+                        snackPosition: SnackPosition.BOTTOM,
+                        backgroundColor: Colors.red,
+                        colorText: Colors.white,
+                      );
+                    }
+                  },
                   onComment: () async {
                     final fp = await postController.getSinglePost(p.id);
                     if (fp != null) {
@@ -1308,7 +1345,28 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                         shares: fp.postShareCount,
                         isLiked: fp.isLiked,
                       );
-                      Get.to(() => PostWithComments(post: postData, onBack: () => Get.back(), onAddComment: (_, __) {}));
+                      Get.to(() => PostWithComments(
+                        post: postData,
+                        onBack: () => Get.back(),
+                        showInteractions: false,
+                        onAddComment: (_, __) {},
+                        onEdit: item.isShared ? null : () async {
+                          Get.back();
+                          Get.to(() => EditPostView(post: fp), transition: Transition.rightToLeft);
+                        },
+                        onDelete: item.isShared ? null : () async {
+                          final success = await postController.deletePost(p.id);
+                          if (success) {
+                            Get.back();
+                            Get.snackbar(isBn ? 'সফল' : 'Success', isBn ? 'পোস্ট মুছে ফেলা হয়েছে' : 'Post deleted',
+                                snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.green, colorText: Colors.white);
+                            timelineController.fetchTimeline();
+                          } else {
+                            Get.snackbar(isBn ? 'ত্রুটি' : 'Error', postController.errorMessage.value.isNotEmpty ? postController.errorMessage.value : (isBn ? 'পোস্ট মুছে ফেলতে ব্যর্থ' : 'Failed to delete post'),
+                                snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.red, colorText: Colors.white);
+                          }
+                        },
+                      ));
                     }
                   },
                   onShare: () {},
@@ -1454,6 +1512,7 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                   author: post.createdBy?.name ?? 'User',
                   username: '@user',
                   timestamp: _formatTimestamp(post.createdAt),
+                  title: post.postTitle.isNotEmpty ? post.postTitle : null,
                   content: post.postDescription,
                   type: post.postImages.isEmpty ? 'text' : (post.postImages.length == 1 ? 'image' : 'multiImage'),
                   image: post.postImages.isNotEmpty ? _imageUrl(post.postImages.first) : null,
@@ -1463,6 +1522,7 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                   isLiked: post.isLiked,
                   isSaved: post.saved,
                   post: post,
+                  hideInteractionsInDetail: true,
                   onLike: () {},
                   onComment: () async {
                     final fp = await postController.getSinglePost(post.id);
@@ -1481,7 +1541,7 @@ class _ProfileBodyState extends State<_ProfileBody> with TickerProviderStateMixi
                         shares: fp.postShareCount,
                         isLiked: fp.isLiked,
                       );
-                      Get.to(() => PostWithComments(post: postData, onBack: () => Get.back(), onAddComment: (_, __) {}));
+                      Get.to(() => PostWithComments(post: postData, onBack: () => Get.back(), showInteractions: false, onAddComment: (_, __) {}));
                     }
                   },
                   onShare: () {},

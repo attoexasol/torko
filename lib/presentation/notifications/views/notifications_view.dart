@@ -13,39 +13,11 @@ class NotificationsView extends StatelessWidget {
     return Obx(() {
       final isDark = appController.isDarkMode;
       final language = appController.language;
-      
-      // Sample notifications
-      final notifications = [
-        {
-          'type': 'like',
-          'user': 'Sarah Johnson',
-          'action': language == AppLanguage.bn ? 'আপনার পোস্টে লাইক দিয়েছেন' : 'liked your post',
-          'time': '2m',
-          'read': false,
-        },
-        {
-          'type': 'comment',
-          'user': 'Michael Chen',
-          'action': language == AppLanguage.bn ? 'মন্তব্য করেছেন' : 'commented on your post',
-          'time': '15m',
-          'read': false,
-        },
-        {
-          'type': 'follow',
-          'user': 'আবদুল কাদের',
-          'action': language == AppLanguage.bn ? 'আপনাকে ফলো করেছেন' : 'started following you',
-          'time': '1h',
-          'read': true,
-        },
-        {
-          'type': 'mention',
-          'user': 'Emma Williams',
-          'action': language == AppLanguage.bn ? 'আপনাকে উল্লেখ করেছেন' : 'mentioned you',
-          'time': '3h',
-          'read': true,
-        },
-      ];
-      
+      final isBn = language == AppLanguage.bn;
+
+      // Real API data only - no mock. Empty until backend provides notifications.
+      const notifications = <Map<String, dynamic>>[];
+
       return Scaffold(
         backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
         appBar: AppBar(
@@ -79,21 +51,51 @@ class NotificationsView extends StatelessWidget {
             ),
           ],
         ),
-        body: ListView.builder(
-          padding: const EdgeInsets.all(8),
-          itemCount: notifications.length,
-          itemBuilder: (context, index) {
-            final notification = notifications[index];
-            return _buildNotificationItem(
-              type: notification['type'] as String,
-              user: notification['user'] as String,
-              action: notification['action'] as String,
-              time: notification['time'] as String,
-              isRead: notification['read'] as bool,
-              isDark: isDark,
-            );
-          },
-        ),
+        body: notifications.isEmpty
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(48),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.notifications_outlined,
+                        size: 48,
+                        color: (isDark
+                                ? AppColors.darkMutedForeground
+                                : AppColors.lightMutedForeground)
+                            .withOpacity(0.5),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        isBn ? 'কোনো বিজ্ঞপ্তি নেই' : 'No notifications yet',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark
+                              ? AppColors.darkMutedForeground
+                              : AppColors.lightMutedForeground,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.all(8),
+                itemCount: notifications.length,
+                itemBuilder: (context, index) {
+                  final notification = notifications[index];
+                  return _buildNotificationItem(
+                    type: notification['type'] as String,
+                    user: notification['user'] as String,
+                    action: notification['action'] as String,
+                    time: notification['time'] as String,
+                    isRead: notification['read'] as bool,
+                    isDark: isDark,
+                  );
+                },
+              ),
       );
     });
   }

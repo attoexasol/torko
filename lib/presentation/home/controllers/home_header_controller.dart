@@ -28,7 +28,7 @@ class HomeHeaderController extends GetxController {
   final RxBool searchOpen = false.obs;
   final RxString searchQuery = ''.obs;
   final RxBool notificationOpen = false.obs;
-  final RxInt unreadCount = 5.obs;
+  final RxInt unreadCount = 0.obs;
 
   AppController get appController => Get.find<AppController>();
   String get language => appController.languageCode;
@@ -80,55 +80,6 @@ class HomeHeaderController extends GetxController {
     isBn ? 'টেক স্টার্টআপ' : 'Tech Startup',
     isBn ? 'রমজান ২০২৫' : 'Ramadan 2025',
     isBn ? 'চট্টগ্রাম ইভেন্ট' : 'Chittagong Events',
-  ];
-
-  // Mock notifications - matches React exactly
-  List<NotificationItem> get mockNotifications => [
-    NotificationItem(
-      id: 1,
-      type: 'like',
-      user: isBn ? 'আহমেদ রহমান' : 'Ahmed Rahman',
-      action: isBn ? 'আপনার পোস্ট লাইক করেছে' : 'liked your post',
-      time: isBn ? '৫ মিনিট আগে' : '5 min ago',
-      unread: true,
-      avatar: '🙂',
-    ),
-    NotificationItem(
-      id: 2,
-      type: 'comment',
-      user: isBn ? 'ফাতিমা খান' : 'Fatima Khan',
-      action: isBn ? 'আপনার পোস্টে মন্তব্য করেছে' : 'commented on your post',
-      time: isBn ? '১৫ মিনিট আগে' : '15 min ago',
-      unread: true,
-      avatar: '👩',
-    ),
-    NotificationItem(
-      id: 3,
-      type: 'follow',
-      user: isBn ? 'মাহমুদ হাসান' : 'Mahmud Hasan',
-      action: isBn ? 'আপনাকে ফলো করতে শুরু করেছে' : 'started following you',
-      time: isBn ? '১ ঘণ্টা আগে' : '1 hour ago',
-      unread: true,
-      avatar: '👨',
-    ),
-    NotificationItem(
-      id: 4,
-      type: 'message',
-      user: isBn ? 'নাফিসা আক্তার' : 'Nafisa Akter',
-      action: isBn ? 'আপনাকে একটি মেসেজ পাঠিয়েছে' : 'sent you a message',
-      time: isBn ? '২ ঘণ্টা আগে' : '2 hours ago',
-      unread: false,
-      avatar: '👩‍💼',
-    ),
-    NotificationItem(
-      id: 5,
-      type: 'like',
-      user: isBn ? 'রাকিব ইসলাম' : 'Rakib Islam',
-      action: isBn ? 'আপনার মন্তব্য লাইক করেছে' : 'liked your comment',
-      time: isBn ? '৩ ঘণ্টা আগে' : '3 hours ago',
-      unread: false,
-      avatar: '🧑',
-    ),
   ];
 
   // User info

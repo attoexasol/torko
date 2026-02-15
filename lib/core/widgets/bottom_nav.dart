@@ -78,7 +78,6 @@ class BottomNav extends StatelessWidget {
                   final isLocalCommunity = navController.isLocalCommunity;
                   final isMessages = navController.isMessages;
                   final isProfile = navController.isProfile;
-                  final badgeCount = appController.messageNotificationCount;
                   
                   return Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -104,13 +103,12 @@ class BottomNav extends StatelessWidget {
                       // Create Post Button (Center)
                       _CenterButton(onTap: () => handleNavigate('createPost')),
                       
-                      // Messages Button
+                      // Messages Button (badge removed - no overlay)
                       _NavButton(
                         isActive: isMessages,
                         onTap: handleMessageClick,
                         activeSize: 20,
                         inactiveSize: 24,
-                        badge: badgeCount > 0 ? badgeCount : null,
                         child: _MessageIcon(isActive: isMessages),
                       ),
                       

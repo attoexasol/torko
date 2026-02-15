@@ -20,7 +20,7 @@ class HomeHeader extends StatefulWidget {
 
 class _HomeHeaderState extends State<HomeHeader> {
   final appController = Get.find<AppController>();
-  int unreadCount = 5;
+  int unreadCount = 0;
 
   void _openDrawer() {
     showGeneralDialog(
@@ -993,49 +993,8 @@ class _NotificationDialogState extends State<_NotificationDialog> {
       final language = appController.language;
       final isBn = language == AppLanguage.bn;
 
-      // Mock notifications - matches React exactly
-      final notifications = [
-        _NotificationItem(
-          id: 1,
-          user: isBn ? 'আহমেদ রহমান' : 'Ahmed Rahman',
-          action: isBn ? 'আপনার পোস্ট লাইক করেছে' : 'liked your post',
-          time: isBn ? '৫ মিনিট আগে' : '5 min ago',
-          unread: true,
-          avatar: '🙂',
-        ),
-        _NotificationItem(
-          id: 2,
-          user: isBn ? 'ফাতিমা খান' : 'Fatima Khan',
-          action: isBn ? 'আপনার পোস্টে মন্তব্য করেছে' : 'commented on your post',
-          time: isBn ? '১৫ মিনিট আগে' : '15 min ago',
-          unread: true,
-          avatar: '👩',
-        ),
-        _NotificationItem(
-          id: 3,
-          user: isBn ? 'মাহমুদ হাসান' : 'Mahmud Hasan',
-          action: isBn ? 'আপনাকে ফলো করতে শুরু করেছে' : 'started following you',
-          time: isBn ? '১ ঘণ্টা আগে' : '1 hour ago',
-          unread: true,
-          avatar: '👨',
-        ),
-        _NotificationItem(
-          id: 4,
-          user: isBn ? 'নাফিসা আক্তার' : 'Nafisa Akter',
-          action: isBn ? 'আপনাকে একটি মেসেজ পাঠিয়েছে' : 'sent you a message',
-          time: isBn ? '২ ঘণ্টা আগে' : '2 hours ago',
-          unread: false,
-          avatar: '👩‍💼',
-        ),
-        _NotificationItem(
-          id: 5,
-          user: isBn ? 'রাকিব ইসলাম' : 'Rakib Islam',
-          action: isBn ? 'আপনার মন্তব্য লাইক করেছে' : 'liked your comment',
-          time: isBn ? '৩ ঘণ্টা আগে' : '3 hours ago',
-          unread: false,
-          avatar: '🧑',
-        ),
-      ];
+      // Real API data only - no mock. Empty until backend provides notifications.
+      const notifications = <_NotificationItem>[];
 
       return Center(
         child: ScaleTransition(
@@ -1141,7 +1100,7 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                                     ),
                                     const SizedBox(height: 12),
                                     Text(
-                                      isBn ? 'কোন বিজ্ঞপ্তি নেই' : 'No notifications',
+                                      isBn ? 'কোনো বিজ্ঞপ্তি নেই' : 'No notifications yet',
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: isDark
