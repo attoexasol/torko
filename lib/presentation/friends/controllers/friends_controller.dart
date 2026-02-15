@@ -218,6 +218,7 @@ class FriendsController extends GetxController {
     }
   }
 
+  /// Load incoming pending requests (Requests tab). POST /friend/requests.
   Future<void> loadRequests() async {
     final token = UserInfo.apiToken;
     if (token == null || token.isEmpty) return;
@@ -225,8 +226,14 @@ class FriendsController extends GetxController {
     isLoadingRequests.value = true;
     hasErrorRequests.value = false;
     try {
-      final list = await FriendsApiService.fetchRequests(token);
+      final list = await FriendsApiService.fetchIncomingRequests(token);
       requests.assignAll(list);
+      if (kDebugMode) {
+        debugPrint('[Requests] loaded count=${list.length}');
+        for (final r in list) {
+          debugPrint('[Requests] userId=${r.userId} requestId=${r.requestId} name=${r.user.fullname}');
+        }
+      }
     } on FriendsApiException catch (e) {
       if (kDebugMode) debugPrint('[Friends] loadRequests: ${e.message}');
       hasErrorRequests.value = true;
@@ -238,6 +245,10 @@ class FriendsController extends GetxController {
     }
   }
 
+  /// Alias for tab naming: same as loadRequests (incoming).
+  Future<void> loadIncomingRequests() => loadRequests();
+
+  /// Load outgoing sent requests (Send tab). POST /friend/requests-sended.
   Future<void> loadSentRequests({bool showLoader = true}) async {
     final token = UserInfo.apiToken;
     if (token == null || token.isEmpty) return;
@@ -245,12 +256,12 @@ class FriendsController extends GetxController {
     if (showLoader) isLoadingSent.value = true;
     hasErrorSent.value = false;
     try {
-      final list = await FriendsApiService.fetchPendingOutgoingRequests(token);
+      final list = await FriendsApiService.fetchSentRequests(token);
       sentRequests.assignAll(list);
       if (kDebugMode) {
-        debugPrint('[Sent] loaded count=${sentRequests.length}');
+        debugPrint('[Send] loaded count=${sentRequests.length}');
         for (final r in sentRequests) {
-          debugPrint('[Sent] userId=${r.userId} requestId=${r.requestId} name=${r.user.fullname}');
+          debugPrint('[Send] userId=${r.userId} requestId=${r.requestId} name=${r.user.fullname}');
         }
       }
     } on FriendsApiException catch (e) {

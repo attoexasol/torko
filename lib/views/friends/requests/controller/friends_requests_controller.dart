@@ -37,7 +37,7 @@ class FriendsRequestsController extends GetxController {
 
     isLoading.value = true;
     try {
-      final list = await FriendsApiService.fetchRequests(token);
+      final list = await FriendsApiService.fetchIncomingRequests(token);
       requests.assignAll(list.map((e) => FriendRequestModel.fromRequestItem(e)));
       requestBadgeCount.value = requests.length;
     } on FriendsApiException catch (e) {

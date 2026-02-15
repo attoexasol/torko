@@ -243,7 +243,8 @@ class _ConversationViewState extends State<ConversationView> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      online ? (isBn ? 'অনলাইন' : 'Online') : (isBn ? 'অফলাইন' : 'Offline'),
+                      // online ? (isBn ? 'অনলাইন' : 'Online') : (isBn ? 'অফলাইন' : 'Offline'),
+                      online ? (isBn ? 'অনলাইন' : 'Online') : (isBn ? 'অনলাইন' : 'Online'),
                       style: TextStyle(
                         color: online ? Colors.green : AppColors.lightMutedForeground,
                         fontSize: 12,

@@ -130,10 +130,38 @@ class FriendsApiService {
         .toList();
   }
 
-  /// Fetch pending friend requests.
-  static Future<List<FriendRequestItem>> fetchRequests(String token) async {
+  /// Parse one request item: userId=id, requestId=request_id, user from json. Null-safe fields.
+  static FriendRequestItem _parseRequestItem(Map<String, dynamic> item) {
+    final userId = item['id'] is int
+        ? item['id'] as int
+        : int.tryParse(item['id']?.toString() ?? '0') ?? 0;
+    final requestId = item['request_id'] is int
+        ? item['request_id'] as int
+        : int.tryParse(item['request_id']?.toString() ?? '0') ?? 0;
+    return FriendRequestItem(
+      userId: userId,
+      requestId: requestId,
+      user: FriendUser.fromJson(item),
+    );
+  }
+
+  static List<FriendRequestItem> _parseRequestsList(dynamic body, String errorContext) {
+    if (body == null) return [];
+    final status = body['status'];
+    if (status != true) {
+      throw FriendsApiException(_safeMsg(body, 'Failed to load $errorContext'));
+    }
+    final requests = body['requests'];
+    if (requests == null || requests is! List) return [];
+    return (requests as List)
+        .map((e) => _parseRequestItem(Map<String, dynamic>.from(e as Map)))
+        .toList();
+  }
+
+  /// Requests tab: incoming pending friend requests. POST /friend/requests.
+  static Future<List<FriendRequestItem>> fetchIncomingRequests(String token) async {
     final res = await NetworkCaller.postAuth(
-      url: Urls.pending_friend_requests,
+      url: Urls.incoming_friend_requests,
       body: {},
     );
     if (!res.isSuccess) {
@@ -141,23 +169,21 @@ class FriendsApiService {
         res.errorMessage ?? 'Failed to load requests',
       );
     }
-    final body = res.body;
-    if (body == null) return [];
+    return _parseRequestsList(res.body, 'requests');
+  }
 
-    final status = body['status'];
-    if (status == false) {
+  /// Send tab: outgoing sent friend requests. POST /friend/requests-sended.
+  static Future<List<FriendRequestItem>> fetchSentRequests(String token) async {
+    final res = await NetworkCaller.postAuth(
+      url: Urls.sent_friend_requests,
+      body: {},
+    );
+    if (!res.isSuccess) {
       throw FriendsApiException(
-        _safeMsg(body, 'Failed to load requests'),
+        res.errorMessage ?? 'Failed to load sent requests',
       );
     }
-
-    final requests = body['requests'];
-    if (requests == null || requests is! List) return [];
-
-    return (requests as List)
-        .map((e) =>
-            FriendRequestItem.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
+    return _parseRequestsList(res.body, 'sent requests');
   }
 
   /// Send friend request.
@@ -198,58 +224,6 @@ class FriendsApiService {
     return (status, message, user);
   }
 
-  /// Fetch pending outgoing (sent) friend requests.
-  /// Alias: fetchSentFriendRequests.
-  static Future<List<FriendRequestItem>> fetchPendingOutgoingRequests(
-    String token,
-  ) async {
-    final res = await NetworkCaller.postAuth(
-      url: Urls.pending_friend_requests,
-      body: {},
-    );
-
-    if (kDebugMode) {
-      debugPrint('[Sent][API] statusCode=${res.statusCode}');
-      debugPrint('[Sent][API] body=${res.body}');
-      final body = res.body;
-      if (body != null && body is Map) {
-        debugPrint('[Sent][API] keys=${body.keys.toList()}');
-        final reqs = body['requests'];
-        debugPrint('[Sent][API] requestsType=${reqs?.runtimeType}');
-        debugPrint('[Sent][API] requestsLen=${reqs is List ? reqs.length : "N/A"}');
-      }
-    }
-
-    if (!res.isSuccess) {
-      throw FriendsApiException(
-        res.errorMessage ?? 'Failed to load sent requests',
-      );
-    }
-    final body = res.body;
-    if (body == null) {
-      if (kDebugMode) debugPrint('[Sent] ERROR: body is null');
-      return [];
-    }
-
-    final status = body['status'];
-    if (status != true) {
-      if (kDebugMode) debugPrint('[Sent] ERROR: status not true OR \'requests\' missing');
-      throw FriendsApiException(
-        _safeMsg(body, 'Failed to load sent requests'),
-      );
-    }
-
-    final requests = body['requests'];
-    if (requests == null || requests is! List) {
-      if (kDebugMode) debugPrint('[Sent] ERROR: requests missing or not a list');
-      return [];
-    }
-
-    return (requests as List)
-        .map((e) =>
-            FriendRequestItem.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
-  }
 
   /// Cancel a sent friend request.
   static Future<(bool success, String message)> cancelSentRequest(

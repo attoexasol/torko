@@ -241,13 +241,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
       final isActive = activeTab.value == tab;
       return GestureDetector(
         onTap: () {
-          if (tab == 'sent') {
-            if (kDebugMode) {
-              debugPrint('[Sent] tab selected -> calling loadSentRequests()');
-            }
-            if (activeTab.value != 'sent') {
-              friendsController.loadSentRequests();
-            }
+          if (tab == 'requests' && activeTab.value != 'requests') {
+            friendsController.loadIncomingRequests();
+          } else if (tab == 'sent' && activeTab.value != 'sent') {
+            friendsController.loadSentRequests();
           }
           activeTab.value = tab;
         },

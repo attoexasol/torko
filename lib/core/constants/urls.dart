@@ -79,6 +79,10 @@ class Urls{
     static const accept_friend_request = "$_baseUrL/friend/accept" ;
     static const reject_friend_reject = "$_baseUrL/friend/reject" ;
     static const pending_friend_requests = "$_baseUrL/friend/requests" ;
+    /// Requests tab: incoming pending friend requests.
+    static const incoming_friend_requests = "$_baseUrL/friend/requests";
+    /// Send tab: outgoing sent friend requests.
+    static const sent_friend_requests = "$_baseUrL/friend/requests-sended";
     static const cancel_friend_requests = "$_baseUrL/friend/cancel-or-delete" ;
     static const friend_lists = "$_baseUrL/friends" ;
     static const friend_search = "$_baseUrL/friends/search" ;
