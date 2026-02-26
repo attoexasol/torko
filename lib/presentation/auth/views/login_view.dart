@@ -27,11 +27,12 @@ class LoginView extends StatelessWidget {
             children: [
               LayoutBuilder(
                 builder: (context, constraints) {
+                  final bottomInset = MediaQuery.of(context).viewInsets.bottom;
                   return SingleChildScrollView(
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: EdgeInsets.only(
-                      bottom: controller.cookiesAccepted.value ? 24 : 160,
+                      bottom: bottomInset + (controller.cookiesAccepted.value ? 24 : 160),
                     ),
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
