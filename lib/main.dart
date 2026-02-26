@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:torko/firebase_options.dart';
 import 'package:torko/core/utils/app_logger.dart';
 import 'package:torko/core/services/firestore_network_service.dart';
 import 'package:torko/core/services/user_info.dart';
@@ -46,7 +47,7 @@ import 'package:torko/presentation/splash/views/splash_view.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await _initializeFirebase();
   if (kDebugMode) AppLogger.auth('Firebase initialized');
   // Firestore: settings → enableNetwork (before controllers/streams)
   await FirestoreNetworkService.initializeOnlineOnly();
@@ -56,6 +57,20 @@ void main() async {
     AppLogger.auth(uid != null ? 'User uid=$uid' : 'User uid=null');
   }
   runApp(const MyApp());
+}
+
+Future<void> _initializeFirebase() async {
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e, st) {
+    if (kDebugMode) {
+      debugPrint('Firebase.initializeApp failed: $e');
+      debugPrint(st.toString());
+    }
+    rethrow;
+  }
 }
 
 class MyApp extends StatelessWidget {
